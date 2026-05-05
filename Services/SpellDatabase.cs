@@ -101,6 +101,7 @@ public sealed class SpellDatabase
                 await CreateTableAsync<BackgroundDefinitionEntity>("BackgroundDefinitions");
                 await CreateTableAsync<FeatDefinitionEntity>("FeatDefinitions");
                 await CreateTableAsync<CharacterFeatEntity>("CharacterFeats");
+                await CreateTableAsync<CharacterHiddenFeatureEntity>("CharacterHiddenFeatures");
                 await CreateTableAsync<SourceSettingEntity>("SourceSettings");
                 await CreateTableAsync<ItemDefinitionEntity>("ItemDefinitions");
                 await CreateTableAsync<ItemWeaponStatEntity>("ItemWeaponStats");
@@ -431,6 +432,14 @@ public sealed class SpellDatabase
             await _database.DeleteAsync(featRow);
         }
 
+        var hiddenFeatureRows = await _database.Table<CharacterHiddenFeatureEntity>()
+            .Where(row => row.CharacterId == characterId)
+            .ToListAsync();
+        foreach (var hiddenFeatureRow in hiddenFeatureRows)
+        {
+            await _database.DeleteAsync(hiddenFeatureRow);
+        }
+
         var savingThrowRows = await _database.Table<CharacterSavingThrowEntity>()
             .Where(row => row.CharacterId == characterId)
             .ToListAsync();
@@ -756,6 +765,50 @@ public sealed class SpellDatabase
             .ToListAsync();
 
         return spellLinks.Select(link => link.SpellId).ToHashSet();
+    }
+
+    public async Task<IReadOnlySet<string>> GetCharacterHiddenFeatureKeysAsync(int characterId)
+    {
+        await InitializeAsync();
+
+        var rows = await _database.Table<CharacterHiddenFeatureEntity>()
+            .Where(row => row.CharacterId == characterId)
+            .ToListAsync();
+
+        return rows
+            .Select(row => row.FeatureKey)
+            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    public async Task SetCharacterFeatureHiddenAsync(int characterId, string featureKey, bool isHidden)
+    {
+        await InitializeAsync();
+
+        if (string.IsNullOrWhiteSpace(featureKey))
+        {
+            return;
+        }
+
+        var normalizedKey = featureKey.Trim();
+        var existing = await _database.Table<CharacterHiddenFeatureEntity>()
+            .Where(row => row.CharacterId == characterId && row.FeatureKey == normalizedKey)
+            .FirstOrDefaultAsync();
+
+        if (isHidden && existing is null)
+        {
+            await _database.InsertAsync(new CharacterHiddenFeatureEntity
+            {
+                CharacterId = characterId,
+                FeatureKey = normalizedKey
+            });
+            return;
+        }
+
+        if (!isHidden && existing is not null)
+        {
+            await _database.DeleteAsync(existing);
+        }
     }
 
     public async Task<IReadOnlyDictionary<int, string>> GetCharacterSpellModesAsync(int characterId)

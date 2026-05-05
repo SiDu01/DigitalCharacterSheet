@@ -1,4 +1,5 @@
 @page "/characters/{Id:int}/edit"
+@using System.Text.Json
 @inject SpellDatabase SpellDatabase
 @inject NavigationManager Navigation
 
@@ -82,7 +83,7 @@
                                 }
                             </div>
 
-                            <select @bind="selectedSubclassDefinitionId">
+                            <select @bind="selectedSubclassDefinitionId" @bind:after="SelectSubclass">
                                 <option value="">No subclass</option>
                                 @foreach (var subclassDefinition in subclassDefinitions)
                                 {
@@ -325,6 +326,89 @@
                             <div><dt>@stat.Label</dt><dd>@stat.Value</dd></div>
                         }
                     </dl>
+
+                    @foreach (var detailSection in SelectedDetail.Sections)
+                    {
+                        <section class="detail-section">
+                            <h2>@detailSection.Title</h2>
+                            @foreach (var paragraph in detailSection.Paragraphs)
+                            {
+                                <p><MarkupText Text="@paragraph" /></p>
+                            }
+                        </section>
+                    }
+
+                    @foreach (var featureGroup in SelectedDetail.FeatureGroups)
+                    {
+                        <section class="detail-section class-feature-section">
+                            <h2>@featureGroup.Title</h2>
+                            <div class="feature-level-list">
+                                @foreach (var levelGroup in featureGroup.Levels)
+                                {
+                                    <article class="feature-level-row">
+                                        <span class="feature-level-badge">Lvl @levelGroup.Level</span>
+                                        <div>
+                                            @foreach (var feature in levelGroup.Features)
+                                            {
+                                                <details class="feature-detail-toggle">
+                                                    <summary class="feature-pill">@feature.Name</summary>
+                                                    @if (feature.Paragraphs.Count == 0)
+                                                    {
+                                                        <p class="muted compact-hint">No detail text available.</p>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="feature-detail-body">
+                                                            @foreach (var paragraph in feature.Paragraphs)
+                                                            {
+                                                                <p><MarkupText Text="@paragraph" /></p>
+                                                            }
+                                                        </div>
+                                                    }
+                                                </details>
+                                            }
+                                        </div>
+                                    </article>
+                                }
+                            </div>
+                        </section>
+                    }
+
+                    @if (SelectedDetail.ProgressionTables.Count > 0)
+                    {
+                        <details class="detail-section progression-details">
+                            <summary>Spellprogression</summary>
+                            @foreach (var table in SelectedDetail.ProgressionTables)
+                            {
+                                <section class="progression-table-block">
+                                    <h3>@table.Title</h3>
+                                    <div class="progression-table-scroll">
+                                        <table class="progression-table">
+                                            <thead>
+                                                <tr>
+                                                    @foreach (var column in table.Columns)
+                                                    {
+                                                        <th>@column</th>
+                                                    }
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var row in table.Rows)
+                                                {
+                                                    <tr>
+                                                        @foreach (var value in row.Values)
+                                                        {
+                                                            <td>@value</td>
+                                                        }
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </section>
+                            }
+                        </details>
+                    }
                 }
             </aside>
         </section>
@@ -383,6 +467,7 @@
     private BackgroundDefinition? SelectedBackground => selectedBackgroundDefinitionId is null ? null : backgroundDefinitions.FirstOrDefault(definition => definition.Id == selectedBackgroundDefinitionId.Value);
     private FeatDefinition? SelectedFeat => selectedFeatDefinitionId is null ? null : featDefinitions.FirstOrDefault(definition => definition.Id == selectedFeatDefinitionId.Value);
     private ClassDefinition? SelectedClass => selectedClassDefinitionId is null ? null : classDefinitions.FirstOrDefault(definition => definition.Id == selectedClassDefinitionId.Value);
+    private SubclassDefinition? SelectedSubclass => selectedSubclassDefinitionId is null ? null : subclassDefinitions.FirstOrDefault(definition => definition.Id == selectedSubclassDefinitionId.Value);
     private int SkillToolChoiceLimit => optionChoiceHints
         .Where(choice => string.Equals(choice.Category, "SkillTools", StringComparison.OrdinalIgnoreCase))
         .Sum(choice => choice.Count);
@@ -403,7 +488,7 @@
         "Race" when SelectedRace is not null => BuildRaceDetail(SelectedRace),
         "Background" when SelectedBackground is not null => BuildBackgroundDetail(SelectedBackground),
         "Feat" when SelectedFeat is not null => BuildFeatDetail(SelectedFeat),
-        "Class" when SelectedClass is not null => BuildClassDetail(SelectedClass),
+        "Class" when SelectedClass is not null => BuildClassDetail(SelectedClass, SelectedSubclass),
         _ => null
     };
 
@@ -467,6 +552,11 @@
     {
         selectedClassDefinitionId = classDefinition.Id;
         await LoadSubclassesForSelectedClass();
+        detailKind = "Class";
+    }
+
+    private void SelectSubclass()
+    {
         detailKind = "Class";
     }
 
@@ -849,7 +939,10 @@
                 new OptionDetailStat("Size", FormatJsonSummary(race.SizeJson)),
                 new OptionDetailStat("Speed", FormatJsonSummary(race.SpeedJson)),
                 new OptionDetailStat("Ability", FormatJsonSummary(race.AbilityJson))
-            ]);
+            ],
+            [],
+            [],
+            []);
     }
 
     private static OptionDetail BuildBackgroundDetail(BackgroundDefinition background)
@@ -863,7 +956,10 @@
                 new OptionDetailStat("Ability", FormatJsonSummary(background.AbilityJson)),
                 new OptionDetailStat("Skills", FormatJsonSummary(background.SkillProficienciesJson)),
                 new OptionDetailStat("Tools", FormatJsonSummary(background.ToolProficienciesJson))
-            ]);
+            ],
+            [],
+            [],
+            []);
     }
 
     private static OptionDetail BuildFeatDetail(FeatDefinition feat)
@@ -877,20 +973,308 @@
                 new OptionDetailStat("Category", string.IsNullOrWhiteSpace(feat.Category) ? "None" : feat.Category),
                 new OptionDetailStat("Prerequisite", FormatJsonSummary(feat.PrerequisiteJson)),
                 new OptionDetailStat("Spells", string.IsNullOrWhiteSpace(feat.AdditionalSpellsJson) ? "None" : "Has spell choices")
-            ]);
+            ],
+            [],
+            [],
+            []);
     }
 
-    private static OptionDetail BuildClassDetail(ClassDefinition classDefinition)
+    private static OptionDetail BuildClassDetail(ClassDefinition classDefinition, SubclassDefinition? subclassDefinition)
     {
+        var classFeatures = BuildFeatureLevelGroups(classDefinition.RawJson, "classFeatures").ToList();
+
+        if (subclassDefinition is not null)
+        {
+            var subclassFeatures = BuildMappedSubclassFeatureLevels(classDefinition.RawJson, subclassDefinition.RawJson).ToList();
+            if (subclassFeatures.Count > 0)
+            {
+                classFeatures = MergeFeatureLevels(classFeatures, subclassFeatures);
+            }
+        }
+
+        var featureGroups = new List<OptionDetailFeatureGroup>
+        {
+            new("Class Features", classFeatures)
+        };
+
+        var progressionTables = BuildProgressionTables(classDefinition.RawJson).ToList();
+        if (subclassDefinition is not null)
+        {
+            progressionTables.AddRange(BuildProgressionTables(subclassDefinition.RawJson));
+        }
+
         return new OptionDetail(
-            "Class",
-            classDefinition.Name,
+            subclassDefinition is null ? "Class" : "Class / Subclass",
+            subclassDefinition is null ? classDefinition.Name : $"{classDefinition.Name}: {subclassDefinition.Name}",
             classDefinition.Source,
             null,
             [
                 new OptionDetailStat("Spellcasting", classDefinition.SpellcastingProgressionId is null ? "None" : "Has progression"),
-                new OptionDetailStat("Source", classDefinition.Source)
-            ]);
+                new OptionDetailStat("Source", classDefinition.Source),
+                new OptionDetailStat("Subclass", subclassDefinition?.DisplayName ?? "None")
+            ],
+            [],
+            featureGroups.Where(group => group.Levels.Count > 0).ToList(),
+            progressionTables);
+    }
+
+    private static IEnumerable<OptionDetailFeatureLevel> BuildFeatureLevelGroups(string rawJson, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            yield break;
+        }
+
+        using var document = JsonDocument.Parse(rawJson);
+        if (!document.RootElement.TryGetProperty(propertyName, out var features) || features.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        var details = BuildFeatureDetailLookup(document.RootElement);
+        foreach (var group in features.EnumerateArray()
+            .Select(feature => ParseFeatureReference(feature, details))
+            .Where(feature => feature is not null)
+            .Select(feature => feature!)
+            .GroupBy(feature => feature.Level)
+            .OrderBy(group => group.Key))
+        {
+            yield return new OptionDetailFeatureLevel(
+                group.Key,
+                group
+                    .GroupBy(feature => feature.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .OrderBy(feature => feature.Name)
+                    .ToList());
+        }
+    }
+
+    private static IEnumerable<OptionDetailFeatureLevel> BuildMappedSubclassFeatureLevels(string classRawJson, string subclassRawJson)
+    {
+        var subclassLevels = BuildFeatureLevelGroups(subclassRawJson, "subclassFeatures").ToList();
+        var classSubclassLevels = BuildSubclassGrantLevels(classRawJson).ToList();
+        if (subclassLevels.Count == 0 || classSubclassLevels.Count == 0)
+        {
+            return subclassLevels;
+        }
+
+        return subclassLevels
+            .Select((level, index) => new OptionDetailFeatureLevel(
+                index < classSubclassLevels.Count ? classSubclassLevels[index] : level.Level,
+                level.Features))
+            .GroupBy(level => level.Level)
+            .OrderBy(group => group.Key)
+            .Select(group => new OptionDetailFeatureLevel(
+                group.Key,
+                group.SelectMany(level => level.Features)
+                    .GroupBy(feature => feature.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .OrderBy(feature => feature.Name)
+                    .ToList()))
+            .ToList();
+    }
+
+    private static List<OptionDetailFeatureLevel> MergeFeatureLevels(IEnumerable<OptionDetailFeatureLevel> first, IEnumerable<OptionDetailFeatureLevel> second)
+    {
+        return first.Concat(second)
+            .GroupBy(level => level.Level)
+            .OrderBy(group => group.Key)
+            .Select(group => new OptionDetailFeatureLevel(
+                group.Key,
+                group.SelectMany(level => level.Features)
+                    .GroupBy(feature => feature.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .OrderBy(feature => feature.Name)
+                    .ToList()))
+            .ToList();
+    }
+
+    private static IEnumerable<int> BuildSubclassGrantLevels(string classRawJson)
+    {
+        if (string.IsNullOrWhiteSpace(classRawJson))
+        {
+            yield break;
+        }
+
+        using var document = JsonDocument.Parse(classRawJson);
+        if (!document.RootElement.TryGetProperty("classFeatures", out var features) || features.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var feature in features.EnumerateArray())
+        {
+            if (feature.ValueKind != JsonValueKind.Object
+                || !feature.TryGetProperty("gainSubclassFeature", out var gainSubclassFeature)
+                || gainSubclassFeature.ValueKind != JsonValueKind.True
+                || !feature.TryGetProperty("classFeature", out var classFeature))
+            {
+                continue;
+            }
+
+            var level = ParseFeatureReferenceLevel(classFeature.GetString());
+            if (level is >= 1 and <= 20)
+            {
+                yield return level;
+            }
+        }
+    }
+
+    private static Dictionary<string, IReadOnlyList<string>> BuildFeatureDetailLookup(JsonElement root)
+    {
+        var details = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+        if (!root.TryGetProperty("_featureDetails", out var featureDetails) || featureDetails.ValueKind != JsonValueKind.Array)
+        {
+            return details;
+        }
+
+        foreach (var featureDetail in featureDetails.EnumerateArray())
+        {
+            var name = ReadJsonString(featureDetail, "name");
+            if (string.IsNullOrWhiteSpace(name) || !featureDetail.TryGetProperty("level", out var levelElement))
+            {
+                continue;
+            }
+
+            var level = levelElement.ValueKind == JsonValueKind.Number && levelElement.TryGetInt32(out var parsedLevel)
+                ? parsedLevel
+                : 0;
+            if (level is < 1 or > 20)
+            {
+                continue;
+            }
+
+            var paragraphs = featureDetail.TryGetProperty("entries", out var entries)
+                ? ExtractParagraphs(entries).ToList()
+                : [];
+            details[BuildFeatureKey(name, level)] = paragraphs;
+        }
+
+        return details;
+    }
+
+    private static OptionDetailFeature? ParseFeatureReference(JsonElement element, IReadOnlyDictionary<string, IReadOnlyList<string>> details)
+    {
+        var reference = element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Object when element.TryGetProperty("classFeature", out var classFeature) => classFeature.GetString(),
+            JsonValueKind.Object when element.TryGetProperty("subclassFeature", out var subclassFeature) => subclassFeature.GetString(),
+            _ => null
+        };
+
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return null;
+        }
+
+        var parts = reference.Split('|', StringSplitOptions.None);
+        var level = ParseFeatureReferenceLevel(reference);
+        if (level == 0)
+        {
+            return null;
+        }
+
+        var name = CleanMarkup(parts[0]);
+        var key = BuildFeatureKey(name, level);
+        return new OptionDetailFeature(name, level, key, details.GetValueOrDefault(key) ?? []);
+    }
+
+    private static int ParseFeatureReferenceLevel(string? reference)
+    {
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return 0;
+        }
+
+        return reference
+            .Split('|', StringSplitOptions.None)
+            .Select(part => int.TryParse(part, out var parsed) ? parsed : 0)
+            .LastOrDefault(parsed => parsed is >= 1 and <= 20);
+    }
+
+    private static string BuildFeatureKey(string name, int level)
+    {
+        return $"{CleanMarkup(name).Trim()}|{level}";
+    }
+
+    private static IEnumerable<OptionDetailProgressionTable> BuildProgressionTables(string rawJson)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            yield break;
+        }
+
+        using var document = JsonDocument.Parse(rawJson);
+        foreach (var propertyName in new[] { "classTableGroups", "subclassTableGroups" })
+        {
+            if (!document.RootElement.TryGetProperty(propertyName, out var tableGroups) || tableGroups.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            foreach (var tableGroup in tableGroups.EnumerateArray())
+            {
+                var table = BuildProgressionTable(tableGroup);
+                if (table is not null)
+                {
+                    yield return table;
+                }
+            }
+        }
+    }
+
+    private static OptionDetailProgressionTable? BuildProgressionTable(JsonElement tableGroup)
+    {
+        var rowProperty = tableGroup.TryGetProperty("rowsSpellProgression", out var spellRows)
+            ? spellRows
+            : tableGroup.TryGetProperty("rows", out var normalRows)
+                ? normalRows
+                : default;
+
+        if (rowProperty.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        var labels = ReadColumnLabels(tableGroup, rowProperty).ToList();
+        var containsSpellData = tableGroup.TryGetProperty("rowsSpellProgression", out _)
+            || labels.Any(label => label.Contains("spell", StringComparison.OrdinalIgnoreCase)
+                || label.Contains("cantrip", StringComparison.OrdinalIgnoreCase)
+                || label.Contains("slot", StringComparison.OrdinalIgnoreCase)
+                || label.Contains("prepared", StringComparison.OrdinalIgnoreCase));
+
+        if (!containsSpellData)
+        {
+            return null;
+        }
+
+        var rows = new List<OptionDetailProgressionRow>();
+        var level = 1;
+        foreach (var row in rowProperty.EnumerateArray())
+        {
+            if (row.ValueKind != JsonValueKind.Array)
+            {
+                level++;
+                continue;
+            }
+
+            var values = new List<string> { level.ToString() };
+            values.AddRange(row.EnumerateArray().Select(FormatTableCell));
+            rows.Add(new OptionDetailProgressionRow(values));
+            level++;
+        }
+
+        if (rows.Count == 0)
+        {
+            return null;
+        }
+
+        var title = ReadJsonString(tableGroup, "title");
+        return new OptionDetailProgressionTable(
+            string.IsNullOrWhiteSpace(title) ? "Spell Progression" : CleanMarkup(title),
+            ["Level", .. labels],
+            rows);
     }
 
     private static string FormatJsonSummary(string rawJson)
@@ -910,6 +1294,159 @@
             .Replace(",", ", ");
     }
 
-    private sealed record OptionDetail(string Kind, string Name, string Source, int? Page, IReadOnlyList<OptionDetailStat> Stats);
+    private static IEnumerable<string> ReadColumnLabels(JsonElement tableGroup, JsonElement rows)
+    {
+        if (tableGroup.TryGetProperty("colLabels", out var labels) && labels.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var label in labels.EnumerateArray())
+            {
+                yield return CleanMarkup(FormatTableCell(label));
+            }
+
+            yield break;
+        }
+
+        var width = rows.EnumerateArray().FirstOrDefault(row => row.ValueKind == JsonValueKind.Array).GetArrayLength();
+        for (var index = 1; index <= width; index++)
+        {
+            yield return FormatOrdinal(index);
+        }
+    }
+
+    private static string FormatTableCell(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString() ?? "",
+            JsonValueKind.Number => element.GetRawText(),
+            JsonValueKind.True => "Yes",
+            JsonValueKind.False => "No",
+            JsonValueKind.Null => "-",
+            JsonValueKind.Array => string.Join(" / ", element.EnumerateArray().Select(FormatTableCell)),
+            JsonValueKind.Object when element.TryGetProperty("type", out var type) && type.GetString() == "bonus" => $"+{ReadJsonString(element, "value")}",
+            _ => CleanMarkup(element.GetRawText())
+        };
+    }
+
+    private static string FormatOrdinal(int value)
+    {
+        var suffix = (value % 100) is 11 or 12 or 13
+            ? "th"
+            : (value % 10) switch
+            {
+                1 => "st",
+                2 => "nd",
+                3 => "rd",
+                _ => "th"
+            };
+
+        return $"{value}{suffix}";
+    }
+
+    private static IEnumerable<string> ExtractParagraphs(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.String)
+        {
+            yield return element.GetString() ?? "";
+            yield break;
+        }
+
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("entry", out var entry))
+            {
+                foreach (var value in ExtractParagraphs(entry))
+                {
+                    yield return value;
+                }
+            }
+
+            if (element.TryGetProperty("entries", out var entries))
+            {
+                foreach (var value in ExtractParagraphs(entries))
+                {
+                    yield return value;
+                }
+            }
+
+            if (element.TryGetProperty("items", out var items))
+            {
+                foreach (var value in ExtractParagraphs(items))
+                {
+                    yield return value;
+                }
+            }
+
+            yield break;
+        }
+
+        if (element.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var item in element.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.Object && item.TryGetProperty("name", out var name))
+            {
+                var text = string.Join(" ", ExtractParagraphs(item));
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    yield return $"{name.GetString()}: {text}";
+                }
+                continue;
+            }
+
+            foreach (var value in ExtractParagraphs(item))
+            {
+                yield return value;
+            }
+        }
+    }
+
+    private static string ReadJsonString(JsonElement element, string propertyName)
+    {
+        return element.ValueKind == JsonValueKind.Object
+            && element.TryGetProperty(propertyName, out var property)
+            && property.ValueKind == JsonValueKind.String
+            ? property.GetString() ?? ""
+            : "";
+    }
+
+    private static string CleanMarkup(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "";
+        }
+
+        var cleaned = value.Replace("{@dc ", "DC ");
+        cleaned = System.Text.RegularExpressions.Regex.Replace(
+            cleaned,
+            @"\{@[a-zA-Z]+ ([^|}]+)(?:\|[^}]*)?\}",
+            "$1");
+
+        return cleaned
+            .Replace("|XPHB", "")
+            .Replace("|PHB", "")
+            .Replace("}", "")
+            .Trim();
+    }
+
+    private sealed record OptionDetail(
+        string Kind,
+        string Name,
+        string Source,
+        int? Page,
+        IReadOnlyList<OptionDetailStat> Stats,
+        IReadOnlyList<OptionDetailSection> Sections,
+        IReadOnlyList<OptionDetailFeatureGroup> FeatureGroups,
+        IReadOnlyList<OptionDetailProgressionTable> ProgressionTables);
     private sealed record OptionDetailStat(string Label, string Value);
+    private sealed record OptionDetailSection(string Title, IReadOnlyList<string> Paragraphs);
+    private sealed record OptionDetailFeature(string Name, int Level, string Key, IReadOnlyList<string> Paragraphs);
+    private sealed record OptionDetailFeatureLevel(int Level, IReadOnlyList<OptionDetailFeature> Features);
+    private sealed record OptionDetailFeatureGroup(string Title, IReadOnlyList<OptionDetailFeatureLevel> Levels);
+    private sealed record OptionDetailProgressionTable(string Title, IReadOnlyList<string> Columns, IReadOnlyList<OptionDetailProgressionRow> Rows);
+    private sealed record OptionDetailProgressionRow(IReadOnlyList<string> Values);
 }

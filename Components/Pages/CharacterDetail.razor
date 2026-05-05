@@ -128,11 +128,25 @@ else
                 </section>
 
                 <section class="sheet-panel main-side-panel">
-                    <nav class="subtab-bar compact-side-tabs" aria-label="Character details">
-                        <button type="button" class="subtab-button @(activeMainPanelTab == "Features" ? "active" : "")" @onclick='() => SetActiveMainPanelTab("Features")'>Features</button>
-                        <button type="button" class="subtab-button @(activeMainPanelTab == "Items" ? "active" : "")" @onclick='() => SetActiveMainPanelTab("Items")'>Items</button>
-                        <button type="button" class="subtab-button @(activeMainPanelTab == "Proficiencies" ? "active" : "")" @onclick='() => SetActiveMainPanelTab("Proficiencies")'>Proficiencies</button>
-                    </nav>
+                    <div class="side-tab-header">
+                        <nav class="subtab-bar compact-side-tabs" aria-label="Character details">
+                            <button type="button" class="subtab-button @(activeMainPanelTab == "Features" ? "active" : "")" @onclick='() => SetActiveMainPanelTab("Features")'>Features</button>
+                            <button type="button" class="subtab-button @(activeMainPanelTab == "Items" ? "active" : "")" @onclick='() => SetActiveMainPanelTab("Items")'>Items</button>
+                            <button type="button" class="subtab-button @(activeMainPanelTab == "Proficiencies" ? "active" : "")" @onclick='() => SetActiveMainPanelTab("Proficiencies")'>Proficiencies</button>
+                        </nav>
+                        @if (activeMainPanelTab == "Features")
+                        {
+                            <div class="feature-edit-toolbar">
+                                @if (hiddenFeatureKeys.Count > 0)
+                                {
+                                    <span>@hiddenFeatureKeys.Count hidden</span>
+                                }
+                                <button type="button" class="text-button no-margin" @onclick="ToggleFeatureEditMode">
+                                    @(featureEditMode ? "Done" : "Edit")
+                                </button>
+                            </div>
+                        }
+                    </div>
 
                     @if (activeMainPanelTab == "Features")
                     {
@@ -153,34 +167,52 @@ else
                                             </header>
                                             @foreach (var level in group.Levels)
                                             {
-                                                <section class="sheet-feature-level">
-                                                    <span class="feature-level-badge">Level @level.Level</span>
-                                                    <div>
-                                                        @foreach (var feature in level.Features)
-                                                        {
-                                                            <details class="feature-detail-toggle">
-                                                                <summary class="feature-pill">@feature.Name</summary>
-                                                                <div class="feature-detail-body">
-                                                                    @if (feature.Paragraphs.Count == 0)
-                                                                    {
-                                                                        <p class="muted compact-hint">No detail text found.</p>
-                                                                    }
-                                                                    else
-                                                                    {
-                                                                        @foreach (var paragraph in feature.Paragraphs.Take(4))
+                                                var visibleFeatures = GetVisibleFeatures(group, level).ToList();
+                                                @if (visibleFeatures.Count > 0)
+                                                {
+                                                    <section class="sheet-feature-level">
+                                                        <span class="feature-level-badge">Level @level.Level</span>
+                                                        <div>
+                                                            @foreach (var feature in visibleFeatures)
+                                                            {
+                                                                var featureKey = BuildCharacterFeatureKey(group, feature);
+                                                                var isHidden = hiddenFeatureKeys.Contains(featureKey);
+                                                                <details class="feature-detail-toggle @(isHidden ? "hidden-feature" : "")">
+                                                                    <summary class="feature-pill">
+                                                                        <span>@feature.Name</span>
+                                                                        @if (featureEditMode)
                                                                         {
-                                                                            <p><MarkupText Text="@paragraph" /></p>
+                                                                            <button type="button"
+                                                                                    class="mini-button feature-hide-button @(isHidden ? "active" : "")"
+                                                                                    title="@(isHidden ? "Show feature" : "Hide feature")"
+                                                                                    @onclick="async () => await ToggleFeatureHidden(featureKey)"
+                                                                                    @onclick:stopPropagation>
+                                                                                @(isHidden ? "Show" : "Hide")
+                                                                            </button>
                                                                         }
-                                                                        @if (feature.Paragraphs.Count > 4)
+                                                                    </summary>
+                                                                    <div class="feature-detail-body">
+                                                                        @if (feature.Paragraphs.Count == 0)
                                                                         {
-                                                                            <p class="muted compact-hint">@(feature.Paragraphs.Count - 4) more paragraphs in source data.</p>
+                                                                            <p class="muted compact-hint">No detail text found.</p>
                                                                         }
-                                                                    }
-                                                                </div>
-                                                            </details>
-                                                        }
-                                                    </div>
-                                                </section>
+                                                                        else
+                                                                        {
+                                                                            @foreach (var paragraph in feature.Paragraphs.Take(4))
+                                                                            {
+                                                                                <p><MarkupText Text="@paragraph" /></p>
+                                                                            }
+                                                                            @if (feature.Paragraphs.Count > 4)
+                                                                            {
+                                                                                <p class="muted compact-hint">@(feature.Paragraphs.Count - 4) more paragraphs in source data.</p>
+                                                                            }
+                                                                        }
+                                                                    </div>
+                                                                </details>
+                                                            }
+                                                        </div>
+                                                    </section>
+                                                }
                                             }
                                         </article>
                                     }
@@ -572,6 +604,7 @@ else
     private List<ClassDefinition> classDefinitions = [];
     private List<SubclassDefinition> subclassDefinitions = [];
     private List<SheetFeatureGroup> sheetFeatureGroups = [];
+    private HashSet<string> hiddenFeatureKeys = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<int> eligibleSpellIds = [];
     private Dictionary<int, SpellEligibility> spellEligibility = [];
     private string searchText = "";
@@ -582,6 +615,7 @@ else
     private string activeSpellTab = "Known";
     private string activeMainPanelTab = "Features";
     private string activeCombatActionTab = "Actions";
+    private bool featureEditMode;
     private bool spellSlotsExpanded;
     private Spell? selectedSpell;
     private SpellGroup? selectedSpellGroup;
@@ -632,6 +666,7 @@ else
         spellEligibility = (await SpellDatabase.GetSpellEligibilityAsync(Id)).ToDictionary();
         eligibleSpellIds = spellEligibility.Keys.ToHashSet();
         spellSlots = (await SpellDatabase.GetCharacterSpellSlotsAsync(Id)).ToList();
+        hiddenFeatureKeys = (await SpellDatabase.GetCharacterHiddenFeatureKeysAsync(Id)).ToHashSet(StringComparer.OrdinalIgnoreCase);
         await LoadCharacterFeatureDefinitions();
         await LoadCharacterSpells();
         ApplySpellFilter();
@@ -722,6 +757,26 @@ else
     private void ToggleSpellSlots()
     {
         spellSlotsExpanded = !spellSlotsExpanded;
+    }
+
+    private void ToggleFeatureEditMode()
+    {
+        featureEditMode = !featureEditMode;
+    }
+
+    private async Task ToggleFeatureHidden(string featureKey)
+    {
+        var shouldHide = !hiddenFeatureKeys.Contains(featureKey);
+        await SpellDatabase.SetCharacterFeatureHiddenAsync(Id, featureKey, shouldHide);
+
+        if (shouldHide)
+        {
+            hiddenFeatureKeys.Add(featureKey);
+        }
+        else
+        {
+            hiddenFeatureKeys.Remove(featureKey);
+        }
     }
 
     private async Task OpenSpell(SpellGroup group)
@@ -969,6 +1024,18 @@ else
         return rollMode == "Advantage" ? "ADV" : "DIS";
     }
 
+    private IEnumerable<SheetFeature> GetVisibleFeatures(SheetFeatureGroup group, SheetFeatureLevel level)
+    {
+        return featureEditMode
+            ? level.Features
+            : level.Features.Where(feature => !hiddenFeatureKeys.Contains(BuildCharacterFeatureKey(group, feature)));
+    }
+
+    private static string BuildCharacterFeatureKey(SheetFeatureGroup group, SheetFeature feature)
+    {
+        return $"{group.Title}|{feature.Key}";
+    }
+
     private static bool IsCombatSavingThrow(CharacterSavingThrow savingThrow)
     {
         return savingThrow.AbilityCode is "dex" or "con" or "wis";
@@ -1038,24 +1105,22 @@ else
                 var classLevels = BuildFeatureLevelGroups(classDefinition.RawJson, "classFeatures")
                     .Where(level => level.Level <= characterClass.Level)
                     .ToList();
+
+                if (characterClass.SubclassDefinitionId is not null)
+                {
+                    var subclassDefinition = subclassDefinitions.FirstOrDefault(definition => definition.Id == characterClass.SubclassDefinitionId.Value);
+                    if (subclassDefinition is not null)
+                    {
+                        var subclassLevels = BuildMappedSubclassFeatureLevels(classDefinition.RawJson, subclassDefinition.RawJson)
+                        .Where(level => level.Level <= characterClass.Level)
+                        .ToList();
+                        classLevels = MergeFeatureLevels(classLevels, subclassLevels);
+                    }
+                }
+
                 if (classLevels.Count > 0)
                 {
                     yield return new SheetFeatureGroup("Class", characterClass.DisplayName, classLevels);
-                }
-            }
-
-            if (characterClass.SubclassDefinitionId is not null)
-            {
-                var subclassDefinition = subclassDefinitions.FirstOrDefault(definition => definition.Id == characterClass.SubclassDefinitionId.Value);
-                if (subclassDefinition is not null)
-                {
-                    var subclassLevels = BuildFeatureLevelGroups(subclassDefinition.RawJson, "subclassFeatures")
-                        .Where(level => level.Level <= characterClass.Level)
-                        .ToList();
-                    if (subclassLevels.Count > 0)
-                    {
-                        yield return new SheetFeatureGroup("Subclass", $"{characterClass.ClassName}: {subclassDefinition.DisplayName}", subclassLevels);
-                    }
                 }
             }
         }
@@ -1089,6 +1154,77 @@ else
                     .Select(group => group.First())
                     .OrderBy(feature => feature.Name)
                     .ToList());
+        }
+    }
+
+    private static IEnumerable<SheetFeatureLevel> BuildMappedSubclassFeatureLevels(string classRawJson, string subclassRawJson)
+    {
+        var subclassLevels = BuildFeatureLevelGroups(subclassRawJson, "subclassFeatures").ToList();
+        var classSubclassLevels = BuildSubclassGrantLevels(classRawJson).ToList();
+        if (subclassLevels.Count == 0 || classSubclassLevels.Count == 0)
+        {
+            return subclassLevels;
+        }
+
+        return subclassLevels
+            .Select((level, index) => new SheetFeatureLevel(
+                index < classSubclassLevels.Count ? classSubclassLevels[index] : level.Level,
+                level.Features))
+            .GroupBy(level => level.Level)
+            .OrderBy(group => group.Key)
+            .Select(group => new SheetFeatureLevel(
+                group.Key,
+                group.SelectMany(level => level.Features)
+                    .GroupBy(feature => feature.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .OrderBy(feature => feature.Name)
+                    .ToList()))
+            .ToList();
+    }
+
+    private static List<SheetFeatureLevel> MergeFeatureLevels(IEnumerable<SheetFeatureLevel> first, IEnumerable<SheetFeatureLevel> second)
+    {
+        return first.Concat(second)
+            .GroupBy(level => level.Level)
+            .OrderBy(group => group.Key)
+            .Select(group => new SheetFeatureLevel(
+                group.Key,
+                group.SelectMany(level => level.Features)
+                    .GroupBy(feature => feature.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .OrderBy(feature => feature.Name)
+                    .ToList()))
+            .ToList();
+    }
+
+    private static IEnumerable<int> BuildSubclassGrantLevels(string classRawJson)
+    {
+        if (string.IsNullOrWhiteSpace(classRawJson))
+        {
+            yield break;
+        }
+
+        using var document = System.Text.Json.JsonDocument.Parse(classRawJson);
+        if (!document.RootElement.TryGetProperty("classFeatures", out var features) || features.ValueKind != System.Text.Json.JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var feature in features.EnumerateArray())
+        {
+            if (feature.ValueKind != System.Text.Json.JsonValueKind.Object
+                || !feature.TryGetProperty("gainSubclassFeature", out var gainSubclassFeature)
+                || gainSubclassFeature.ValueKind != System.Text.Json.JsonValueKind.True
+                || !feature.TryGetProperty("classFeature", out var classFeature))
+            {
+                continue;
+            }
+
+            var level = ParseFeatureReferenceLevel(classFeature.GetString());
+            if (level is >= 1 and <= 20)
+            {
+                yield return level;
+            }
         }
     }
 
@@ -1141,9 +1277,7 @@ else
         }
 
         var parts = reference.Split('|', StringSplitOptions.None);
-        var level = parts
-            .Select(part => int.TryParse(part, out var parsed) ? parsed : 0)
-            .LastOrDefault(parsed => parsed is >= 1 and <= 20);
+        var level = ParseFeatureReferenceLevel(reference);
 
         if (level == 0)
         {
@@ -1153,6 +1287,19 @@ else
         var name = CleanMarkup(parts[0]);
         var key = BuildFeatureKey(name, level);
         return new SheetFeature(name, level, key, details.GetValueOrDefault(key) ?? []);
+    }
+
+    private static int ParseFeatureReferenceLevel(string? reference)
+    {
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return 0;
+        }
+
+        return reference
+            .Split('|', StringSplitOptions.None)
+            .Select(part => int.TryParse(part, out var parsed) ? parsed : 0)
+            .LastOrDefault(parsed => parsed is >= 1 and <= 20);
     }
 
     private static string BuildFeatureKey(string name, int level)

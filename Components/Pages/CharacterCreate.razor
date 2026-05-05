@@ -1103,19 +1103,21 @@
 
     private static OptionDetail BuildClassDetail(ClassDefinition classDefinition, SubclassDefinition? subclassDefinition)
     {
-        var featureGroups = new List<OptionDetailFeatureGroup>
-        {
-            new("Class Features", BuildFeatureLevelGroups(classDefinition.RawJson, "classFeatures").ToList())
-        };
+        var classFeatures = BuildFeatureLevelGroups(classDefinition.RawJson, "classFeatures").ToList();
 
         if (subclassDefinition is not null)
         {
-            var subclassFeatures = BuildFeatureLevelGroups(subclassDefinition.RawJson, "subclassFeatures").ToList();
+            var subclassFeatures = BuildMappedSubclassFeatureLevels(classDefinition.RawJson, subclassDefinition.RawJson).ToList();
             if (subclassFeatures.Count > 0)
             {
-                featureGroups.Add(new($"{subclassDefinition.Name} Features", subclassFeatures));
+                classFeatures = MergeFeatureLevels(classFeatures, subclassFeatures);
             }
         }
+
+        var featureGroups = new List<OptionDetailFeatureGroup>
+        {
+            new("Class Features", classFeatures)
+        };
 
         var progressionTables = BuildProgressionTables(classDefinition.RawJson).ToList();
         if (subclassDefinition is not null)
@@ -1169,6 +1171,77 @@
         }
     }
 
+    private static IEnumerable<OptionDetailFeatureLevel> BuildMappedSubclassFeatureLevels(string classRawJson, string subclassRawJson)
+    {
+        var subclassLevels = BuildFeatureLevelGroups(subclassRawJson, "subclassFeatures").ToList();
+        var classSubclassLevels = BuildSubclassGrantLevels(classRawJson).ToList();
+        if (subclassLevels.Count == 0 || classSubclassLevels.Count == 0)
+        {
+            return subclassLevels;
+        }
+
+        return subclassLevels
+            .Select((level, index) => new OptionDetailFeatureLevel(
+                index < classSubclassLevels.Count ? classSubclassLevels[index] : level.Level,
+                level.Features))
+            .GroupBy(level => level.Level)
+            .OrderBy(group => group.Key)
+            .Select(group => new OptionDetailFeatureLevel(
+                group.Key,
+                group.SelectMany(level => level.Features)
+                    .GroupBy(feature => feature.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .OrderBy(feature => feature.Name)
+                    .ToList()))
+            .ToList();
+    }
+
+    private static List<OptionDetailFeatureLevel> MergeFeatureLevels(IEnumerable<OptionDetailFeatureLevel> first, IEnumerable<OptionDetailFeatureLevel> second)
+    {
+        return first.Concat(second)
+            .GroupBy(level => level.Level)
+            .OrderBy(group => group.Key)
+            .Select(group => new OptionDetailFeatureLevel(
+                group.Key,
+                group.SelectMany(level => level.Features)
+                    .GroupBy(feature => feature.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .OrderBy(feature => feature.Name)
+                    .ToList()))
+            .ToList();
+    }
+
+    private static IEnumerable<int> BuildSubclassGrantLevels(string classRawJson)
+    {
+        if (string.IsNullOrWhiteSpace(classRawJson))
+        {
+            yield break;
+        }
+
+        using var document = JsonDocument.Parse(classRawJson);
+        if (!document.RootElement.TryGetProperty("classFeatures", out var features) || features.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var feature in features.EnumerateArray())
+        {
+            if (feature.ValueKind != JsonValueKind.Object
+                || !feature.TryGetProperty("gainSubclassFeature", out var gainSubclassFeature)
+                || gainSubclassFeature.ValueKind != JsonValueKind.True
+                || !feature.TryGetProperty("classFeature", out var classFeature))
+            {
+                continue;
+            }
+
+            var level = ParseFeatureReferenceLevel(classFeature.GetString());
+            if (level is >= 1 and <= 20)
+            {
+                yield return level;
+            }
+        }
+    }
+
     private static Dictionary<string, IReadOnlyList<string>> BuildFeatureDetailLookup(JsonElement root)
     {
         var details = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
@@ -1218,9 +1291,7 @@
         }
 
         var parts = reference.Split('|', StringSplitOptions.None);
-        var level = parts
-            .Select(part => int.TryParse(part, out var parsed) ? parsed : 0)
-            .LastOrDefault(parsed => parsed is >= 1 and <= 20);
+        var level = ParseFeatureReferenceLevel(reference);
 
         if (level == 0)
         {
@@ -1230,6 +1301,19 @@
         var name = CleanMarkup(parts[0]);
         var key = BuildFeatureKey(name, level);
         return new OptionDetailFeature(name, level, key, details.GetValueOrDefault(key) ?? []);
+    }
+
+    private static int ParseFeatureReferenceLevel(string? reference)
+    {
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return 0;
+        }
+
+        return reference
+            .Split('|', StringSplitOptions.None)
+            .Select(part => int.TryParse(part, out var parsed) ? parsed : 0)
+            .LastOrDefault(parsed => parsed is >= 1 and <= 20);
     }
 
     private static string BuildFeatureKey(string name, int level)

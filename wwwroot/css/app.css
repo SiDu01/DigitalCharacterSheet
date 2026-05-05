@@ -1028,6 +1028,13 @@ main {
     margin: 0;
 }
 
+.side-tab-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+}
+
 .side-tab-content {
     display: grid;
     align-content: start;
@@ -1042,6 +1049,21 @@ main {
     min-height: 0;
     overflow: auto;
     padding-right: .15rem;
+}
+
+.feature-edit-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: .5rem;
+    flex: 0 0 auto;
+    min-height: 1.9rem;
+}
+
+.feature-edit-toolbar span {
+    color: #64748b;
+    font-size: .78rem;
+    font-weight: 800;
 }
 
 .sheet-feature-group {
@@ -1085,10 +1107,18 @@ main {
 }
 
 .sheet-feature-level .feature-pill {
+    gap: .45rem;
+    justify-content: space-between;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.sheet-feature-level .feature-pill span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .sheet-feature-level .feature-detail-toggle[open] .feature-pill {
@@ -1099,6 +1129,17 @@ main {
     max-height: 14rem;
     overflow: auto;
     font-size: .82rem;
+}
+
+.feature-hide-button {
+    min-height: 1.35rem;
+    min-width: 3.2rem;
+    padding-inline: .35rem;
+    font-size: .72rem;
+}
+
+.feature-detail-toggle.hidden-feature {
+    opacity: .55;
 }
 
 .sheet-check-row {
@@ -2556,6 +2597,10 @@ main {
 
 [data-theme="leather"] .combat-stat-card span,
 [data-theme="leather"] .combat-action-list span {
+    color: var(--app-muted);
+}
+
+[data-theme="leather"] .feature-edit-toolbar span {
     color: var(--app-muted);
 }
 
