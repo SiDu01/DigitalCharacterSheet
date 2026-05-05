@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>DigitalCharacterSheet</title>
+    <base href="/" />
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="DigitalCharacterSheet.styles.css" />
+    <link rel="icon" href="data:,">
+</head>
+
+<body>
+
+    <div class="status-bar-safe-area"></div>
+
+    <div id="app">Loading...</div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <script>
+        const savedTheme = localStorage.getItem("digitalCharacterSheet.theme") || "classic";
+        document.documentElement.dataset.theme = savedTheme;
+
+        window.digitalCharacterSheet = {
+            isWideSpellLayout: () => window.matchMedia("(min-width: 1100px)").matches,
+            getTheme: () => localStorage.getItem("digitalCharacterSheet.theme") || "classic",
+            setTheme: (theme) => {
+                const normalizedTheme = theme === "leather" ? "leather" : "classic";
+                localStorage.setItem("digitalCharacterSheet.theme", normalizedTheme);
+                document.documentElement.dataset.theme = normalizedTheme;
+            },
+            observeSpellListEnd: (element, dotNetReference) => {
+                if (!element || typeof element.closest !== "function") {
+                    return;
+                }
+
+                window.digitalCharacterSheet.disposeSpellListEnd(element);
+
+                const root = element.closest(".spell-list-pane") || null;
+                let isLoading = false;
+                const observer = new IntersectionObserver(async (entries) => {
+                    if (isLoading || !entries.some(entry => entry.isIntersecting)) {
+                        return;
+                    }
+
+                    isLoading = true;
+                    try {
+                        await dotNetReference.invokeMethodAsync("ShowMoreSpells");
+                    } finally {
+                        setTimeout(() => {
+                            isLoading = false;
+                        }, 150);
+                    }
+                }, {
+                    root,
+                    rootMargin: "160px 0px",
+                    threshold: 0.01
+                });
+
+                observer.observe(element);
+                element._spellListObserver = observer;
+            },
+            disposeSpellListEnd: (element) => {
+                if (element && element._spellListObserver) {
+                    element._spellListObserver.disconnect();
+                    delete element._spellListObserver;
+                }
+            }
+        };
+    </script>
+    <script src="_framework/blazor.webview.js" autostart="false"></script>
+
+</body>
+
+</html>

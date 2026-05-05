@@ -1,0 +1,69 @@
+@using System.Text.RegularExpressions
+
+@foreach (var segment in Segments)
+{
+    if (segment.IsReference)
+    {
+        <span class="json-ref-badge @segment.CssClass">@segment.Label</span>
+    }
+    else
+    {
+        @segment.Label
+    }
+}
+
+@code {
+    [Parameter] public string Text { get; set; } = "";
+
+    private static readonly Regex ReferenceRegex = new(@"\{@(?<type>[a-zA-Z0-9_]+)\s+(?<value>[^}]+)\}", RegexOptions.Compiled);
+
+    private IReadOnlyList<TextSegment> Segments => Parse(Text).ToList();
+
+    private static IEnumerable<TextSegment> Parse(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            yield break;
+        }
+
+        var currentIndex = 0;
+        foreach (Match match in ReferenceRegex.Matches(value))
+        {
+            if (match.Index > currentIndex)
+            {
+                yield return TextSegment.Text(value[currentIndex..match.Index]);
+            }
+
+            var referenceType = match.Groups["type"].Value;
+            var referenceValue = match.Groups["value"].Value;
+            yield return TextSegment.Reference(BuildReferenceLabel(referenceType, referenceValue), BuildReferenceClass(referenceType));
+            currentIndex = match.Index + match.Length;
+        }
+
+        if (currentIndex < value.Length)
+        {
+            yield return TextSegment.Text(value[currentIndex..]);
+        }
+    }
+
+    private static string BuildReferenceLabel(string referenceType, string referenceValue)
+    {
+        var label = referenceValue.Split('|', StringSplitOptions.TrimEntries).FirstOrDefault() ?? referenceValue;
+        return referenceType switch
+        {
+            "dc" => $"DC {label}",
+            _ => label
+        };
+    }
+
+    private static string BuildReferenceClass(string referenceType)
+    {
+        return $"json-ref-{referenceType.ToLowerInvariant()}";
+    }
+
+    private sealed record TextSegment(string Label, bool IsReference, string CssClass)
+    {
+        public static TextSegment Text(string value) => new(value, false, "");
+        public static TextSegment Reference(string label, string cssClass) => new(label, true, cssClass);
+    }
+}

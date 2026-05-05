@@ -1,0 +1,16 @@
+@if (Hints.Count > 0)
+{
+    <div class="choice-hint-list">
+        @foreach (var hint in Hints)
+        {
+            <div class="choice-hint">
+                <span>@hint.Source</span>
+                <p>@hint.Description</p>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<CharacterOptionChoice> Hints { get; set; } = [];
+}

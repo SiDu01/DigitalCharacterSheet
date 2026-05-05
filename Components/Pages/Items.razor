@@ -1,0 +1,664 @@
+@page "/items"
+@implements IAsyncDisposable
+@inject SpellDatabase SpellDatabase
+@inject IJSRuntime JsRuntime
+
+<PageTitle>Items</PageTitle>
+
+<section class="spell-page item-page">
+    <header class="page-header">
+        <div>
+            <p class="eyebrow">Equipment</p>
+            <h1>@(string.IsNullOrWhiteSpace(selectedCategory) ? "Items" : selectedCategory)</h1>
+        </div>
+        <div class="header-actions">
+            @if (!string.IsNullOrWhiteSpace(selectedCategory))
+            {
+                <button type="button" class="text-button no-margin" @onclick="ShowCategories">Categories</button>
+            }
+            <div class="spell-count">@VisibleCountText</div>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(loadError))
+    {
+        <section class="sheet-panel">
+            <p class="eyebrow">Datenbankfehler</p>
+            <pre class="error-details">@loadError</pre>
+        </section>
+    }
+    else if (isLoading)
+    {
+        <p class="muted">Datenbank wird vorbereitet...</p>
+    }
+    else
+    {
+        @if (string.IsNullOrWhiteSpace(selectedCategory))
+        {
+            <section class="item-category-grid">
+                @foreach (var category in ItemCategoryTiles)
+                {
+                    <button type="button" class="item-category-tile" @onclick="() => OpenCategory(category.Name)">
+                        <span class="item-category-count">@category.Count</span>
+                        <strong>@category.Name</strong>
+                        <small>@category.Description</small>
+                    </button>
+                }
+            </section>
+        }
+        else
+        {
+            <section class="spell-toolbar">
+                <input class="search-input" placeholder="Item suchen" @bind="searchText" @bind:event="oninput" @bind:after="ApplyFilter" />
+
+                <button type="button"
+                        class="text-button no-margin spell-filter-button @(IsFilterPaneOpen ? "active" : "")"
+                        @onclick="OpenFilters">
+                    Filter@(ActiveFilterCount > 0 ? $" ({ActiveFilterCount})" : "")
+                </button>
+
+                @if (ActiveFilterCount > 0)
+                {
+                    <button type="button" class="text-button no-margin" @onclick="ResetFilters">Reset</button>
+                }
+            </section>
+
+            <section class="active-filter-bar @(ActiveFilterCount == 0 ? "empty" : "")" aria-label="Active item filters">
+                @foreach (var chip in ActiveFilterChips)
+                {
+                    <button type="button" class="filter-chip" @onclick="() => chip.Clear()">
+                        <span>@chip.Label</span>
+                        <strong>x</strong>
+                    </button>
+                }
+                @if (ActiveFilterCount > 0)
+                {
+                    <button type="button" class="filter-chip reset-chip" @onclick="ResetFilters">Reset</button>
+                }
+            </section>
+
+            <section class="spell-master-detail">
+            <section class="spell-list spell-list-pane">
+                @foreach (var rarityGroup in VisibleItemGroups.GroupBy(group => group.Rarity))
+                {
+                    <div class="spell-level-separator">@FormatRarity(rarityGroup.Key)</div>
+                    @foreach (var group in rarityGroup)
+                    {
+                        var item = group.ResolveVersion(selectedItem);
+                        <article class="spell-row @(selectedItemGroup?.Name == group.Name ? "selected" : "")" @onclick="() => OpenItem(group)">
+                            <div class="spell-main">
+                                <div class="spell-title">
+                                    <h2>@group.Name</h2>
+                                    <span class="@GetRarityClass(group.Rarity)">@FormatRarity(group.Rarity)</span>
+                                </div>
+                                <div class="spell-meta">
+                                    <span>@DisplayValue(group.TypeCode)</span>
+                                    @if (group.RequiresAttunement)
+                                    {
+                                        <span>Attunement</span>
+                                    }
+                                    @foreach (var source in group.Versions.Select(version => version.Source).Distinct())
+                                    {
+                                        <span class="source-badge">@source</span>
+                                    }
+                                </div>
+                            </div>
+                        </article>
+                    }
+                }
+                @if (visibleItemGroupCount < filteredItemGroups.Count)
+                {
+                    <div class="spell-list-sentinel" @ref="itemListSentinel">
+                        Weitere Items werden geladen...
+                    </div>
+                }
+            </section>
+
+            <aside class="spell-detail-pane">
+                @if (IsFilterPaneOpen)
+                {
+                    <section class="spell-filter-pane">
+                        <header class="detail-header compact-detail-header">
+                            <div>
+                                <p class="eyebrow">Equipment</p>
+                                <h2>Filter</h2>
+                            </div>
+                            <button type="button" class="primary-action" @onclick="ApplyDraftFilters">Apply</button>
+                        </header>
+
+                        <div class="filter-pane-grid">
+                            <label class="stacked-field">
+                                <span>Source</span>
+                                <select @bind="draftSource">
+                                    <option value="">Alle Quellen</option>
+                                    @foreach (var source in sources)
+                                    {
+                                        <option value="@source">@source</option>
+                                    }
+                                </select>
+                            </label>
+
+                            <label class="stacked-field">
+                                <span>Rarity</span>
+                                <select @bind="draftRarity">
+                                    <option value="">Alle Rarities</option>
+                                    @foreach (var rarity in rarities)
+                                    {
+                                        <option value="@rarity">@FormatRarity(rarity)</option>
+                                    }
+                                </select>
+                            </label>
+
+                            <label class="stacked-field">
+                                <span>Type</span>
+                                <select @bind="draftTypeCode">
+                                    <option value="">Alle Types</option>
+                                    @foreach (var typeCode in typeCodes)
+                                    {
+                                        <option value="@typeCode">@typeCode</option>
+                                    }
+                                </select>
+                            </label>
+
+                            <label class="stacked-field">
+                                <span>Kind</span>
+                                <select @bind="draftItemKind">
+                                    <option value="">Alle Kinds</option>
+                                    @foreach (var itemKind in itemKinds)
+                                    {
+                                        <option value="@itemKind">@FormatItemKind(itemKind)</option>
+                                    }
+                                </select>
+                            </label>
+                        </div>
+
+                        <section class="filter-section filter-toggle-grid">
+                            <label class="switch-toggle">
+                                <input type="checkbox" @bind="draftOnlyWeapons" />
+                                <span>Weapons</span>
+                            </label>
+                            <label class="switch-toggle">
+                                <input type="checkbox" @bind="draftOnlyArmor" />
+                                <span>Armor</span>
+                            </label>
+                            <label class="switch-toggle">
+                                <input type="checkbox" @bind="draftOnlyAttunement" />
+                                <span>Attunement</span>
+                            </label>
+                            <label class="switch-toggle">
+                                <input type="checkbox" @bind="draftOnlyConsumables" />
+                                <span>Consumables</span>
+                            </label>
+                            <label class="switch-toggle">
+                                <input type="checkbox" @bind="draftOnlyWondrous" />
+                                <span>Wondrous</span>
+                            </label>
+                        </section>
+
+                        <footer class="filter-actions">
+                            <button type="button" class="text-button no-margin" @onclick="ResetDraftFilters">Reset</button>
+                            <button type="button" class="primary-action" @onclick="ApplyDraftFilters">Apply</button>
+                        </footer>
+                    </section>
+                }
+                else if (selectedItem is null)
+                {
+                    <div class="empty-detail">
+                        <p class="eyebrow">Details</p>
+                        <h2>Select an item</h2>
+                        <p class="muted">On wide screens the item details stay open next to the list.</p>
+                    </div>
+                }
+                else
+                {
+                    <ItemDetailContent Item="selectedItem"
+                                       Versions="selectedItemGroup?.Versions"
+                                       OnSelectVersion="SelectVersion" />
+                }
+            </aside>
+        </section>
+        }
+    }
+</section>
+
+@code {
+    private List<ItemDefinition> allItems = [];
+    private List<ItemGroup> itemGroups = [];
+    private List<ItemGroup> filteredItemGroups = [];
+    private IReadOnlyDictionary<string, int> sourcePriorities = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    private List<string> sources = [];
+    private List<string> rarities = [];
+    private List<string> typeCodes = [];
+    private List<string> itemKinds = [];
+    private string searchText = "";
+    private string selectedSource = "";
+    private string selectedRarity = "";
+    private string selectedTypeCode = "";
+    private string selectedItemKind = "";
+    private bool onlyWeapons;
+    private bool onlyArmor;
+    private bool onlyAttunement;
+    private bool onlyConsumables;
+    private bool onlyWondrous;
+    private string selectedCategory = "";
+    private string draftSource = "";
+    private string draftRarity = "";
+    private string draftTypeCode = "";
+    private string draftItemKind = "";
+    private bool draftOnlyWeapons;
+    private bool draftOnlyArmor;
+    private bool draftOnlyAttunement;
+    private bool draftOnlyConsumables;
+    private bool draftOnlyWondrous;
+    private string rightPaneMode = "Details";
+    private string loadError = "";
+    private bool isLoading = true;
+    private ItemDefinition? selectedItem;
+    private ItemGroup? selectedItemGroup;
+    private int visibleItemGroupCount = InitialVisibleItemGroupCount;
+    private ElementReference itemListSentinel;
+    private DotNetObjectReference<Items>? dotNetObjectReference;
+    private bool scrollObserverInitialized;
+    private const int InitialVisibleItemGroupCount = 80;
+    private const int VisibleItemGroupIncrement = 80;
+    private IEnumerable<ItemGroup> VisibleItemGroups => filteredItemGroups.Take(visibleItemGroupCount);
+    private string VisibleCountText => string.IsNullOrWhiteSpace(selectedCategory)
+        ? $"{itemGroups.Count} Items"
+        : $"{Math.Min(visibleItemGroupCount, filteredItemGroups.Count)} von {filteredItemGroups.Count} angezeigt";
+    private List<FilterChip> ActiveFilterChips => BuildActiveFilterChips();
+    private int ActiveFilterCount => ActiveFilterChips.Count;
+    private bool IsFilterPaneOpen => rightPaneMode == "Filters";
+    private List<ItemCategoryTile> ItemCategoryTiles => BuildItemCategoryTiles();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            allItems = (await SpellDatabase.GetItemDefinitionsAsync()).ToList();
+            sourcePriorities = await SpellDatabase.GetSourcePriorityMapAsync();
+            itemGroups = GroupItems(allItems);
+            filteredItemGroups = itemGroups;
+            sources = allItems.Select(item => item.Source).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct().OrderBy(value => value).ToList();
+            rarities = allItems.Select(item => item.Rarity).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct().OrderBy(value => RaritySortKey(value)).ThenBy(value => value).ToList();
+            typeCodes = allItems.Select(item => item.TypeCode).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct().OrderBy(value => value).ToList();
+            itemKinds = allItems.Select(item => item.ItemKind).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct().OrderBy(value => value).ToList();
+        }
+        catch (Exception exception)
+        {
+            loadError = exception.ToString();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (isLoading
+            || !string.IsNullOrWhiteSpace(loadError)
+            || string.IsNullOrWhiteSpace(selectedCategory)
+            || scrollObserverInitialized
+            || visibleItemGroupCount >= filteredItemGroups.Count)
+        {
+            return;
+        }
+
+        dotNetObjectReference = DotNetObjectReference.Create(this);
+        await JsRuntime.InvokeVoidAsync("digitalCharacterSheet.observeSpellListEnd", itemListSentinel, dotNetObjectReference);
+        scrollObserverInitialized = true;
+    }
+
+    private void ApplyFilter()
+    {
+        filteredItemGroups = GroupItems(ApplyLocalFilter(allItems)).ToList();
+        visibleItemGroupCount = InitialVisibleItemGroupCount;
+        scrollObserverInitialized = false;
+        dotNetObjectReference?.Dispose();
+        dotNetObjectReference = null;
+        if (selectedItemGroup is not null && filteredItemGroups.All(group => group.Name != selectedItemGroup.Name))
+        {
+            selectedItemGroup = filteredItemGroups.FirstOrDefault();
+            selectedItem = selectedItemGroup?.Primary;
+        }
+    }
+
+    private void OpenCategory(string category)
+    {
+        selectedCategory = category;
+        selectedItem = null;
+        selectedItemGroup = null;
+        rightPaneMode = "Details";
+        ApplyFilter();
+    }
+
+    private void ShowCategories()
+    {
+        selectedCategory = "";
+        selectedItem = null;
+        selectedItemGroup = null;
+        rightPaneMode = "Details";
+        ResetFilters();
+    }
+
+    private void OpenFilters()
+    {
+        CopyAppliedFiltersToDraft();
+        rightPaneMode = "Filters";
+    }
+
+    private void CopyAppliedFiltersToDraft()
+    {
+        draftSource = selectedSource;
+        draftRarity = selectedRarity;
+        draftTypeCode = selectedTypeCode;
+        draftItemKind = selectedItemKind;
+        draftOnlyWeapons = onlyWeapons;
+        draftOnlyArmor = onlyArmor;
+        draftOnlyAttunement = onlyAttunement;
+        draftOnlyConsumables = onlyConsumables;
+        draftOnlyWondrous = onlyWondrous;
+    }
+
+    private void ApplyDraftFilters()
+    {
+        selectedSource = draftSource;
+        selectedRarity = draftRarity;
+        selectedTypeCode = draftTypeCode;
+        selectedItemKind = draftItemKind;
+        onlyWeapons = draftOnlyWeapons;
+        onlyArmor = draftOnlyArmor;
+        onlyAttunement = draftOnlyAttunement;
+        onlyConsumables = draftOnlyConsumables;
+        onlyWondrous = draftOnlyWondrous;
+        ApplyFilter();
+    }
+
+    private void ResetDraftFilters()
+    {
+        ResetFilters();
+        CopyAppliedFiltersToDraft();
+        rightPaneMode = "Filters";
+    }
+
+    private void ResetFilters()
+    {
+        searchText = "";
+        selectedSource = "";
+        selectedRarity = "";
+        selectedTypeCode = "";
+        selectedItemKind = "";
+        onlyWeapons = false;
+        onlyArmor = false;
+        onlyAttunement = false;
+        onlyConsumables = false;
+        onlyWondrous = false;
+        ApplyFilter();
+        CopyAppliedFiltersToDraft();
+    }
+
+    private void OpenItem(ItemGroup group)
+    {
+        selectedItemGroup = group;
+        selectedItem = group.ResolveVersion(selectedItem);
+        rightPaneMode = "Details";
+    }
+
+    private void SelectVersion(ItemDefinition item)
+    {
+        selectedItem = item;
+    }
+
+    [JSInvokable]
+    public Task ShowMoreSpells()
+    {
+        if (visibleItemGroupCount >= filteredItemGroups.Count)
+        {
+            return Task.CompletedTask;
+        }
+
+        visibleItemGroupCount = Math.Min(
+            visibleItemGroupCount + VisibleItemGroupIncrement,
+            filteredItemGroups.Count);
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private IEnumerable<ItemDefinition> ApplyLocalFilter(IEnumerable<ItemDefinition> items)
+    {
+        var query = items;
+
+        if (!string.IsNullOrWhiteSpace(selectedCategory))
+        {
+            query = query.Where(item => item.Category == selectedCategory);
+        }
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            var search = searchText.Trim();
+            query = query.Where(item =>
+                item.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || item.Description.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || item.TypeCode.Contains(search, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedSource))
+        {
+            query = query.Where(item => item.Source == selectedSource);
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedRarity))
+        {
+            query = query.Where(item => item.Rarity == selectedRarity);
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedTypeCode))
+        {
+            query = query.Where(item => item.TypeCode == selectedTypeCode);
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedItemKind))
+        {
+            query = query.Where(item => item.ItemKind == selectedItemKind);
+        }
+
+        if (onlyWeapons)
+        {
+            query = query.Where(item => item.IsWeapon);
+        }
+
+        if (onlyArmor)
+        {
+            query = query.Where(item => item.IsArmor);
+        }
+
+        if (onlyAttunement)
+        {
+            query = query.Where(item => item.RequiresAttunement);
+        }
+
+        if (onlyConsumables)
+        {
+            query = query.Where(item => item.IsConsumable);
+        }
+
+        if (onlyWondrous)
+        {
+            query = query.Where(item => item.IsWondrous);
+        }
+
+        return query
+            .OrderBy(item => item.ItemKind)
+            .ThenBy(item => RaritySortKey(item.Rarity))
+            .ThenBy(item => item.Name)
+            .ThenBy(item => SourceSortKey(item.Source));
+    }
+
+    private List<ItemGroup> GroupItems(IEnumerable<ItemDefinition> items)
+    {
+        return items
+            .GroupBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new ItemGroup(group, sourcePriorities))
+            .OrderBy(group => group.Primary.Category)
+            .ThenBy(group => RaritySortKey(group.Rarity))
+            .ThenBy(group => group.Name)
+            .ToList();
+    }
+
+    private List<FilterChip> BuildActiveFilterChips()
+    {
+        var chips = new List<FilterChip>();
+        AddChip(chips, searchText, $"Search: {searchText}", () => searchText = "");
+        AddChip(chips, selectedSource, $"Source: {selectedSource}", () => selectedSource = "");
+        AddChip(chips, selectedRarity, $"Rarity: {FormatRarity(selectedRarity)}", () => selectedRarity = "");
+        AddChip(chips, selectedTypeCode, $"Type: {selectedTypeCode}", () => selectedTypeCode = "");
+        AddChip(chips, selectedItemKind, $"Kind: {FormatItemKind(selectedItemKind)}", () => selectedItemKind = "");
+
+        AddToggleChip(chips, onlyWeapons, "Weapons", () => onlyWeapons = false);
+        AddToggleChip(chips, onlyArmor, "Armor", () => onlyArmor = false);
+        AddToggleChip(chips, onlyAttunement, "Attunement", () => onlyAttunement = false);
+        AddToggleChip(chips, onlyConsumables, "Consumables", () => onlyConsumables = false);
+        AddToggleChip(chips, onlyWondrous, "Wondrous", () => onlyWondrous = false);
+
+        return chips;
+    }
+
+    private void AddChip(List<FilterChip> chips, string value, string label, Action clear)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        chips.Add(new FilterChip(label, () =>
+        {
+            clear();
+            ApplyFilter();
+        }));
+    }
+
+    private void AddToggleChip(List<FilterChip> chips, bool isActive, string label, Action clear)
+    {
+        if (!isActive)
+        {
+            return;
+        }
+
+        chips.Add(new FilterChip(label, () =>
+        {
+            clear();
+            ApplyFilter();
+        }));
+    }
+
+    private int SourceSortKey(string source)
+    {
+        return sourcePriorities.TryGetValue(source, out var priority) ? priority : 1000;
+    }
+
+    private static string DisplayValue(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+
+    private static string FormatItemKind(string itemKind)
+    {
+        return itemKind switch
+        {
+            "BaseItem" => "Base Items",
+            "MagicItem" => "Magic Items",
+            "ItemGroup" => "Item Groups",
+            _ => string.IsNullOrWhiteSpace(itemKind) ? "Other" : itemKind
+        };
+    }
+
+    private static string FormatRarity(string rarity)
+    {
+        return string.IsNullOrWhiteSpace(rarity) ? "None" : rarity;
+    }
+
+    private static int RaritySortKey(string rarity)
+    {
+        return rarity switch
+        {
+            "none" => 0,
+            "common" => 1,
+            "uncommon" => 2,
+            "rare" => 3,
+            "very rare" => 4,
+            "legendary" => 5,
+            "artifact" => 6,
+            _ => 100
+        };
+    }
+
+    private static string GetRarityClass(string rarity)
+    {
+        var normalized = string.IsNullOrWhiteSpace(rarity)
+            ? "none"
+            : rarity.Replace(" ", "-", StringComparison.OrdinalIgnoreCase).ToLowerInvariant();
+        return $"spell-level-badge item-rarity-badge rarity-{normalized}";
+    }
+
+    private List<ItemCategoryTile> BuildItemCategoryTiles()
+    {
+        return itemGroups
+            .GroupBy(group => group.Primary.Category)
+            .Select(group => new ItemCategoryTile(group.Key, group.Count(), DescribeCategory(group.Key)))
+            .OrderBy(tile => CategorySortKey(tile.Name))
+            .ThenBy(tile => tile.Name)
+            .ToList();
+    }
+
+    private static int CategorySortKey(string category)
+    {
+        return category switch
+        {
+            "Weapons" => 0,
+            "Armor" => 1,
+            "Magic Items" => 2,
+            "Consumables" => 3,
+            "Tools" => 4,
+            "Spellcasting Focus" => 5,
+            "Adventuring Gear" => 6,
+            "Item Groups" => 7,
+            _ => 100
+        };
+    }
+
+    private static string DescribeCategory(string category)
+    {
+        return category switch
+        {
+            "Weapons" => "Damage, mastery and properties",
+            "Armor" => "AC, category and stealth rules",
+            "Magic Items" => "Attunement, bonuses and charges",
+            "Consumables" => "Potions, ammunition and expendables",
+            "Tools" => "Kits, instruments and proficiencies",
+            "Spellcasting Focus" => "Arcane, divine and class foci",
+            "Adventuring Gear" => "General equipment and gear",
+            "Item Groups" => "Grouped item families",
+            _ => "Items"
+        };
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (scrollObserverInitialized)
+        {
+            try
+            {
+                await JsRuntime.InvokeVoidAsync("digitalCharacterSheet.disposeSpellListEnd", itemListSentinel);
+            }
+            catch
+            {
+                // The WebView may already be disposed during navigation.
+            }
+        }
+
+        dotNetObjectReference?.Dispose();
+    }
+
+    private sealed record FilterChip(string Label, Action Clear);
+    private sealed record ItemCategoryTile(string Name, int Count, string Description);
+}

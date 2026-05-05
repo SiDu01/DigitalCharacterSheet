@@ -1,0 +1,19 @@
+@page "/"
+@inject NavigationManager Navigation
+
+<section class="home-shell">
+    <div>
+        <p class="eyebrow">Digital Character Sheet</p>
+        <h1>Spellbook</h1>
+        <p class="lede">Lokale 5e-Spell-Datenbank fuer Android, vorbereitet fuer Suche, Filter und spaetere Charakterfunktionen.</p>
+    </div>
+
+    <button class="primary-action" @onclick="OpenSpells">Spells oeffnen</button>
+</section>
+
+@code {
+    private void OpenSpells()
+    {
+        Navigation.NavigateTo("spells");
+    }
+}

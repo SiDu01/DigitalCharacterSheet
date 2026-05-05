@@ -1,0 +1,202 @@
+@page "/settings"
+@inject SpellDatabase SpellDatabase
+@inject IJSRuntime JsRuntime
+
+<PageTitle>Settings</PageTitle>
+
+<section class="settings-page">
+    <header class="page-header">
+        <div>
+            <p class="eyebrow">Settings</p>
+            <h1>Settings</h1>
+        </div>
+    </header>
+
+    <nav class="tab-bar" aria-label="Settings sections">
+        <button type="button" class="tab-button @(activeTab == "Appearance" ? "active" : "")" @onclick='() => SetActiveTab("Appearance")'>Appearance</button>
+        <button type="button" class="tab-button @(activeTab == "Sources" ? "active" : "")" @onclick='() => SetActiveTab("Sources")'>Sources</button>
+        <button type="button" class="tab-button @(activeTab == "Data" ? "active" : "")" @onclick='() => SetActiveTab("Data")'>Data</button>
+    </nav>
+
+    @if (activeTab == "Appearance")
+    {
+        <section class="settings-panel">
+            <header>
+                <p class="eyebrow">Theme</p>
+                <h2>Color Theme</h2>
+            </header>
+
+            <section class="theme-grid">
+                <button type="button" class="theme-card @(selectedTheme == "classic" ? "active" : "")" @onclick='async () => await SelectTheme("classic")'>
+                    <span class="theme-preview classic-preview"></span>
+                    <strong>Classic</strong>
+                    <small>Current light app style</small>
+                </button>
+
+                <button type="button" class="theme-card @(selectedTheme == "leather" ? "active" : "")" @onclick='async () => await SelectTheme("leather")'>
+                    <span class="theme-preview leather-preview"></span>
+                    <strong>Leather Book</strong>
+                    <small>Dark warm leather and brass</small>
+                </button>
+            </section>
+        </section>
+    }
+    else if (activeTab == "Sources")
+    {
+        <section class="settings-panel">
+            <header class="settings-panel-header">
+                <div>
+                    <p class="eyebrow">Content</p>
+                    <h2>Sources</h2>
+                </div>
+                <button type="button" class="text-button no-margin" @onclick="ResetSources">Reset</button>
+            </header>
+
+            @if (isLoadingSources)
+            {
+                <p class="muted">Sources werden geladen...</p>
+            }
+            else
+            {
+                <section class="source-settings-list">
+                    @for (var index = 0; index < sourceSettings.Count; index++)
+                    {
+                        var source = sourceSettings[index];
+                        <article class="source-settings-row @(source.IsEnabled ? "" : "disabled")">
+                            <label class="switch-toggle">
+                                <input type="checkbox" checked="@source.IsEnabled" @onchange="async args => await SetSourceEnabled(source, args.Value is bool value && value)" />
+                                <span>@source.DisplayName</span>
+                            </label>
+                            <span class="source-code">@source.SourceCode</span>
+                            <div class="source-order-actions">
+                                <button type="button" class="mini-button source-move-button" disabled="@(index == 0)" @onclick="async () => await MoveSource(source, -1)">Up</button>
+                                <button type="button" class="mini-button source-move-button" disabled="@(index == sourceSettings.Count - 1)" @onclick="async () => await MoveSource(source, 1)">Down</button>
+                            </div>
+                        </article>
+                    }
+                </section>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(sourceMessage))
+            {
+                <p class="muted">@sourceMessage</p>
+            }
+        </section>
+    }
+    else
+    {
+        <section class="settings-panel">
+            <header>
+                <p class="eyebrow">Data</p>
+                <h2>Data Settings</h2>
+            </header>
+            <div class="settings-actions">
+                <button type="button" class="text-button no-margin" disabled="@isExporting" @onclick="ExportCharacters">
+                    Export Characters
+                </button>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(dataMessage))
+            {
+                <p class="muted">@dataMessage</p>
+            }
+        </section>
+    }
+</section>
+
+@code {
+    private string activeTab = "Appearance";
+    private string selectedTheme = "classic";
+    private bool isExporting;
+    private bool isLoadingSources = true;
+    private string dataMessage = "";
+    private string sourceMessage = "";
+    private List<SourceSetting> sourceSettings = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSourceSettings();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        selectedTheme = await JsRuntime.InvokeAsync<string>("digitalCharacterSheet.getTheme");
+        StateHasChanged();
+    }
+
+    private void SetActiveTab(string tab)
+    {
+        activeTab = tab;
+    }
+
+    private async Task SelectTheme(string theme)
+    {
+        selectedTheme = theme == "leather" ? "leather" : "classic";
+        await JsRuntime.InvokeVoidAsync("digitalCharacterSheet.setTheme", selectedTheme);
+    }
+
+    private async Task LoadSourceSettings()
+    {
+        try
+        {
+            isLoadingSources = true;
+            sourceSettings = (await SpellDatabase.GetSourceSettingsAsync()).ToList();
+        }
+        catch (Exception exception)
+        {
+            sourceMessage = $"Sources konnten nicht geladen werden: {exception.Message}";
+        }
+        finally
+        {
+            isLoadingSources = false;
+        }
+    }
+
+    private async Task SetSourceEnabled(SourceSetting source, bool isEnabled)
+    {
+        source.IsEnabled = isEnabled;
+        await SpellDatabase.SetSourceEnabledAsync(source.SourceCode, isEnabled);
+        sourceMessage = isEnabled
+            ? $"{source.SourceCode} ist aktiv."
+            : $"{source.SourceCode} ist deaktiviert.";
+    }
+
+    private async Task MoveSource(SourceSetting source, int direction)
+    {
+        await SpellDatabase.MoveSourceAsync(source.SourceCode, direction);
+        await LoadSourceSettings();
+        sourceMessage = $"{source.SourceCode} Priorität aktualisiert.";
+    }
+
+    private async Task ResetSources()
+    {
+        await SpellDatabase.ResetSourceSettingsAsync();
+        await LoadSourceSettings();
+        sourceMessage = "Source-Einstellungen zurückgesetzt.";
+    }
+
+    private async Task ExportCharacters()
+    {
+        try
+        {
+            isExporting = true;
+            dataMessage = "";
+            var fileName = $"characters-{DateTime.Now:yyyyMMdd-HHmmss}.json";
+            var exportPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), fileName);
+            var savedPath = await SpellDatabase.ExportCharactersAsync(exportPath);
+            dataMessage = $"Export saved: {savedPath}";
+        }
+        catch (Exception exception)
+        {
+            dataMessage = $"Export failed: {exception.Message}";
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+}

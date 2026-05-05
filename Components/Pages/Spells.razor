@@ -1,0 +1,671 @@
+@page "/spells"
+@implements IAsyncDisposable
+@inject SpellDatabase SpellDatabase
+@inject NavigationManager Navigation
+@inject IJSRuntime JsRuntime
+
+<PageTitle>Spells</PageTitle>
+
+<section class="spell-page">
+    <header class="page-header">
+        <div>
+            <p class="eyebrow">Spellbook</p>
+            <h1>Spells</h1>
+        </div>
+        <div class="spell-count">@VisibleCountText</div>
+    </header>
+
+    <section class="spell-toolbar">
+        <input class="search-input" placeholder="Spell suchen" @bind="filter.SearchText" @bind:event="oninput" @bind:after="ApplyFilter" />
+
+        <button type="button"
+                class="text-button no-margin spell-filter-button @(IsFilterPaneOpen ? "active" : "")"
+                @onclick="OpenFilters">
+            Filter@(ActiveFilterCount > 0 ? $" ({ActiveFilterCount})" : "")
+        </button>
+
+        @if (ActiveFilterCount > 0)
+        {
+            <button type="button" class="text-button no-margin" @onclick="ResetFilters">Reset</button>
+        }
+    </section>
+
+    <section class="active-filter-bar @(ActiveFilterCount == 0 ? "empty" : "")" aria-label="Active spell filters">
+        @foreach (var chip in ActiveFilterChips)
+        {
+            <button type="button" class="filter-chip" @onclick="() => chip.Clear()">
+                <span>@chip.Label</span>
+                <strong>x</strong>
+            </button>
+        }
+        @if (ActiveFilterCount > 0)
+        {
+            <button type="button" class="filter-chip reset-chip" @onclick="ResetFilters">Reset</button>
+        }
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(loadError))
+    {
+        <section class="sheet-panel">
+            <p class="eyebrow">Datenbankfehler</p>
+            <pre class="error-details">@loadError</pre>
+        </section>
+    }
+    else if (isLoading)
+    {
+        <p class="muted">Datenbank wird vorbereitet...</p>
+    }
+    else
+    {
+        <section class="spell-master-detail">
+            <section class="spell-list spell-list-pane">
+                @foreach (var levelGroup in VisibleSpellGroups.GroupBy(group => group.Level))
+                {
+                    <div class="spell-level-separator">@FormatSpellLevel(levelGroup.Key)</div>
+                    @foreach (var group in levelGroup)
+                    {
+                        var spell = group.ResolveVersion(selectedSpell);
+                        <article class="spell-row @(selectedSpellGroup?.Name == group.Name ? "selected" : "")" @onclick="async () => await OpenSpell(group)">
+                            <div class="spell-main">
+                                <div class="spell-title">
+                                    <h2>@group.Name</h2>
+                                    <span class="@GetSpellLevelClass(group.Level)">@group.LevelDisplay</span>
+                                </div>
+                                <div class="spell-meta">
+                                    <span>@group.School</span>
+                                    <span>@group.CastingTimeDisplay</span>
+                                    <span>@group.RangeDisplay</span>
+                                    @foreach (var source in group.Versions.Select(version => version.Source).Distinct())
+                                    {
+                                        <span class="source-badge">@source</span>
+                                    }
+                                </div>
+                            </div>
+                            <div class="spell-row-actions">
+                                <button class="icon-button favorite-button @(group.IsFavorite ? "active" : "")"
+                                        title="Favorite markieren"
+                                        @onclick="async () => await ToggleFavorite(spell)"
+                                        @onclick:stopPropagation>
+                                    @(group.IsFavorite ? "Fav" : "F")
+                                </button>
+                                <button class="icon-button @(group.IsPrepared ? "active" : "")"
+                                        title="Prepared markieren"
+                                        @onclick="async () => await TogglePrepared(spell)"
+                                        @onclick:stopPropagation>
+                                    @(group.IsPrepared ? "P" : "+")
+                                </button>
+                            </div>
+                        </article>
+                    }
+                }
+                @if (visibleSpellGroupCount < filteredSpellGroups.Count)
+                {
+                    <div class="spell-list-sentinel" @ref="spellListSentinel">
+                        Weitere Spells werden geladen...
+                    </div>
+                }
+            </section>
+
+            <aside class="spell-detail-pane">
+                @if (IsFilterPaneOpen)
+                {
+                    <section class="spell-filter-pane">
+                        <header class="detail-header compact-detail-header">
+                            <div>
+                                <p class="eyebrow">Spellbook</p>
+                                <h2>Filter</h2>
+                            </div>
+                            <button type="button" class="primary-action" @onclick="ApplyDraftFilters">Apply</button>
+                        </header>
+
+                        <div class="filter-pane-grid">
+                            <label class="stacked-field">
+                                <span>Class</span>
+                                <select @bind="draftClassName">
+                                    <option value="">Alle Klassen</option>
+                                    @foreach (var className in classNames)
+                                    {
+                                        <option value="@className">@className</option>
+                                    }
+                                </select>
+                            </label>
+
+                            <label class="stacked-field">
+                                <span>School</span>
+                                <select @bind="draftSchool">
+                                    <option value="">Alle Schools</option>
+                                    @foreach (var school in schools)
+                                    {
+                                        <option value="@school">@school</option>
+                                    }
+                                </select>
+                            </label>
+
+                            <label class="stacked-field">
+                                <span>Source</span>
+                                <select @bind="draftSource">
+                                    <option value="">Alle Quellen</option>
+                                    @foreach (var source in sources)
+                                    {
+                                        <option value="@source">@source</option>
+                                    }
+                                </select>
+                            </label>
+
+                            <label class="stacked-field">
+                                <span>Component</span>
+                                <select @bind="draftComponent">
+                                    <option value="">Alle Components</option>
+                                    <option value="V">Verbal</option>
+                                    <option value="S">Somatic</option>
+                                    <option value="M">Material</option>
+                                    <option value="M-Cost">Materialkosten</option>
+                                    <option value="M-Consumed">Material verbraucht</option>
+                                </select>
+                            </label>
+
+                            <label class="stacked-field">
+                                <span>Save</span>
+                                <select @bind="draftSave">
+                                    <option value="">Alle Saves</option>
+                                    @foreach (var savingThrow in savingThrows)
+                                    {
+                                        <option value="@savingThrow">@savingThrow</option>
+                                    }
+                                </select>
+                            </label>
+
+                            <label class="stacked-field">
+                                <span>Damage</span>
+                                <select @bind="draftDamageType">
+                                    <option value="">Alle Damage Types</option>
+                                    @foreach (var damageType in damageTypes)
+                                    {
+                                        <option value="@damageType">@damageType</option>
+                                    }
+                                </select>
+                            </label>
+                        </div>
+
+                        <section class="filter-section">
+                            <p class="eyebrow">Level</p>
+                            <div class="level-filter-grid">
+                                <button type="button" class="source-version @(string.IsNullOrWhiteSpace(draftLevel) ? "active" : "")" @onclick="@(() => SetDraftLevel(""))">All</button>
+                                @for (var level = 0; level <= 9; level++)
+                                {
+                                    var levelValue = level.ToString();
+                                    <button type="button" class="source-version @(draftLevel == levelValue ? "active" : "")" @onclick="@(() => SetDraftLevel(levelValue))">
+                                        @(level == 0 ? "C" : levelValue)
+                                    </button>
+                                }
+                            </div>
+                        </section>
+
+                        <section class="filter-section filter-toggle-grid">
+                            <label class="switch-toggle">
+                                <input type="checkbox" @bind="draftOnlyConcentration" />
+                                <span>Concentration</span>
+                            </label>
+                            <label class="switch-toggle">
+                                <input type="checkbox" @bind="draftOnlyRitual" />
+                                <span>Ritual</span>
+                            </label>
+                            <label class="switch-toggle">
+                                <input type="checkbox" @bind="draftOnlyFavorites" />
+                                <span>Favorites</span>
+                            </label>
+                        </section>
+
+                        <footer class="filter-actions">
+                            <button type="button" class="text-button no-margin" @onclick="ResetDraftFilters">Reset</button>
+                            <button type="button" class="primary-action" @onclick="ApplyDraftFilters">Apply</button>
+                        </footer>
+                    </section>
+                }
+                else if (selectedSpell is null)
+                {
+                    <div class="empty-detail">
+                        <p class="eyebrow">Details</p>
+                        <h2>Select a spell</h2>
+                        <p class="muted">On wide screens the spell details stay open next to the list.</p>
+                    </div>
+                }
+                else
+                {
+                    <SpellDetailContent Spell="selectedSpell"
+                                        Versions="selectedSpellGroup?.Versions"
+                                        OnTogglePrepared="TogglePrepared"
+                                        OnSelectVersion="SelectVersion" />
+                }
+            </aside>
+        </section>
+    }
+</section>
+
+@code {
+    private readonly SpellFilter filter = new();
+    private List<Spell> allSpells = [];
+    private List<SpellGroup> spellGroups = [];
+    private List<SpellGroup> filteredSpellGroups = [];
+    private List<string> schools = [];
+    private List<string> sources = [];
+    private List<string> classNames = [];
+    private List<string> savingThrows = [];
+    private List<string> damageTypes = [];
+    private IReadOnlyDictionary<string, int> sourcePriorities = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyDictionary<string, HashSet<string>> spellNamesByClass = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+    private bool isLoading = true;
+    private bool onlyConcentration;
+    private bool onlyRitual;
+    private bool onlyFavorites;
+    private string selectedLevel = "";
+    private string selectedClassName = "";
+    private string selectedComponent = "";
+    private string selectedSave = "";
+    private string selectedDamageType = "";
+    private string rightPaneMode = "Details";
+    private string draftLevel = "";
+    private string draftClassName = "";
+    private string draftSchool = "";
+    private string draftSource = "";
+    private string draftComponent = "";
+    private string draftSave = "";
+    private string draftDamageType = "";
+    private bool draftOnlyConcentration;
+    private bool draftOnlyRitual;
+    private bool draftOnlyFavorites;
+    private string loadError = "";
+    private Spell? selectedSpell;
+    private SpellGroup? selectedSpellGroup;
+    private int visibleSpellGroupCount = InitialVisibleSpellGroupCount;
+    private ElementReference spellListSentinel;
+    private DotNetObjectReference<Spells>? dotNetObjectReference;
+    private bool scrollObserverInitialized;
+    private const int InitialVisibleSpellGroupCount = 80;
+    private const int VisibleSpellGroupIncrement = 80;
+    private IEnumerable<SpellGroup> VisibleSpellGroups => filteredSpellGroups.Take(visibleSpellGroupCount);
+    private string VisibleCountText => $"{Math.Min(visibleSpellGroupCount, filteredSpellGroups.Count)} von {filteredSpellGroups.Count} angezeigt";
+    private List<FilterChip> ActiveFilterChips => BuildActiveFilterChips();
+    private int ActiveFilterCount => ActiveFilterChips.Count;
+    private bool IsFilterPaneOpen => rightPaneMode == "Filters";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (isLoading
+            || !string.IsNullOrWhiteSpace(loadError)
+            || scrollObserverInitialized
+            || visibleSpellGroupCount >= filteredSpellGroups.Count)
+        {
+            return;
+        }
+
+        dotNetObjectReference = DotNetObjectReference.Create(this);
+        await JsRuntime.InvokeVoidAsync("digitalCharacterSheet.observeSpellListEnd", spellListSentinel, dotNetObjectReference);
+        scrollObserverInitialized = true;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            allSpells = (await SpellDatabase.GetSpellSummariesAsync()).ToList();
+            sourcePriorities = await SpellDatabase.GetSourcePriorityMapAsync();
+            classNames = (await SpellDatabase.GetSpellcastingClassNamesAsync()).ToList();
+            spellNamesByClass = await SpellDatabase.GetSpellNamesByClassAsync();
+            spellGroups = GroupSpells(allSpells);
+            filteredSpellGroups = spellGroups;
+            schools = allSpells.Select(spell => spell.School).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct().OrderBy(value => value).ToList();
+            sources = allSpells.Select(spell => spell.Source).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct().OrderBy(value => value).ToList();
+            savingThrows = allSpells.SelectMany(spell => spell.SavingThrows).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(value => value).ToList();
+            damageTypes = allSpells.SelectMany(spell => spell.DamageTypes).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(value => value).ToList();
+        }
+        catch (Exception exception)
+        {
+            loadError = exception.ToString();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ApplyLevelFilter()
+    {
+        filter.Level = int.TryParse(selectedLevel, out var level) ? level : null;
+        ApplyFilter();
+    }
+
+    private void ApplyBooleanFilters()
+    {
+        filter.RequiresConcentration = onlyConcentration ? true : null;
+        filter.IsRitual = onlyRitual ? true : null;
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        filteredSpellGroups = GroupSpells(ApplyLocalFilter(allSpells, filter)).ToList();
+        visibleSpellGroupCount = InitialVisibleSpellGroupCount;
+        scrollObserverInitialized = false;
+        dotNetObjectReference?.Dispose();
+        dotNetObjectReference = null;
+        if (selectedSpellGroup is not null && filteredSpellGroups.All(group => group.Name != selectedSpellGroup.Name))
+        {
+            selectedSpellGroup = filteredSpellGroups.FirstOrDefault();
+            selectedSpell = selectedSpellGroup?.Primary;
+        }
+    }
+
+    private void OpenFilters()
+    {
+        CopyAppliedFiltersToDraft();
+        rightPaneMode = "Filters";
+    }
+
+    private void CopyAppliedFiltersToDraft()
+    {
+        draftLevel = selectedLevel;
+        draftClassName = selectedClassName;
+        draftSchool = filter.School;
+        draftSource = filter.Source;
+        draftComponent = selectedComponent;
+        draftSave = selectedSave;
+        draftDamageType = selectedDamageType;
+        draftOnlyConcentration = onlyConcentration;
+        draftOnlyRitual = onlyRitual;
+        draftOnlyFavorites = onlyFavorites;
+    }
+
+    private void ApplyDraftFilters()
+    {
+        selectedLevel = draftLevel;
+        selectedClassName = draftClassName;
+        selectedComponent = draftComponent;
+        selectedSave = draftSave;
+        selectedDamageType = draftDamageType;
+        onlyConcentration = draftOnlyConcentration;
+        onlyRitual = draftOnlyRitual;
+        onlyFavorites = draftOnlyFavorites;
+        filter.Level = int.TryParse(selectedLevel, out var level) ? level : null;
+        filter.School = draftSchool;
+        filter.Source = draftSource;
+        filter.RequiresConcentration = onlyConcentration ? true : null;
+        filter.IsRitual = onlyRitual ? true : null;
+        ApplyFilter();
+    }
+
+    private void ResetDraftFilters()
+    {
+        ResetFilters();
+        CopyAppliedFiltersToDraft();
+        rightPaneMode = "Filters";
+    }
+
+    private void SetDraftLevel(string level)
+    {
+        draftLevel = level;
+    }
+
+    [JSInvokable]
+    public Task ShowMoreSpells()
+    {
+        if (visibleSpellGroupCount >= filteredSpellGroups.Count)
+        {
+            return Task.CompletedTask;
+        }
+
+        visibleSpellGroupCount = Math.Min(
+            visibleSpellGroupCount + VisibleSpellGroupIncrement,
+            filteredSpellGroups.Count);
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task TogglePrepared(Spell spell)
+    {
+        spell.IsPrepared = !spell.IsPrepared;
+        await SpellDatabase.SetPreparedAsync(spell.Id, spell.IsPrepared);
+    }
+
+    private async Task ToggleFavorite(Spell spell)
+    {
+        spell.IsFavorite = !spell.IsFavorite;
+        await SpellDatabase.SetFavoriteAsync(spell.Id, spell.IsFavorite);
+    }
+
+    private async Task OpenSpell(SpellGroup group)
+    {
+        var spell = group.ResolveVersion(selectedSpell);
+        rightPaneMode = "Details";
+
+        if (await IsSplitViewAvailable())
+        {
+            var detailGroup = await LoadDetailGroup(group);
+            selectedSpellGroup = detailGroup;
+            selectedSpell = detailGroup.ResolveVersion(spell);
+            return;
+        }
+
+        Navigation.NavigateTo($"spells/{spell.Id}");
+    }
+
+    private async Task<bool> IsSplitViewAvailable()
+    {
+        try
+        {
+            return await JsRuntime.InvokeAsync<bool>("digitalCharacterSheet.isWideSpellLayout");
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void SelectVersion(Spell spell)
+    {
+        selectedSpell = spell;
+    }
+
+    private async Task<SpellGroup> LoadDetailGroup(SpellGroup group)
+    {
+        var versions = await SpellDatabase.GetSpellVersionsAsync(group.Name);
+        return versions.Count == 0 ? group : new SpellGroup(versions, sourcePriorities);
+    }
+
+    private List<SpellGroup> GroupSpells(IEnumerable<Spell> spells)
+    {
+        return spells
+            .GroupBy(spell => spell.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new SpellGroup(group, sourcePriorities))
+            .OrderBy(group => group.Level)
+            .ThenBy(group => group.Name)
+            .ToList();
+    }
+
+    private static string GetSpellLevelClass(int level)
+    {
+        return $"spell-level-badge level-{level}";
+    }
+
+    private static string FormatSpellLevel(int level)
+    {
+        return level == 0 ? "Cantrips" : $"Level {level}";
+    }
+
+    private void ResetFilters()
+    {
+        filter.SearchText = "";
+        filter.Level = null;
+        filter.School = "";
+        filter.Source = "";
+        filter.RequiresConcentration = null;
+        filter.IsRitual = null;
+        selectedLevel = "";
+        selectedClassName = "";
+        selectedComponent = "";
+        selectedSave = "";
+        selectedDamageType = "";
+        onlyConcentration = false;
+        onlyRitual = false;
+        onlyFavorites = false;
+        ApplyFilter();
+        CopyAppliedFiltersToDraft();
+    }
+
+    private List<FilterChip> BuildActiveFilterChips()
+    {
+        var chips = new List<FilterChip>();
+        AddChip(chips, filter.SearchText, $"Search: {filter.SearchText}", () => filter.SearchText = "");
+        AddChip(chips, selectedClassName, $"Class: {selectedClassName}", () => selectedClassName = "");
+        AddChip(chips, selectedLevel, $"Level: {(selectedLevel == "0" ? "Cantrip" : selectedLevel)}", () =>
+        {
+            selectedLevel = "";
+            filter.Level = null;
+        });
+        AddChip(chips, filter.School, $"School: {filter.School}", () => filter.School = "");
+        AddChip(chips, filter.Source, $"Source: {filter.Source}", () => filter.Source = "");
+        AddChip(chips, selectedComponent, $"Component: {selectedComponent}", () => selectedComponent = "");
+        AddChip(chips, selectedSave, $"Save: {selectedSave}", () => selectedSave = "");
+        AddChip(chips, selectedDamageType, $"Damage: {selectedDamageType}", () => selectedDamageType = "");
+
+        if (onlyConcentration)
+        {
+            chips.Add(new FilterChip("Concentration", () =>
+            {
+                onlyConcentration = false;
+                filter.RequiresConcentration = null;
+                ApplyFilter();
+            }));
+        }
+
+        if (onlyRitual)
+        {
+            chips.Add(new FilterChip("Ritual", () =>
+            {
+                onlyRitual = false;
+                filter.IsRitual = null;
+                ApplyFilter();
+            }));
+        }
+
+        if (onlyFavorites)
+        {
+            chips.Add(new FilterChip("Favorites", () =>
+            {
+                onlyFavorites = false;
+                ApplyFilter();
+            }));
+        }
+
+        return chips;
+    }
+
+    private void AddChip(List<FilterChip> chips, string value, string label, Action clear)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        chips.Add(new FilterChip(label, () =>
+        {
+            clear();
+            ApplyFilter();
+        }));
+    }
+
+    private IEnumerable<Spell> ApplyLocalFilter(IEnumerable<Spell> spells, SpellFilter filter)
+    {
+        var query = spells;
+
+        if (!string.IsNullOrWhiteSpace(filter.SearchText))
+        {
+            var search = filter.SearchText.Trim();
+            query = query.Where(spell =>
+                spell.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || spell.Description.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || spell.UpCast.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || spell.Aliases.Any(alias => alias.Contains(search, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        if (filter.Level is not null)
+        {
+            query = query.Where(spell => spell.Level == filter.Level);
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedClassName)
+            && spellNamesByClass.TryGetValue(selectedClassName, out var allowedSpellNames))
+        {
+            query = query.Where(spell => allowedSpellNames.Contains(spell.Name));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.School))
+        {
+            query = query.Where(spell => spell.School == filter.School);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Source))
+        {
+            query = query.Where(spell => spell.Source == filter.Source);
+        }
+
+        if (filter.RequiresConcentration is not null)
+        {
+            query = query.Where(spell => spell.RequiresConcentration == filter.RequiresConcentration);
+        }
+
+        if (filter.IsRitual is not null)
+        {
+            query = query.Where(spell => spell.IsRitual == filter.IsRitual);
+        }
+
+        if (onlyFavorites)
+        {
+            query = query.Where(spell => spell.IsFavorite);
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedComponent))
+        {
+            query = selectedComponent switch
+            {
+                "V" => query.Where(spell => spell.HasVerbalComponent),
+                "S" => query.Where(spell => spell.HasSomaticComponent),
+                "M" => query.Where(spell => spell.HasMaterialComponent),
+                "M-Cost" => query.Where(spell => spell.MaterialCostCopper is not null),
+                "M-Consumed" => query.Where(spell => spell.ConsumesMaterial),
+                _ => query
+            };
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedSave))
+        {
+            query = query.Where(spell => spell.SavingThrows.Contains(selectedSave, StringComparer.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedDamageType))
+        {
+            query = query.Where(spell => spell.DamageTypes.Contains(selectedDamageType, StringComparer.OrdinalIgnoreCase));
+        }
+
+        return query.OrderBy(spell => spell.Level).ThenBy(spell => spell.Name).ThenBy(spell => spell.Source);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (scrollObserverInitialized)
+        {
+            try
+            {
+                await JsRuntime.InvokeVoidAsync("digitalCharacterSheet.disposeSpellListEnd", spellListSentinel);
+            }
+            catch
+            {
+                // The WebView may already be disposed during navigation.
+            }
+        }
+
+        dotNetObjectReference?.Dispose();
+    }
+
+    private sealed record FilterChip(string Label, Action Clear);
+}

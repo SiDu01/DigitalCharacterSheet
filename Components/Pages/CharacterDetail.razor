@@ -1,0 +1,1257 @@
+@page "/characters/{Id:int}"
+@inject SpellDatabase SpellDatabase
+@inject NavigationManager Navigation
+@inject IJSRuntime JsRuntime
+
+<PageTitle>@character?.Name</PageTitle>
+
+@if (character is null)
+{
+    <p class="muted">Character wird geladen...</p>
+}
+else
+{
+    <section class="character-page">
+        <button class="back-button" title="Back" aria-label="Back" @onclick="OpenCharacters">‹</button>
+
+        <header class="character-compact-header">
+            <div class="character-title-line">
+                <p class="eyebrow">Character</p>
+                <h1>@character.Name</h1>
+            </div>
+            <div class="character-chip-row">
+                @if (!string.IsNullOrWhiteSpace(character.Summary))
+                {
+                    <span class="character-chip">@character.Summary</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(RaceDisplay))
+                {
+                    <span class="character-chip">@RaceDisplay</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(character.BackgroundName))
+                {
+                    <span class="character-chip">@character.BackgroundName</span>
+                }
+                @if (character.Feats.Count > 0)
+                {
+                    <span class="character-chip">@character.Feats.Count feats</span>
+                }
+            </div>
+            <div class="detail-actions">
+                <div class="spell-count">@characterSpellIds.Count spells / @PreparedCount prepared</div>
+                @if (confirmDelete)
+                {
+                    <button class="danger-action" @onclick="DeleteCharacter">Confirm Delete</button>
+                    <button class="text-button no-margin" @onclick="CancelDelete">Cancel</button>
+                }
+                else
+                {
+                    <button class="text-button no-margin" @onclick="EditCharacter">Edit</button>
+                    <button class="danger-action" @onclick="RequestDelete">Delete</button>
+                }
+            </div>
+        </header>
+
+        <nav class="tab-bar" aria-label="Character sections">
+            <button type="button" class="tab-button @(activeTab == "Main" ? "active" : "")" @onclick='() => SetActiveTab("Main")'>Main</button>
+            <button type="button" class="tab-button @(activeTab == "Combat" ? "active" : "")" @onclick='() => SetActiveTab("Combat")'>Combat</button>
+            <button type="button" class="tab-button @(activeTab == "Spells" ? "active" : "")" @onclick='() => SetActiveTab("Spells")'>Spells</button>
+        </nav>
+
+        @if (activeTab == "Main")
+        {
+            <section class="character-main-sheet">
+                <section class="main-left-stack">
+                    <section class="sheet-panel ability-panel">
+                        <header>
+                            <p class="eyebrow">Abilities</p>
+                        </header>
+                        <div class="sheet-ability-list">
+                            @foreach (var ability in AbilityScores)
+                            {
+                                <div class="sheet-ability">
+                                    <strong>@FormatModifier(AbilityModifier(ability.Value))</strong>
+                                    <span>@ability.Label</span>
+                                    <small>@ability.Value</small>
+                                </div>
+                            }
+                        </div>
+                    </section>
+
+                    <section class="sheet-panel save-panel">
+                        <header>
+                            <p class="eyebrow">Saving Throws</p>
+                        </header>
+                        <div class="sheet-check-list">
+                            @foreach (var savingThrow in character.SavingThrows)
+                            {
+                                <div class="sheet-check-row">
+                                    <span class="prof-dot @(savingThrow.IsProficient ? "active" : "")"></span>
+                                    <strong>@FormatModifier(GetSavingThrowModifier(savingThrow))</strong>
+                                    <span>@savingThrow.AbilityName</span>
+                                    @if (savingThrow.RollMode is "Advantage" or "Disadvantage")
+                                    {
+                                        <small>@ShortRollMode(savingThrow.RollMode)</small>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(savingThrow.Notes))
+                                    {
+                                        <em title="@savingThrow.Notes">@savingThrow.Notes</em>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </section>
+                </section>
+
+                <section class="sheet-panel skill-panel">
+                    <header>
+                        <p class="eyebrow">Skills</p>
+                    </header>
+                    <div class="sheet-check-list skill-check-list">
+                        @foreach (var skill in character.Skills)
+                        {
+                            <div class="sheet-check-row">
+                                <span class="prof-dot @(skill.IsProficient ? "active" : "")"></span>
+                                <strong>@FormatModifier(GetSkillModifier(skill))</strong>
+                                <span>@skill.Name <small>@skill.AbilityCode.ToUpperInvariant()</small></span>
+                                @if (skill.RollMode is "Advantage" or "Disadvantage")
+                                {
+                                    <small>@ShortRollMode(skill.RollMode)</small>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(skill.Notes))
+                                {
+                                    <em title="@skill.Notes">@skill.Notes</em>
+                                }
+                            </div>
+                        }
+                    </div>
+                </section>
+
+                <section class="sheet-panel main-side-panel">
+                    <nav class="subtab-bar compact-side-tabs" aria-label="Character details">
+                        <button type="button" class="subtab-button @(activeMainPanelTab == "Features" ? "active" : "")" @onclick='() => SetActiveMainPanelTab("Features")'>Features</button>
+                        <button type="button" class="subtab-button @(activeMainPanelTab == "Items" ? "active" : "")" @onclick='() => SetActiveMainPanelTab("Items")'>Items</button>
+                        <button type="button" class="subtab-button @(activeMainPanelTab == "Proficiencies" ? "active" : "")" @onclick='() => SetActiveMainPanelTab("Proficiencies")'>Proficiencies</button>
+                    </nav>
+
+                    @if (activeMainPanelTab == "Features")
+                    {
+                        <div class="side-tab-content">
+                            @if (sheetFeatureGroups.Count == 0)
+                            {
+                                <p class="muted compact-hint">No class or subclass features found for this level.</p>
+                            }
+                            else
+                            {
+                                <section class="sheet-feature-list">
+                                    @foreach (var group in sheetFeatureGroups)
+                                    {
+                                        <article class="sheet-feature-group">
+                                            <header>
+                                                <p class="eyebrow">@group.Kind</p>
+                                                <h3>@group.Title</h3>
+                                            </header>
+                                            @foreach (var level in group.Levels)
+                                            {
+                                                <section class="sheet-feature-level">
+                                                    <span class="feature-level-badge">Level @level.Level</span>
+                                                    <div>
+                                                        @foreach (var feature in level.Features)
+                                                        {
+                                                            <details class="feature-detail-toggle">
+                                                                <summary class="feature-pill">@feature.Name</summary>
+                                                                <div class="feature-detail-body">
+                                                                    @if (feature.Paragraphs.Count == 0)
+                                                                    {
+                                                                        <p class="muted compact-hint">No detail text found.</p>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        @foreach (var paragraph in feature.Paragraphs.Take(4))
+                                                                        {
+                                                                            <p><MarkupText Text="@paragraph" /></p>
+                                                                        }
+                                                                        @if (feature.Paragraphs.Count > 4)
+                                                                        {
+                                                                            <p class="muted compact-hint">@(feature.Paragraphs.Count - 4) more paragraphs in source data.</p>
+                                                                        }
+                                                                    }
+                                                                </div>
+                                                            </details>
+                                                        }
+                                                    </div>
+                                                </section>
+                                            }
+                                        </article>
+                                    }
+                                </section>
+                            }
+
+                            @if (character.Feats.Count > 0)
+                            {
+                                <section>
+                                    <p class="eyebrow">Feats</p>
+                                <div class="sheet-chip-list">
+                                    @foreach (var feat in character.Feats)
+                                    {
+                                        <span class="sheet-chip">@feat.DisplayName</span>
+                                    }
+                                </div>
+                                </section>
+                            }
+                        </div>
+                    }
+                    else if (activeMainPanelTab == "Items")
+                    {
+                        <div class="side-tab-content">
+                            <p class="muted compact-hint">Character inventory is not connected yet.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="side-tab-content">
+                            <section>
+                                <p class="eyebrow">Tools</p>
+                                <div class="sheet-chip-list">
+                                    @foreach (var tool in character.ToolProficiencies.Where(tool => tool.IsProficient))
+                                    {
+                                        <span class="sheet-chip" title="@tool.Notes">@tool.Name</span>
+                                    }
+                                    @if (!character.ToolProficiencies.Any(tool => tool.IsProficient))
+                                    {
+                                        <p class="muted compact-hint">No tool proficiencies.</p>
+                                    }
+                                </div>
+                            </section>
+                            <section>
+                                <p class="eyebrow">Languages</p>
+                                <div class="sheet-chip-list">
+                                    @foreach (var language in character.LanguageProficiencies.Where(language => language.IsProficient))
+                                    {
+                                        <span class="sheet-chip" title="@language.Notes">@language.Name</span>
+                                    }
+                                    @if (!character.LanguageProficiencies.Any(language => language.IsProficient))
+                                    {
+                                        <p class="muted compact-hint">No languages selected.</p>
+                                    }
+                                </div>
+                            </section>
+                        </div>
+                    }
+                </section>
+            </section>
+        }
+        else if (activeTab == "Combat")
+        {
+            <section class="character-combat-sheet">
+                <section class="combat-stat-grid">
+                    <article class="combat-stat-card primary">
+                        <p class="eyebrow">Armor Class</p>
+                        <strong>@ArmorClass</strong>
+                        <span>Unarmored base</span>
+                    </article>
+                    <article class="combat-stat-card">
+                        <p class="eyebrow">Initiative</p>
+                        <strong>@FormatModifier(InitiativeModifier)</strong>
+                        <span>Dexterity</span>
+                    </article>
+                    <article class="combat-stat-card">
+                        <p class="eyebrow">Speed</p>
+                        <strong>--</strong>
+                        <span>Race movement not connected</span>
+                    </article>
+                    <article class="combat-stat-card">
+                        <p class="eyebrow">Hit Points</p>
+                        <strong>--</strong>
+                        <span>HP tracking not connected</span>
+                    </article>
+                    <article class="combat-stat-card">
+                        <p class="eyebrow">Passive Perception</p>
+                        <strong>@PassivePerception</strong>
+                        <span>Perception</span>
+                    </article>
+                    <article class="combat-stat-card">
+                        <p class="eyebrow">Proficiency</p>
+                        <strong>@FormatModifier(ProficiencyBonus)</strong>
+                        <span>Level @character.Level</span>
+                    </article>
+                </section>
+
+                <section class="sheet-panel combat-save-panel">
+                    <header>
+                        <p class="eyebrow">Combat Saves</p>
+                    </header>
+                    <div class="combat-save-list">
+                        @foreach (var savingThrow in character.SavingThrows.Where(IsCombatSavingThrow))
+                        {
+                            <div class="sheet-check-row">
+                                <span class="prof-dot @(savingThrow.IsProficient ? "active" : "")"></span>
+                                <strong>@FormatModifier(GetSavingThrowModifier(savingThrow))</strong>
+                                <span>@savingThrow.AbilityName</span>
+                                @if (savingThrow.RollMode is "Advantage" or "Disadvantage")
+                                {
+                                    <small>@ShortRollMode(savingThrow.RollMode)</small>
+                                }
+                            </div>
+                        }
+                    </div>
+                </section>
+
+                <section class="sheet-panel combat-action-panel">
+                    <nav class="subtab-bar compact-side-tabs" aria-label="Combat action types">
+                        <button type="button" class="subtab-button @(activeCombatActionTab == "Actions" ? "active" : "")" @onclick='() => SetActiveCombatActionTab("Actions")'>Actions</button>
+                        <button type="button" class="subtab-button @(activeCombatActionTab == "BonusActions" ? "active" : "")" @onclick='() => SetActiveCombatActionTab("BonusActions")'>Bonus Actions</button>
+                        <button type="button" class="subtab-button @(activeCombatActionTab == "Reactions" ? "active" : "")" @onclick='() => SetActiveCombatActionTab("Reactions")'>Reactions</button>
+                    </nav>
+
+                    @if (activeCombatActionTab == "Actions")
+                    {
+                        <div class="combat-action-list">
+                            <article>
+                                <strong>Attack</strong>
+                                <span>Weapon attacks will use equipped items once inventory is connected.</span>
+                            </article>
+                            @foreach (var feature in CombatFeatureActions.Where(feature => feature.ActionType == "Actions"))
+                            {
+                                <article>
+                                    <strong>@feature.Name</strong>
+                                    <span>@feature.Summary</span>
+                                </article>
+                            }
+                            @foreach (var spell in CombatPreparedSpells)
+                            {
+                                <article>
+                                    <strong>@spell.Name</strong>
+                                    <span>@FormatSpellLevel(spell.Level) · @spell.CastingTimeDisplay · @spell.Source</span>
+                                </article>
+                            }
+                            <article>
+                                <strong>Dodge / Dash / Disengage / Help / Hide / Ready / Search</strong>
+                                <span>Common actions</span>
+                            </article>
+                        </div>
+                    }
+                    else if (activeCombatActionTab == "BonusActions")
+                    {
+                        <div class="combat-action-list">
+                            @foreach (var feature in CombatFeatureActions.Where(feature => feature.ActionType == "BonusActions"))
+                            {
+                                <article>
+                                    <strong>@feature.Name</strong>
+                                    <span>@feature.Summary</span>
+                                </article>
+                            }
+                            @if (!CombatFeatureActions.Any(feature => feature.ActionType == "BonusActions"))
+                            {
+                                <p class="muted compact-hint">No feature actions detected yet.</p>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="combat-action-list">
+                            <article>
+                                <strong>Opportunity Attack</strong>
+                                <span>Common reaction</span>
+                            </article>
+                            @foreach (var feature in CombatFeatureActions.Where(feature => feature.ActionType == "Reactions"))
+                            {
+                                <article>
+                                    <strong>@feature.Name</strong>
+                                    <span>@feature.Summary</span>
+                                </article>
+                            }
+                            <article>
+                                <strong>Readied Action</strong>
+                                <span>When trigger occurs</span>
+                            </article>
+                        </div>
+                    }
+                </section>
+            </section>
+        }
+        else
+        {
+            <section class="spell-master-detail character-spell-master-detail">
+            <section class="character-spell-pane">
+                <section class="sheet-panel spell-slot-panel compact-spell-slot-panel">
+                    <header class="spell-slot-summary">
+                        <div>
+                            <p class="eyebrow">Spell Slots</p>
+                            <p>@SpellSlotSummary</p>
+                        </div>
+                        @if (spellSlots.Count > 0)
+                        {
+                            <button type="button" class="text-button no-margin" @onclick="ToggleSpellSlots">
+                                @(spellSlotsExpanded ? "Hide" : "Edit")
+                            </button>
+                        }
+                    </header>
+                    @if (spellSlots.Count == 0)
+                    {
+                        <p class="muted compact-hint">No normal spell slots available.</p>
+                    }
+                    else if (spellSlotsExpanded)
+                    {
+                        <section class="compact-slot-list">
+                            @foreach (var slot in spellSlots)
+                            {
+                                <div class="compact-slot">
+                                    <div>
+                                        <strong>@slot.SpellLevel</strong>
+                                        <span>@slot.RemainingSlots/@slot.MaxSlots</span>
+                                    </div>
+                                    <div class="slot-pips">
+                                        @for (var index = 0; index < slot.MaxSlots; index++)
+                                        {
+                                            <span class="slot-pip @(index < slot.UsedSlots ? "used" : "")"></span>
+                                        }
+                                    </div>
+                                    <button class="mini-button" title="Use slot" @onclick="async () => await UseSlot(slot)">-</button>
+                                    <button class="mini-button" title="Restore slot" @onclick="async () => await RestoreSlot(slot)">+</button>
+                                </div>
+                            }
+                        </section>
+                    }
+                </section>
+
+                <nav class="subtab-bar" aria-label="Spell list sections">
+                    <button type="button" class="subtab-button @(activeSpellTab == "Known" ? "active" : "")" @onclick='() => SetActiveSpellTab("Known")'>Known Spells</button>
+                    <button type="button" class="subtab-button @(activeSpellTab == "All" ? "active" : "")" @onclick='() => SetActiveSpellTab("All")'>All Spells</button>
+                </nav>
+
+                <section class="spell-management-grid">
+                @if (activeSpellTab == "Known")
+                {
+                <section class="sheet-panel spell-book-panel">
+                    <header class="sheet-panel-header">
+                        <p class="eyebrow">Spell List</p>
+                        <span>@characterSpellIds.Count total / @PreparedCount prepared</span>
+                    </header>
+                    @if (knownSpellGroups.Count == 0)
+                    {
+                        <p class="muted">Noch keine Spells hinzugefuegt.</p>
+                    }
+                    else
+                    {
+                        <section class="spell-list compact">
+                            @foreach (var levelGroup in knownSpellGroups.GroupBy(group => group.Level))
+                            {
+                                <div class="spell-level-separator">@FormatSpellLevel(levelGroup.Key)</div>
+                                @foreach (var group in levelGroup)
+                                {
+                                    var spell = ResolveCharacterVersion(group);
+                                    <article class="spell-row compact-spell-row @(selectedSpellGroup?.Name == group.Name ? "selected" : "")" @onclick="async () => await OpenSpell(group)">
+                                        <div class="spell-main">
+                                            <div class="spell-title">
+                                                <h2>@group.Name</h2>
+                                                <span class="@GetSpellLevelClass(group.Level)">@group.LevelDisplay</span>
+                                            </div>
+                                        <div class="spell-meta">
+                                            <span>@group.School</span>
+                                            <span>@group.SourceDisplay</span>
+                                            <span>@GetGroupMode(group)</span>
+                                        </div>
+                                    </div>
+                                    <div class="spell-row-actions">
+                                        <button class="mode-button @(GetSpellMode(spell.Id) == "Prepared" ? "active" : "")"
+                                                title="Toggle prepared"
+                                                @onclick="async () => await ToggleSpellMode(spell)"
+                                                @onclick:stopPropagation>
+                                            @(GetSpellMode(spell.Id) == "Prepared" ? "Prep" : "Known")
+                                        </button>
+                                        <button class="mini-button active"
+                                                title="Remove"
+                                                @onclick="async () => await ToggleSpell(spell)"
+                                                @onclick:stopPropagation>-</button>
+                                    </div>
+                                    </article>
+                                }
+                            }
+                        </section>
+                    }
+                </section>
+                }
+
+                @if (activeSpellTab == "All")
+                {
+                <section class="sheet-panel add-spell-panel">
+                    <header class="sheet-panel-header">
+                        <p class="eyebrow">Add Spells</p>
+                        <label class="switch-toggle" title="Eligible only">
+                            <input type="checkbox" @bind="showOnlyEligible" @bind:after="ApplySpellFilter" />
+                            <span>Eligible only</span>
+                        </label>
+                    </header>
+                    <section class="filter-bar character-spell-filter">
+                        <input class="search-input" placeholder="Spell suchen" @bind="searchText" @bind:event="oninput" @bind:after="ApplySpellFilter" />
+                        <select @bind="selectedLevel" @bind:after="ApplySpellFilter">
+                            <option value="">Alle Level</option>
+                            @for (var level = 0; level <= 9; level++)
+                            {
+                                <option value="@level">@(level == 0 ? "Cantrip" : $"Level {level}")</option>
+                            }
+                        </select>
+                    </section>
+
+                    <section class="spell-list">
+                        @foreach (var levelGroup in availableSpellGroups.Take(80).GroupBy(group => group.Level))
+                        {
+                            <div class="spell-level-separator">@FormatSpellLevel(levelGroup.Key)</div>
+                            @foreach (var group in levelGroup)
+                            {
+                                var spell = ResolveCharacterVersion(group);
+                                var known = group.Versions.Any(version => characterSpellIds.Contains(version.Id));
+                                <article class="spell-row compact-spell-row @(selectedSpellGroup?.Name == group.Name ? "selected" : "")" @onclick="async () => await OpenSpell(group)">
+                                    <div class="spell-main">
+                                        <div class="spell-title">
+                                            <h2>@group.Name</h2>
+                                            <span class="@GetSpellLevelClass(group.Level)">@group.LevelDisplay</span>
+                                        </div>
+                                        <div class="spell-meta">
+                                            <span>@group.School</span>
+                                            <span>@group.CastingTimeDisplay</span>
+                                            <span>@group.SourceDisplay</span>
+                                            @if (TryGetEligibilityReason(group, out var reason))
+                                            {
+                                                <span>@reason</span>
+                                            }
+                                        </div>
+                                    </div>
+                                    <button class="mini-button @(known ? "active" : "")"
+                                            title="Toggle spell"
+                                            @onclick="async () => await ToggleSpell(spell)"
+                                            @onclick:stopPropagation>
+                                        @(known ? "-" : "+")
+                                    </button>
+                                </article>
+                            }
+                        }
+                    </section>
+                </section>
+                }
+                </section>
+            </section>
+
+            <aside class="spell-detail-pane">
+                @if (selectedSpell is null)
+                {
+                    <div class="empty-detail">
+                        <p class="eyebrow">Details</p>
+                        <h2>Select a spell</h2>
+                        <p class="muted">On wide screens spell details stay open while you manage this character's list.</p>
+                    </div>
+                }
+                else
+                {
+                    <SpellDetailContent Spell="selectedSpell"
+                                        Versions="selectedSpellGroup?.Versions"
+                                        PreparedActionLabel="@GetSpellMode(selectedSpell.Id)"
+                                        IsPreparedActionActive="@(GetSpellMode(selectedSpell.Id) == "Prepared")"
+                                        OnTogglePrepared="ToggleSpellMode"
+                                        OnSelectVersion="SelectVersion" />
+                }
+            </aside>
+        </section>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Character? character;
+    private List<Spell> allSpells = [];
+    private List<Spell> knownSpells = [];
+    private List<SpellGroup> knownSpellGroups = [];
+    private List<SpellGroup> availableSpellGroups = [];
+    private IReadOnlyDictionary<string, int> sourcePriorities = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    private HashSet<int> characterSpellIds = [];
+    private Dictionary<int, string> characterSpellModes = [];
+    private List<SpellSlot> spellSlots = [];
+    private List<ClassDefinition> classDefinitions = [];
+    private List<SubclassDefinition> subclassDefinitions = [];
+    private List<SheetFeatureGroup> sheetFeatureGroups = [];
+    private HashSet<int> eligibleSpellIds = [];
+    private Dictionary<int, SpellEligibility> spellEligibility = [];
+    private string searchText = "";
+    private string selectedLevel = "";
+    private bool showOnlyEligible = true;
+    private bool confirmDelete;
+    private string activeTab = "Main";
+    private string activeSpellTab = "Known";
+    private string activeMainPanelTab = "Features";
+    private string activeCombatActionTab = "Actions";
+    private bool spellSlotsExpanded;
+    private Spell? selectedSpell;
+    private SpellGroup? selectedSpellGroup;
+    private int PreparedCount => characterSpellModes.Values.Count(mode => mode == "Prepared");
+    private int ArmorClass => 10 + GetAbilityModifier("dex");
+    private int InitiativeModifier => GetAbilityModifier("dex");
+    private int PassivePerception => 10 + GetSkillModifierByName("Perception");
+    private IReadOnlyList<CombatFeatureAction> CombatFeatureActions => sheetFeatureGroups
+        .SelectMany(group => group.Levels)
+        .SelectMany(level => level.Features)
+        .Select(BuildCombatFeatureAction)
+        .Where(feature => feature is not null)
+        .Select(feature => feature!)
+        .GroupBy(feature => $"{feature.ActionType}|{feature.Name}", StringComparer.OrdinalIgnoreCase)
+        .Select(group => group.First())
+        .OrderBy(feature => feature.Name)
+        .ToList();
+    private IReadOnlyList<Spell> CombatPreparedSpells => knownSpells
+        .Where(spell => spell.Level == 0 || GetSpellMode(spell.Id) == "Prepared")
+        .OrderBy(spell => spell.Level)
+        .ThenBy(spell => spell.Name)
+        .ToList();
+    private string SpellSlotSummary => spellSlots.Count == 0
+        ? "No slots"
+        : string.Join(" · ", spellSlots.Select(slot => $"{FormatSpellLevel(slot.SpellLevel)} {slot.RemainingSlots}/{slot.MaxSlots}"));
+    private string RaceDisplay => character is null
+        ? ""
+        : string.IsNullOrWhiteSpace(character.SubraceName)
+            ? character.RaceName
+            : $"{character.RaceName} ({character.SubraceName})";
+    private IReadOnlyList<(string Label, int Value)> AbilityScores => character is null
+        ? []
+        :
+        [
+            ("STR", character.Strength),
+            ("DEX", character.Dexterity),
+            ("CON", character.Constitution),
+            ("INT", character.Intelligence),
+            ("WIS", character.Wisdom),
+            ("CHA", character.Charisma)
+        ];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        character = await SpellDatabase.GetCharacterAsync(Id);
+        allSpells = (await SpellDatabase.GetSpellSummariesAsync()).ToList();
+        sourcePriorities = await SpellDatabase.GetSourcePriorityMapAsync();
+        spellEligibility = (await SpellDatabase.GetSpellEligibilityAsync(Id)).ToDictionary();
+        eligibleSpellIds = spellEligibility.Keys.ToHashSet();
+        spellSlots = (await SpellDatabase.GetCharacterSpellSlotsAsync(Id)).ToList();
+        await LoadCharacterFeatureDefinitions();
+        await LoadCharacterSpells();
+        ApplySpellFilter();
+    }
+
+    private async Task LoadCharacterFeatureDefinitions()
+    {
+        classDefinitions = (await SpellDatabase.GetClassDefinitionsAsync()).ToList();
+        subclassDefinitions = [];
+
+        if (character is null)
+        {
+            sheetFeatureGroups = [];
+            return;
+        }
+
+        foreach (var classDefinitionId in character.Classes.Select(characterClass => characterClass.ClassDefinitionId).Where(id => id > 0).Distinct())
+        {
+            subclassDefinitions.AddRange(await SpellDatabase.GetSubclassDefinitionsAsync(classDefinitionId));
+        }
+
+        subclassDefinitions = subclassDefinitions
+            .GroupBy(subclass => subclass.Id)
+            .Select(group => group.First())
+            .ToList();
+        sheetFeatureGroups = BuildSheetFeatureGroups().ToList();
+    }
+
+    private async Task LoadCharacterSpells()
+    {
+        characterSpellIds = (await SpellDatabase.GetCharacterSpellIdsAsync(Id)).ToHashSet();
+        characterSpellModes = (await SpellDatabase.GetCharacterSpellModesAsync(Id)).ToDictionary();
+        knownSpells = allSpells
+            .Where(spell => characterSpellIds.Contains(spell.Id))
+            .OrderBy(spell => spell.Level)
+            .ThenBy(spell => spell.Name)
+            .ToList();
+        knownSpellGroups = GroupSpells(knownSpells);
+    }
+
+    private async Task ToggleSpell(Spell spell)
+    {
+        var shouldKnow = !characterSpellIds.Contains(spell.Id);
+        await SpellDatabase.SetCharacterSpellAsync(Id, spell.Id, shouldKnow);
+        await LoadCharacterSpells();
+        ApplySpellFilter();
+    }
+
+    private async Task ToggleSpellMode(Spell spell)
+    {
+        var nextMode = GetSpellMode(spell.Id) == "Prepared" ? "Known" : "Prepared";
+        await SpellDatabase.SetCharacterSpellModeAsync(Id, spell.Id, nextMode);
+        await LoadCharacterSpells();
+    }
+
+    private async Task UseSlot(SpellSlot slot)
+    {
+        await SpellDatabase.SetCharacterSpellSlotUsageAsync(Id, slot.SpellLevel, slot.UsedSlots + 1);
+        spellSlots = (await SpellDatabase.GetCharacterSpellSlotsAsync(Id)).ToList();
+    }
+
+    private async Task RestoreSlot(SpellSlot slot)
+    {
+        await SpellDatabase.SetCharacterSpellSlotUsageAsync(Id, slot.SpellLevel, slot.UsedSlots - 1);
+        spellSlots = (await SpellDatabase.GetCharacterSpellSlotsAsync(Id)).ToList();
+    }
+
+    private void SetActiveTab(string tab)
+    {
+        activeTab = tab;
+    }
+
+    private void SetActiveSpellTab(string tab)
+    {
+        activeSpellTab = tab;
+    }
+
+    private void SetActiveMainPanelTab(string tab)
+    {
+        activeMainPanelTab = tab;
+    }
+
+    private void SetActiveCombatActionTab(string tab)
+    {
+        activeCombatActionTab = tab;
+    }
+
+    private void ToggleSpellSlots()
+    {
+        spellSlotsExpanded = !spellSlotsExpanded;
+    }
+
+    private async Task OpenSpell(SpellGroup group)
+    {
+        var spell = ResolveCharacterVersion(group);
+
+        if (await IsSplitViewAvailable())
+        {
+            var detailGroup = await LoadDetailGroup(group);
+            selectedSpellGroup = detailGroup;
+            selectedSpell = detailGroup.ResolveVersion(spell);
+            return;
+        }
+
+        Navigation.NavigateTo($"spells/{spell.Id}");
+    }
+
+    private async Task<bool> IsSplitViewAvailable()
+    {
+        try
+        {
+            return await JsRuntime.InvokeAsync<bool>("digitalCharacterSheet.isWideSpellLayout");
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void SelectVersion(Spell spell)
+    {
+        selectedSpell = spell;
+    }
+
+    private async Task<SpellGroup> LoadDetailGroup(SpellGroup group)
+    {
+        var versions = await SpellDatabase.GetSpellVersionsAsync(group.Name);
+        return versions.Count == 0 ? group : new SpellGroup(versions, sourcePriorities);
+    }
+
+    private void ApplySpellFilter()
+    {
+        var query = allSpells.AsEnumerable();
+
+        if (showOnlyEligible)
+        {
+            query = query.Where(spell => eligibleSpellIds.Contains(spell.Id));
+        }
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            query = query.Where(spell => spell.Name.Contains(searchText.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (int.TryParse(selectedLevel, out var level))
+        {
+            query = query.Where(spell => spell.Level == level);
+        }
+
+        availableSpellGroups = GroupSpells(query)
+            .OrderBy(group => group.Versions.Any(spell => characterSpellIds.Contains(spell.Id)) ? 1 : 0)
+            .ThenBy(group => group.Level)
+            .ThenBy(group => group.Name)
+            .ToList();
+
+        if (selectedSpellGroup is not null && availableSpellGroups.Concat(knownSpellGroups).All(group => group.Name != selectedSpellGroup.Name))
+        {
+            selectedSpellGroup = knownSpellGroups.FirstOrDefault() ?? availableSpellGroups.FirstOrDefault();
+            selectedSpell = selectedSpellGroup?.Primary;
+        }
+    }
+
+    private void OpenCharacters()
+    {
+        Navigation.NavigateTo("characters");
+    }
+
+    private void EditCharacter()
+    {
+        Navigation.NavigateTo($"characters/{Id}/edit");
+    }
+
+    private void RequestDelete()
+    {
+        confirmDelete = true;
+    }
+
+    private void CancelDelete()
+    {
+        confirmDelete = false;
+    }
+
+    private async Task DeleteCharacter()
+    {
+        await SpellDatabase.DeleteCharacterAsync(Id);
+        Navigation.NavigateTo("characters");
+    }
+
+    private Spell ResolveCharacterVersion(SpellGroup group)
+    {
+        if (selectedSpell is not null && string.Equals(selectedSpell.Name, group.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            var matchingSelected = group.Versions.FirstOrDefault(spell => spell.Id == selectedSpell.Id);
+            if (matchingSelected is not null)
+            {
+                return matchingSelected;
+            }
+        }
+
+        return group.Versions.FirstOrDefault(spell => characterSpellIds.Contains(spell.Id)) ?? group.Primary;
+    }
+
+    private string GetSpellMode(int spellId)
+    {
+        return characterSpellModes.TryGetValue(spellId, out var mode) ? mode : "Known";
+    }
+
+    private string GetGroupMode(SpellGroup group)
+    {
+        return group.Versions.Any(version => GetSpellMode(version.Id) == "Prepared") ? "Prepared" : "Known";
+    }
+
+    private bool TryGetEligibilityReason(SpellGroup group, out string reason)
+    {
+        var reasons = group.Versions
+            .Where(version => spellEligibility.ContainsKey(version.Id))
+            .SelectMany(version => spellEligibility[version.Id].Reasons)
+            .Distinct()
+            .ToList();
+
+        reason = string.Join(", ", reasons);
+        return reasons.Count > 0;
+    }
+
+    private List<SpellGroup> GroupSpells(IEnumerable<Spell> spells)
+    {
+        return spells
+            .GroupBy(spell => spell.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new SpellGroup(group, sourcePriorities))
+            .OrderBy(group => group.Level)
+            .ThenBy(group => group.Name)
+            .ToList();
+    }
+
+    private static int AbilityModifier(int abilityScore)
+    {
+        return (int)Math.Floor((abilityScore - 10) / 2.0);
+    }
+
+    private static string FormatModifier(int modifier)
+    {
+        return modifier >= 0 ? $"+{modifier}" : modifier.ToString();
+    }
+
+    private static string FormatSpellLevel(int level)
+    {
+        return level == 0 ? "Cantrips" : $"Level {level}";
+    }
+
+    private static string GetSpellLevelClass(int level)
+    {
+        return $"spell-level-badge level-{level}";
+    }
+
+    private static string FormatProficiency(CharacterSavingThrow savingThrow)
+    {
+        return FormatProficiency(savingThrow.IsProficient, savingThrow.RollMode, savingThrow.Notes);
+    }
+
+    private static string FormatProficiency(CharacterSkill skill)
+    {
+        return FormatProficiency(skill.IsProficient, skill.RollMode, skill.Notes);
+    }
+
+    private static string FormatProficiency(bool isProficient, string rollMode, string notes)
+    {
+        var parts = new List<string>();
+        if (isProficient)
+        {
+            parts.Add("Prof");
+        }
+
+        if (rollMode is "Advantage" or "Disadvantage")
+        {
+            parts.Add(rollMode);
+        }
+
+        if (!string.IsNullOrWhiteSpace(notes))
+        {
+            parts.Add(notes);
+        }
+
+        return parts.Count == 0 ? "-" : string.Join(" / ", parts);
+    }
+
+    private int GetSavingThrowModifier(CharacterSavingThrow savingThrow)
+    {
+        return GetAbilityModifier(savingThrow.AbilityCode) + (savingThrow.IsProficient ? ProficiencyBonus : 0);
+    }
+
+    private int GetSkillModifier(CharacterSkill skill)
+    {
+        return GetAbilityModifier(skill.AbilityCode) + (skill.IsProficient ? ProficiencyBonus : 0);
+    }
+
+    private int GetSkillModifierByName(string name)
+    {
+        var skill = character?.Skills.FirstOrDefault(skill => string.Equals(skill.Name, name, StringComparison.OrdinalIgnoreCase));
+        return skill is null ? 0 : GetSkillModifier(skill);
+    }
+
+    private int GetAbilityModifier(string abilityCode)
+    {
+        if (character is null)
+        {
+            return 0;
+        }
+
+        var score = abilityCode switch
+        {
+            "str" => character.Strength,
+            "dex" => character.Dexterity,
+            "con" => character.Constitution,
+            "int" => character.Intelligence,
+            "wis" => character.Wisdom,
+            "cha" => character.Charisma,
+            _ => 10
+        };
+
+        return AbilityModifier(score);
+    }
+
+    private int ProficiencyBonus => character?.Level switch
+    {
+        null => 2,
+        <= 4 => 2,
+        <= 8 => 3,
+        <= 12 => 4,
+        <= 16 => 5,
+        _ => 6
+    };
+
+    private static string ShortRollMode(string rollMode)
+    {
+        return rollMode == "Advantage" ? "ADV" : "DIS";
+    }
+
+    private static bool IsCombatSavingThrow(CharacterSavingThrow savingThrow)
+    {
+        return savingThrow.AbilityCode is "dex" or "con" or "wis";
+    }
+
+    private static CombatFeatureAction? BuildCombatFeatureAction(SheetFeature feature)
+    {
+        var text = string.Join(" ", feature.Paragraphs);
+        var actionType = ClassifyFeatureAction(text);
+        if (actionType == "")
+        {
+            return null;
+        }
+
+        return new CombatFeatureAction(feature.Name, actionType, BuildFeatureActionSummary(text));
+    }
+
+    private static string ClassifyFeatureAction(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return "";
+        }
+
+        var normalized = text.ToLowerInvariant();
+        if (normalized.Contains("as a bonus action") || normalized.Contains("use a bonus action") || normalized.Contains("use your bonus action"))
+        {
+            return "BonusActions";
+        }
+
+        if (normalized.Contains("as a reaction") || normalized.Contains("use a reaction") || normalized.Contains("use your reaction"))
+        {
+            return "Reactions";
+        }
+
+        if (normalized.Contains("as an action") || normalized.Contains("as a magic action") || normalized.Contains("use an action") || normalized.Contains("use your action"))
+        {
+            return "Actions";
+        }
+
+        return "";
+    }
+
+    private static string BuildFeatureActionSummary(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return "Feature action";
+        }
+
+        var cleaned = CleanMarkup(text);
+        return cleaned.Length <= 150 ? cleaned : $"{cleaned[..150].Trim()}...";
+    }
+
+    private IEnumerable<SheetFeatureGroup> BuildSheetFeatureGroups()
+    {
+        if (character is null)
+        {
+            yield break;
+        }
+
+        foreach (var characterClass in character.Classes.OrderBy(characterClass => characterClass.ClassName))
+        {
+            var classDefinition = classDefinitions.FirstOrDefault(definition => definition.Id == characterClass.ClassDefinitionId);
+            if (classDefinition is not null)
+            {
+                var classLevels = BuildFeatureLevelGroups(classDefinition.RawJson, "classFeatures")
+                    .Where(level => level.Level <= characterClass.Level)
+                    .ToList();
+                if (classLevels.Count > 0)
+                {
+                    yield return new SheetFeatureGroup("Class", characterClass.DisplayName, classLevels);
+                }
+            }
+
+            if (characterClass.SubclassDefinitionId is not null)
+            {
+                var subclassDefinition = subclassDefinitions.FirstOrDefault(definition => definition.Id == characterClass.SubclassDefinitionId.Value);
+                if (subclassDefinition is not null)
+                {
+                    var subclassLevels = BuildFeatureLevelGroups(subclassDefinition.RawJson, "subclassFeatures")
+                        .Where(level => level.Level <= characterClass.Level)
+                        .ToList();
+                    if (subclassLevels.Count > 0)
+                    {
+                        yield return new SheetFeatureGroup("Subclass", $"{characterClass.ClassName}: {subclassDefinition.DisplayName}", subclassLevels);
+                    }
+                }
+            }
+        }
+    }
+
+    private static IEnumerable<SheetFeatureLevel> BuildFeatureLevelGroups(string rawJson, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            yield break;
+        }
+
+        using var document = System.Text.Json.JsonDocument.Parse(rawJson);
+        if (!document.RootElement.TryGetProperty(propertyName, out var features) || features.ValueKind != System.Text.Json.JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        var details = BuildFeatureDetailLookup(document.RootElement);
+        foreach (var group in features.EnumerateArray()
+            .Select(feature => ParseFeatureReference(feature, details))
+            .Where(feature => feature is not null)
+            .Select(feature => feature!)
+            .GroupBy(feature => feature.Level)
+            .OrderBy(group => group.Key))
+        {
+            yield return new SheetFeatureLevel(
+                group.Key,
+                group
+                    .GroupBy(feature => feature.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .OrderBy(feature => feature.Name)
+                    .ToList());
+        }
+    }
+
+    private static Dictionary<string, IReadOnlyList<string>> BuildFeatureDetailLookup(System.Text.Json.JsonElement root)
+    {
+        var details = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+        if (!root.TryGetProperty("_featureDetails", out var featureDetails) || featureDetails.ValueKind != System.Text.Json.JsonValueKind.Array)
+        {
+            return details;
+        }
+
+        foreach (var featureDetail in featureDetails.EnumerateArray())
+        {
+            var name = ReadJsonString(featureDetail, "name");
+            if (string.IsNullOrWhiteSpace(name) || !featureDetail.TryGetProperty("level", out var levelElement))
+            {
+                continue;
+            }
+
+            var level = levelElement.ValueKind == System.Text.Json.JsonValueKind.Number && levelElement.TryGetInt32(out var parsedLevel)
+                ? parsedLevel
+                : 0;
+            if (level is < 1 or > 20)
+            {
+                continue;
+            }
+
+            var paragraphs = featureDetail.TryGetProperty("entries", out var entries)
+                ? ExtractParagraphs(entries).ToList()
+                : [];
+            details[BuildFeatureKey(name, level)] = paragraphs;
+        }
+
+        return details;
+    }
+
+    private static SheetFeature? ParseFeatureReference(System.Text.Json.JsonElement element, IReadOnlyDictionary<string, IReadOnlyList<string>> details)
+    {
+        var reference = element.ValueKind switch
+        {
+            System.Text.Json.JsonValueKind.String => element.GetString(),
+            System.Text.Json.JsonValueKind.Object when element.TryGetProperty("classFeature", out var classFeature) => classFeature.GetString(),
+            System.Text.Json.JsonValueKind.Object when element.TryGetProperty("subclassFeature", out var subclassFeature) => subclassFeature.GetString(),
+            _ => null
+        };
+
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return null;
+        }
+
+        var parts = reference.Split('|', StringSplitOptions.None);
+        var level = parts
+            .Select(part => int.TryParse(part, out var parsed) ? parsed : 0)
+            .LastOrDefault(parsed => parsed is >= 1 and <= 20);
+
+        if (level == 0)
+        {
+            return null;
+        }
+
+        var name = CleanMarkup(parts[0]);
+        var key = BuildFeatureKey(name, level);
+        return new SheetFeature(name, level, key, details.GetValueOrDefault(key) ?? []);
+    }
+
+    private static string BuildFeatureKey(string name, int level)
+    {
+        return $"{CleanMarkup(name).Trim()}|{level}";
+    }
+
+    private static IEnumerable<string> ExtractParagraphs(System.Text.Json.JsonElement element)
+    {
+        if (element.ValueKind == System.Text.Json.JsonValueKind.String)
+        {
+            yield return element.GetString() ?? "";
+            yield break;
+        }
+
+        if (element.ValueKind == System.Text.Json.JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("entry", out var entry))
+            {
+                foreach (var value in ExtractParagraphs(entry))
+                {
+                    yield return value;
+                }
+            }
+
+            if (element.TryGetProperty("entries", out var entries))
+            {
+                foreach (var value in ExtractParagraphs(entries))
+                {
+                    yield return value;
+                }
+            }
+
+            if (element.TryGetProperty("items", out var items))
+            {
+                foreach (var value in ExtractParagraphs(items))
+                {
+                    yield return value;
+                }
+            }
+
+            yield break;
+        }
+
+        if (element.ValueKind != System.Text.Json.JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var item in element.EnumerateArray())
+        {
+            if (item.ValueKind == System.Text.Json.JsonValueKind.Object && item.TryGetProperty("name", out var name))
+            {
+                var text = string.Join(" ", ExtractParagraphs(item));
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    yield return $"{name.GetString()}: {text}";
+                }
+                continue;
+            }
+
+            foreach (var value in ExtractParagraphs(item))
+            {
+                yield return value;
+            }
+        }
+    }
+
+    private static string ReadJsonString(System.Text.Json.JsonElement element, string propertyName)
+    {
+        return element.ValueKind == System.Text.Json.JsonValueKind.Object
+            && element.TryGetProperty(propertyName, out var property)
+            && property.ValueKind == System.Text.Json.JsonValueKind.String
+            ? property.GetString() ?? ""
+            : "";
+    }
+
+    private static string CleanMarkup(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "";
+        }
+
+        var cleaned = value.Replace("{@dc ", "DC ");
+        cleaned = System.Text.RegularExpressions.Regex.Replace(
+            cleaned,
+            @"\{@[a-zA-Z]+ ([^|}]+)(?:\|[^}]*)?\}",
+            "$1");
+
+        return cleaned
+            .Replace("|XPHB", "")
+            .Replace("|PHB", "")
+            .Replace("}", "")
+            .Trim();
+    }
+
+    private sealed record SheetFeatureGroup(string Kind, string Title, IReadOnlyList<SheetFeatureLevel> Levels);
+    private sealed record SheetFeatureLevel(int Level, IReadOnlyList<SheetFeature> Features);
+    private sealed record SheetFeature(string Name, int Level, string Key, IReadOnlyList<string> Paragraphs);
+    private sealed record CombatFeatureAction(string Name, string ActionType, string Summary);
+}

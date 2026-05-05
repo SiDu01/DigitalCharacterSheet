@@ -1,0 +1,54 @@
+@page "/spells/{Id:int}"
+@inject SpellDatabase SpellDatabase
+@inject NavigationManager Navigation
+
+<PageTitle>@spell?.Name</PageTitle>
+
+@if (spell is null)
+{
+    <p class="muted">Spell wird geladen...</p>
+}
+else
+{
+    <section class="spell-detail">
+        <SpellDetailContent Spell="spell"
+                            Versions="versions"
+                            ShowBackButton="true"
+                            OnBack="OpenSpells"
+                            OnTogglePrepared="TogglePrepared"
+                            OnSelectVersion="SelectVersion" />
+    </section>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Spell? spell;
+    private List<Spell> versions = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        spell = await SpellDatabase.GetSpellAsync(Id);
+        if (spell is not null)
+        {
+            versions = (await SpellDatabase.GetSpellVersionsAsync(spell.Name)).ToList();
+        }
+    }
+
+    private async Task TogglePrepared(Spell selectedSpell)
+    {
+        selectedSpell.IsPrepared = !selectedSpell.IsPrepared;
+        await SpellDatabase.SetPreparedAsync(selectedSpell.Id, selectedSpell.IsPrepared);
+    }
+
+    private void SelectVersion(Spell selectedSpell)
+    {
+        spell = selectedSpell;
+    }
+
+    private void OpenSpells()
+    {
+        Navigation.NavigateTo("spells");
+    }
+
+}

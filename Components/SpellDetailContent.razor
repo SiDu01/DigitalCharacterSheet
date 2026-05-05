@@ -1,0 +1,126 @@
+@if (Spell is not null)
+{
+    <section class="spell-detail-content">
+        @if (ShowBackButton)
+        {
+            <button class="back-button" title="Back" aria-label="Back" @onclick="OnBack">‹</button>
+        }
+
+        <header class="detail-header">
+            <div>
+                <div class="source-switcher" aria-label="Spell source versions">
+                    @foreach (var version in SourceVersions)
+                    {
+                        <button class="source-version @(version.Id == Spell.Id ? "active" : "")"
+                                title="@BuildSourceTitle(version)"
+                                @onclick="async () => await SelectVersion(version)">
+                            @version.Source@(version.Page is null ? "" : $" p. {version.Page}")
+                        </button>
+                    }
+                </div>
+                <h1>@Spell.Name</h1>
+                <p>@Spell.LevelDisplay @Spell.School</p>
+            </div>
+            <button class="primary-action @(IsActionActive ? "active" : "")" @onclick="TogglePrepared">
+                @ActionLabel
+            </button>
+        </header>
+
+        <dl class="detail-grid">
+            <div><dt>Casting Time</dt><dd>@Spell.CastingTimeDisplay</dd></div>
+            <div><dt>Range</dt><dd>@Spell.RangeDisplay</dd></div>
+            <div><dt>Components</dt><dd>@Spell.ComponentsDisplay</dd></div>
+            <div><dt>Duration</dt><dd>@Spell.DurationDisplay</dd></div>
+        </dl>
+
+        @if (!string.IsNullOrWhiteSpace(Spell.MaterialCostDisplay) || Spell.ConsumesMaterial)
+        {
+            <section class="detail-section">
+                <h2>Material</h2>
+                <p>@Spell.MaterialComponent</p>
+                @if (!string.IsNullOrWhiteSpace(Spell.MaterialCostDisplay))
+                {
+                    <p class="muted">Kosten: @Spell.MaterialCostDisplay</p>
+                }
+                @if (Spell.ConsumesMaterial)
+                {
+                    <p class="muted">Wird verbraucht.</p>
+                }
+            </section>
+        }
+
+        <section class="detail-section">
+            <h2>Beschreibung</h2>
+            @foreach (var paragraph in SplitParagraphs(Spell.Description))
+            {
+                <p><MarkupText Text="@paragraph" /></p>
+            }
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Spell.UpCast))
+        {
+            <section class="detail-section">
+            <h2>Upcast</h2>
+            @foreach (var paragraph in SplitParagraphs(Spell.UpCast))
+            {
+                <p><MarkupText Text="@paragraph" /></p>
+            }
+        </section>
+        }
+
+        <section class="tag-cloud">
+            @foreach (var tag in BuildTags(Spell))
+            {
+                <span>@tag</span>
+            }
+        </section>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Spell? Spell { get; set; }
+    [Parameter] public IReadOnlyList<Spell>? Versions { get; set; }
+    [Parameter] public bool ShowBackButton { get; set; }
+    [Parameter] public EventCallback OnBack { get; set; }
+    [Parameter] public EventCallback<Spell> OnTogglePrepared { get; set; }
+    [Parameter] public EventCallback<Spell> OnSelectVersion { get; set; }
+    [Parameter] public string? PreparedActionLabel { get; set; }
+    [Parameter] public bool? IsPreparedActionActive { get; set; }
+
+    private IReadOnlyList<Spell> SourceVersions => Versions is { Count: > 0 } ? Versions : Spell is null ? [] : [Spell];
+    private bool IsActionActive => Spell is not null && (IsPreparedActionActive ?? Spell.IsPrepared);
+    private string ActionLabel => PreparedActionLabel ?? (Spell?.IsPrepared == true ? "Prepared" : "Prepare");
+
+    private async Task TogglePrepared()
+    {
+        if (Spell is not null)
+        {
+            await OnTogglePrepared.InvokeAsync(Spell);
+        }
+    }
+
+    private async Task SelectVersion(Spell version)
+    {
+        await OnSelectVersion.InvokeAsync(version);
+    }
+
+    private static string BuildSourceTitle(Spell spell)
+    {
+        return spell.Page is null ? spell.Source : $"{spell.Source} page {spell.Page}";
+    }
+
+    private static IEnumerable<string> SplitParagraphs(string value)
+    {
+        return value.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    private static IEnumerable<string> BuildTags(Spell spell)
+    {
+        if (spell.IsRitual) yield return "Ritual";
+        if (spell.RequiresConcentration) yield return "Concentration";
+        foreach (var value in spell.SavingThrows.Select(value => $"Save: {value}")) yield return value;
+        foreach (var value in spell.DamageTypes.Select(value => $"Damage: {value}")) yield return value;
+        foreach (var value in spell.ConditionsInflicted.Select(value => $"Condition: {value}")) yield return value;
+        foreach (var value in spell.SpellAttackTypes.Select(value => $"Attack: {value}")) yield return value;
+    }
+}

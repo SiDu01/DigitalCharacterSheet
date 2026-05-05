@@ -1,0 +1,67 @@
+@page "/characters"
+@inject SpellDatabase SpellDatabase
+@inject NavigationManager Navigation
+
+<PageTitle>Characters</PageTitle>
+
+<section class="character-page">
+    <header class="page-header">
+        <div>
+            <p class="eyebrow">Party</p>
+            <h1>Characters</h1>
+        </div>
+        <div class="header-actions">
+            <div class="spell-count">@characters.Count</div>
+            <button class="primary-action" @onclick="CreateNew">New Character</button>
+        </div>
+    </header>
+
+    @if (isLoading)
+    {
+        <p class="muted">Characters werden geladen...</p>
+    }
+    else if (characters.Count == 0)
+    {
+        <section class="empty-detail">
+            <p class="eyebrow">No Characters</p>
+            <h2>Create your first character</h2>
+            <p class="muted">Characters can have race, background, multiple classes, subclasses, and their own spell list.</p>
+        </section>
+    }
+    else
+    {
+        <section class="character-list">
+            @foreach (var character in characters)
+            {
+                <article class="character-row" @onclick="() => OpenCharacter(character.Id)">
+                    <div>
+                        <h2>@character.Name</h2>
+                        <p>@character.Summary</p>
+                    </div>
+                    <button class="text-button" @onclick="() => OpenCharacter(character.Id)" @onclick:stopPropagation>Open</button>
+                </article>
+            }
+        </section>
+    }
+</section>
+
+@code {
+    private List<Character> characters = [];
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        characters = (await SpellDatabase.GetCharactersAsync()).ToList();
+        isLoading = false;
+    }
+
+    private void CreateNew()
+    {
+        Navigation.NavigateTo("characters/new");
+    }
+
+    private void OpenCharacter(int id)
+    {
+        Navigation.NavigateTo($"characters/{id}");
+    }
+}
