@@ -49,7 +49,19 @@ Resources\Raw\seed\digital-character-sheet.db3
 Build or refresh it with:
 
 ```powershell
-dotnet run --project Tools\SeedDatabaseBuilder\SeedDatabaseBuilder.csproj -- Resources\Raw\seed\digital-character-sheet.db3
+dotnet run --project Tools\SeedDatabaseBuilder\SeedDatabaseBuilder.csproj
+```
+
+The builder asks for the path to your local `5e Tools\data` folder and writes the seed database to:
+
+```text
+Resources\Raw\seed\digital-character-sheet.db3
+```
+
+You can also run it non-interactively:
+
+```powershell
+dotnet run --project Tools\SeedDatabaseBuilder\SeedDatabaseBuilder.csproj -- --source "D:\Dev\5e Tools\data" --output Resources\Raw\seed\digital-character-sheet.db3
 ```
 
 The app copies the seed database only when no app database exists yet. Installing over an existing app keeps existing app data. To force a fresh first-run database copy, clear app data:

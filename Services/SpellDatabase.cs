@@ -18,6 +18,9 @@ public sealed class SpellDatabase
     private const string SeedDatabaseVersion = "seed-v1";
     private const string DatabaseFileName = "digital-character-sheet.db3";
     private const string SeedDatabaseAssetName = "seed/digital-character-sheet.db3";
+#if SEED_BUILDER
+    private static string seedSourceDataPath = Path.Combine("Resources", "Raw");
+#endif
     private static readonly SemaphoreSlim InitializationLock = new(1, 1);
     private readonly SQLiteAsyncConnection _database;
     private readonly SpellImportService _importService;
@@ -45,6 +48,18 @@ public sealed class SpellDatabase
 
     public static async Task CreateSeedDatabaseAsync(string databasePath)
     {
+        await CreateSeedDatabaseAsync(databasePath, null);
+    }
+
+    public static async Task CreateSeedDatabaseAsync(string databasePath, string? sourceDataPath)
+    {
+#if SEED_BUILDER
+        if (!string.IsNullOrWhiteSpace(sourceDataPath))
+        {
+            seedSourceDataPath = sourceDataPath;
+        }
+#endif
+
         if (File.Exists(databasePath))
         {
             File.Delete(databasePath);
@@ -103,6 +118,7 @@ public sealed class SpellDatabase
                 await CreateTableAsync<FeatDefinitionEntity>("FeatDefinitions");
                 await CreateTableAsync<CharacterFeatEntity>("CharacterFeats");
                 await CreateTableAsync<CharacterHiddenFeatureEntity>("CharacterHiddenFeatures");
+                await CreateTableAsync<CharacterGrantedEffectEntity>("CharacterGrantedEffects");
                 await CreateTableAsync<SourceSettingEntity>("SourceSettings");
                 await CreateTableAsync<ItemDefinitionEntity>("ItemDefinitions");
                 await CreateTableAsync<ItemWeaponStatEntity>("ItemWeaponStats");
@@ -171,6 +187,7 @@ public sealed class SpellDatabase
         var feats = await GetAllCharacterFeatsAsync();
         var savingThrows = await GetAllCharacterSavingThrowsAsync();
         var skills = await GetAllCharacterSkillsAsync();
+        var grantedEffects = await GetAllCharacterGrantedEffectsAsync();
         var fightingStyles = await GetAllCharacterFightingStylesAsync();
         var toolProficiencies = await GetAllCharacterToolProficienciesAsync();
         var languageProficiencies = await GetAllCharacterLanguageProficienciesAsync();
@@ -184,6 +201,7 @@ public sealed class SpellDatabase
                 feats.Where(feat => feat.CharacterId == entity.Id),
                 savingThrows.Where(savingThrow => savingThrow.CharacterId == entity.Id),
                 skills.Where(skill => skill.CharacterId == entity.Id),
+                grantedEffects.Where(effect => effect.CharacterId == entity.Id),
                 fightingStyles.Where(style => style.CharacterId == entity.Id),
                 toolProficiencies.Where(tool => tool.CharacterId == entity.Id),
                 languageProficiencies.Where(language => language.CharacterId == entity.Id),
@@ -207,13 +225,14 @@ public sealed class SpellDatabase
         var feats = await GetCharacterFeatsAsync(entity.Id);
         var savingThrows = await GetCharacterSavingThrowsAsync(entity.Id);
         var skills = await GetCharacterSkillsAsync(entity.Id);
+        var grantedEffects = await GetCharacterGrantedEffectsAsync(entity.Id);
         var fightingStyles = await GetCharacterFightingStylesAsync(entity.Id);
         var toolProficiencies = await GetCharacterToolProficienciesAsync(entity.Id);
         var languageProficiencies = await GetCharacterLanguageProficienciesAsync(entity.Id);
         var raceDefinitions = await _database.Table<RaceDefinitionEntity>().ToListAsync();
         var subraceDefinitions = await _database.Table<SubraceDefinitionEntity>().ToListAsync();
         var backgroundDefinitions = await _database.Table<BackgroundDefinitionEntity>().ToListAsync();
-        return ToModel(entity, classes, feats, savingThrows, skills, fightingStyles, toolProficiencies, languageProficiencies, raceDefinitions, subraceDefinitions, backgroundDefinitions);
+        return ToModel(entity, classes, feats, savingThrows, skills, grantedEffects, fightingStyles, toolProficiencies, languageProficiencies, raceDefinitions, subraceDefinitions, backgroundDefinitions);
     }
 
     public async Task<Character> AddCharacterAsync(Character character)
@@ -262,6 +281,8 @@ public sealed class SpellDatabase
             });
         }
 
+        await PruneInvalidGrantedEffectsAsync(character.Id, character.Classes);
+
         foreach (var feat in character.Feats.Where(feat => feat.FeatDefinitionId > 0))
         {
             await _database.InsertAsync(new CharacterFeatEntity
@@ -281,13 +302,14 @@ public sealed class SpellDatabase
         var feats = await GetCharacterFeatsAsync(entity.Id);
         var savingThrows = await GetCharacterSavingThrowsAsync(entity.Id);
         var skills = await GetCharacterSkillsAsync(entity.Id);
+        var grantedEffects = await GetCharacterGrantedEffectsAsync(entity.Id);
         var fightingStyles = await GetCharacterFightingStylesAsync(entity.Id);
         var toolProficiencies = await GetCharacterToolProficienciesAsync(entity.Id);
         var languageProficiencies = await GetCharacterLanguageProficienciesAsync(entity.Id);
         var raceDefinitions = await _database.Table<RaceDefinitionEntity>().ToListAsync();
         var subraceDefinitions = await _database.Table<SubraceDefinitionEntity>().ToListAsync();
         var backgroundDefinitions = await _database.Table<BackgroundDefinitionEntity>().ToListAsync();
-        return ToModel(entity, classes, feats, savingThrows, skills, fightingStyles, toolProficiencies, languageProficiencies, raceDefinitions, subraceDefinitions, backgroundDefinitions);
+        return ToModel(entity, classes, feats, savingThrows, skills, grantedEffects, fightingStyles, toolProficiencies, languageProficiencies, raceDefinitions, subraceDefinitions, backgroundDefinitions);
     }
 
     public async Task UpdateCharacterAsync(Character character)
@@ -397,8 +419,6 @@ public sealed class SpellDatabase
             await _database.DeleteAsync(existingFightingStyle);
         }
 
-        await InsertCharacterFightingStylesAsync(character.Id, character.FightingStyles);
-
         var existingTools = await _database.Table<CharacterToolProficiencyEntity>()
             .Where(row => row.CharacterId == character.Id)
             .ToListAsync();
@@ -454,6 +474,14 @@ public sealed class SpellDatabase
         foreach (var hiddenFeatureRow in hiddenFeatureRows)
         {
             await _database.DeleteAsync(hiddenFeatureRow);
+        }
+
+        var grantedEffectRows = await _database.Table<CharacterGrantedEffectEntity>()
+            .Where(row => row.CharacterId == characterId)
+            .ToListAsync();
+        foreach (var grantedEffectRow in grantedEffectRows)
+        {
+            await _database.DeleteAsync(grantedEffectRow);
         }
 
         var savingThrowRows = await _database.Table<CharacterSavingThrowEntity>()
@@ -634,6 +662,48 @@ public sealed class SpellDatabase
 
         var rows = await _database.Table<CharacterFightingStyleEntity>().Where(row => row.CharacterId == characterId).ToListAsync();
         return rows.Select(ToModel).ToList();
+    }
+
+    public async Task<IReadOnlyList<CharacterGrantedEffect>> GetCharacterGrantedEffectsAsync(int characterId)
+    {
+        await InitializeAsync();
+
+        var rows = await _database.Table<CharacterGrantedEffectEntity>().Where(row => row.CharacterId == characterId).ToListAsync();
+        return rows.Select(ToModel).ToList();
+    }
+
+    public async Task AddCharacterGrantedEffectsAsync(int characterId, IEnumerable<CharacterGrantedEffect> effects)
+    {
+        await InitializeAsync();
+
+        var now = DateTime.UtcNow;
+        var existing = await _database.Table<CharacterGrantedEffectEntity>()
+            .Where(row => row.CharacterId == characterId)
+            .ToListAsync();
+        var existingKeys = existing
+            .Select(BuildGrantedEffectKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var entities = effects
+            .Where(effect => !string.IsNullOrWhiteSpace(effect.EffectType))
+            .Select(effect => new CharacterGrantedEffectEntity
+            {
+                CharacterId = characterId,
+                SourceType = effect.SourceType.Trim(),
+                SourceDefinitionId = effect.SourceDefinitionId,
+                SourceLevel = effect.SourceLevel,
+                EffectType = effect.EffectType.Trim(),
+                TargetKey = effect.TargetKey.Trim(),
+                Value = effect.Value.Trim(),
+                Label = effect.Label.Trim(),
+                CreatedAt = effect.CreatedAt == default ? now : effect.CreatedAt
+            })
+            .Where(entity => existingKeys.Add(BuildGrantedEffectKey(entity)))
+            .ToList();
+
+        if (entities.Count > 0)
+        {
+            await _database.InsertAllAsync(entities);
+        }
     }
 
     public async Task<IReadOnlyList<CharacterToolProficiency>> GetCharacterToolProficienciesAsync(int characterId)
@@ -1296,7 +1366,7 @@ public sealed class SpellDatabase
     private static async Task<Stream> OpenAssetAsync(string assetPath)
     {
 #if SEED_BUILDER
-        return File.OpenRead(Path.Combine("Resources", "Raw", assetPath));
+        return File.OpenRead(Path.Combine(seedSourceDataPath, assetPath));
 #else
         try
         {
@@ -2836,12 +2906,12 @@ public sealed class SpellDatabase
 
     private static Character ToModel(CharacterEntity entity)
     {
-        return ToModel(entity, [], [], [], [], [], [], [], [], [], []);
+        return ToModel(entity, [], [], [], [], [], [], [], [], [], [], []);
     }
 
     private static Character ToModel(CharacterEntity entity, IEnumerable<CharacterClass> classes)
     {
-        return ToModel(entity, classes, [], [], [], [], [], [], [], [], []);
+        return ToModel(entity, classes, [], [], [], [], [], [], [], [], [], []);
     }
 
     private static Character ToModel(
@@ -2850,6 +2920,7 @@ public sealed class SpellDatabase
         IEnumerable<CharacterFeat> feats,
         IEnumerable<CharacterSavingThrow> savingThrows,
         IEnumerable<CharacterSkill> skills,
+        IEnumerable<CharacterGrantedEffect> grantedEffects,
         IEnumerable<CharacterFightingStyle> fightingStyles,
         IEnumerable<CharacterToolProficiency> toolProficiencies,
         IEnumerable<CharacterLanguageProficiency> languageProficiencies,
@@ -2867,7 +2938,13 @@ public sealed class SpellDatabase
             ? null
             : subraceDefinitions.FirstOrDefault(definition => definition.Id == entity.SubraceDefinitionId.Value);
 
-        return new Character
+        var grantedEffectsList = grantedEffects
+            .Where(effect => IsGrantedEffectValidForClasses(effect, classes))
+            .GroupBy(BuildGrantedEffectKey, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToList();
+
+        var character = new Character
         {
             Id = entity.Id,
             Name = entity.Name,
@@ -2894,7 +2971,10 @@ public sealed class SpellDatabase
             Classes = classes.ToList(),
             Feats = feats.ToList(),
             SavingThrows = MergeSavingThrows(savingThrows),
-            Skills = MergeSkills(skills),
+            Skills = MergeSkills(skills)
+                .Select(ClearGrantedSkillState)
+                .ToList(),
+            GrantedEffects = grantedEffectsList,
             FightingStyles = fightingStyles
                 .GroupBy(style => $"{style.Name}|{style.Source}", StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.First())
@@ -2903,6 +2983,9 @@ public sealed class SpellDatabase
             ToolProficiencies = MergeToolProficiencies(toolProficiencies),
             LanguageProficiencies = MergeLanguageProficiencies(languageProficiencies)
         };
+
+        ApplyGrantedEffects(character);
+        return character;
     }
 
     private static RaceDefinition ToModel(RaceDefinitionEntity entity)
@@ -3081,6 +3164,23 @@ public sealed class SpellDatabase
             Name = entity.Name,
             Source = entity.Source,
             Notes = entity.Notes
+        };
+    }
+
+    private static CharacterGrantedEffect ToModel(CharacterGrantedEffectEntity entity)
+    {
+        return new CharacterGrantedEffect
+        {
+            Id = entity.Id,
+            CharacterId = entity.CharacterId,
+            SourceType = entity.SourceType,
+            SourceDefinitionId = entity.SourceDefinitionId,
+            SourceLevel = entity.SourceLevel,
+            EffectType = entity.EffectType,
+            TargetKey = entity.TargetKey,
+            Value = entity.Value,
+            Label = entity.Label,
+            CreatedAt = entity.CreatedAt
         };
     }
 
@@ -3290,6 +3390,12 @@ public sealed class SpellDatabase
     private async Task<IReadOnlyList<CharacterSkill>> GetAllCharacterSkillsAsync()
     {
         var rows = await _database.Table<CharacterSkillEntity>().ToListAsync();
+        return rows.Select(ToModel).ToList();
+    }
+
+    private async Task<IReadOnlyList<CharacterGrantedEffect>> GetAllCharacterGrantedEffectsAsync()
+    {
+        var rows = await _database.Table<CharacterGrantedEffectEntity>().ToListAsync();
         return rows.Select(ToModel).ToList();
     }
 
@@ -3509,6 +3615,105 @@ public sealed class SpellDatabase
             "Expertise" => "Expertise",
             _ => isProficient ? "Proficient" : "None"
         };
+    }
+
+    private static CharacterSkill ClearGrantedSkillState(CharacterSkill skill)
+    {
+        if (skill.ProficiencyLevel is "Half" or "Expertise")
+        {
+            skill.ProficiencyLevel = skill.IsProficient ? "Proficient" : "None";
+        }
+
+        return skill;
+    }
+
+    private static void ApplyGrantedEffects(Character character)
+    {
+        foreach (var effect in character.GrantedEffects)
+        {
+            switch (effect.EffectType)
+            {
+                case "SkillHalfProficiency" when string.Equals(effect.TargetKey, "AllSkills", StringComparison.OrdinalIgnoreCase):
+                    foreach (var skill in character.Skills.Where(skill => !skill.IsProficient && skill.ProficiencyLevel is not "Proficient" and not "Expertise"))
+                    {
+                        skill.ProficiencyLevel = "Half";
+                    }
+                    break;
+                case "SkillExpertise":
+                    ApplySkillExpertise(character, effect.TargetKey);
+                    break;
+                case "FightingStyle":
+                    if (character.FightingStyles.All(style => !string.Equals(style.Name, effect.TargetKey, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        character.FightingStyles.Add(new CharacterFightingStyle
+                        {
+                            CharacterId = character.Id,
+                            Name = effect.TargetKey,
+                            Source = effect.Value,
+                            Notes = effect.Label
+                        });
+                    }
+                    break;
+            }
+        }
+
+        character.FightingStyles = character.FightingStyles
+            .GroupBy(style => $"{style.Name}|{style.Source}", StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .OrderBy(style => style.Name)
+            .ToList();
+    }
+
+    private static void ApplySkillExpertise(Character character, string skillName)
+    {
+        var skill = character.Skills.FirstOrDefault(skill => string.Equals(skill.Name, skillName, StringComparison.OrdinalIgnoreCase));
+        if (skill is null)
+        {
+            return;
+        }
+
+        skill.IsProficient = true;
+        skill.ProficiencyLevel = "Expertise";
+    }
+
+    private async Task PruneInvalidGrantedEffectsAsync(int characterId, IEnumerable<CharacterClass> classes)
+    {
+        var classList = classes.ToList();
+        var existing = await _database.Table<CharacterGrantedEffectEntity>()
+            .Where(row => row.CharacterId == characterId)
+            .ToListAsync();
+
+        foreach (var effect in existing.Where(effect => !IsGrantedEffectValidForClasses(ToModel(effect), classList)))
+        {
+            await _database.DeleteAsync(effect);
+        }
+    }
+
+    private static bool IsGrantedEffectValidForClasses(CharacterGrantedEffect effect, IEnumerable<CharacterClass> classes)
+    {
+        if (!string.Equals(effect.SourceType, "Class", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(effect.SourceType, "Subclass", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var matchingClass = classes.FirstOrDefault(characterClass => characterClass.ClassDefinitionId == effect.SourceDefinitionId);
+        if (matchingClass is null)
+        {
+            return false;
+        }
+
+        return effect.SourceLevel is null || matchingClass.Level >= effect.SourceLevel.Value;
+    }
+
+    private static string BuildGrantedEffectKey(CharacterGrantedEffect effect)
+    {
+        return $"{effect.CharacterId}|{effect.SourceType}|{effect.SourceDefinitionId}|{effect.SourceLevel}|{effect.EffectType}|{effect.TargetKey}|{effect.Value}";
+    }
+
+    private static string BuildGrantedEffectKey(CharacterGrantedEffectEntity effect)
+    {
+        return $"{effect.CharacterId}|{effect.SourceType}|{effect.SourceDefinitionId}|{effect.SourceLevel}|{effect.EffectType}|{effect.TargetKey}|{effect.Value}";
     }
 
     private static int? FindProgressionId(IEnumerable<SpellcastingProgressionEntity> progressions, string code)

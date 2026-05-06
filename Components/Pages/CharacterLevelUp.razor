@@ -470,9 +470,10 @@
             }
         }
 
-        ApplyLevelUpChoices(grantsHalfProficiency);
+        var grantedEffects = ApplyLevelUpChoices(grantsHalfProficiency);
         character.Level = character.Classes.Sum(characterClass => characterClass.Level);
         await SpellDatabase.UpdateCharacterAsync(character);
+        await SpellDatabase.AddCharacterGrantedEffectsAsync(character.Id, grantedEffects);
         Navigation.NavigateTo($"characters/{Id}");
     }
 
@@ -513,18 +514,20 @@
             Level = 1
         });
 
-        ApplyLevelUpChoices(GrantsHalfProficiency);
+        var grantedEffects = ApplyLevelUpChoices(GrantsHalfProficiency);
         character.PrimaryClassDefinitionId ??= selectedNewClassDefinition.Id;
         character.Level = character.Classes.Sum(characterClass => characterClass.Level);
         await SpellDatabase.UpdateCharacterAsync(character);
+        await SpellDatabase.AddCharacterGrantedEffectsAsync(character.Id, grantedEffects);
         Navigation.NavigateTo($"characters/{Id}");
     }
 
-    private void ApplyLevelUpChoices(bool grantsHalfProficiency)
+    private IReadOnlyList<CharacterGrantedEffect> ApplyLevelUpChoices(bool grantsHalfProficiency)
     {
+        var grantedEffects = new List<CharacterGrantedEffect>();
         if (character is null)
         {
-            return;
+            return grantedEffects;
         }
 
         if (selectedFeatDefinitionId is not null
@@ -546,34 +549,50 @@
         if (!string.IsNullOrWhiteSpace(selectedFightingStyle)
             && character.FightingStyles.All(style => !string.Equals(style.Name, selectedFightingStyle, StringComparison.OrdinalIgnoreCase)))
         {
-            character.FightingStyles.Add(new CharacterFightingStyle
+            grantedEffects.Add(new CharacterGrantedEffect
             {
                 CharacterId = character.Id,
-                Name = selectedFightingStyle,
-                Source = SelectedTargetClassDefinition?.Source ?? "",
-                Notes = $"Chosen during level-up at level {NextClassLevel}."
+                SourceType = "Class",
+                SourceDefinitionId = SelectedTargetClassDefinition?.Id ?? 0,
+                SourceLevel = NextClassLevel,
+                EffectType = "FightingStyle",
+                TargetKey = selectedFightingStyle,
+                Value = SelectedTargetClassDefinition?.Source ?? "",
+                Label = $"Chosen during level-up at level {NextClassLevel}."
             });
         }
 
         foreach (var skillName in selectedExpertiseSkills)
         {
-            var skill = character.Skills.FirstOrDefault(skill => string.Equals(skill.Name, skillName, StringComparison.OrdinalIgnoreCase));
-            if (skill is null)
+            grantedEffects.Add(new CharacterGrantedEffect
             {
-                continue;
-            }
-
-            skill.IsProficient = true;
-            skill.ProficiencyLevel = "Expertise";
+                CharacterId = character.Id,
+                SourceType = "Class",
+                SourceDefinitionId = SelectedTargetClassDefinition?.Id ?? 0,
+                SourceLevel = NextClassLevel,
+                EffectType = "SkillExpertise",
+                TargetKey = skillName,
+                Value = "Expertise",
+                Label = $"Chosen during level-up at level {NextClassLevel}."
+            });
         }
 
         if (grantsHalfProficiency)
         {
-            foreach (var skill in character.Skills.Where(skill => skill.ProficiencyLevel is not "Proficient" and not "Expertise" && !skill.IsProficient))
+            grantedEffects.Add(new CharacterGrantedEffect
             {
-                skill.ProficiencyLevel = "Half";
-            }
+                CharacterId = character.Id,
+                SourceType = "Class",
+                SourceDefinitionId = SelectedTargetClassDefinition?.Id ?? 0,
+                SourceLevel = NextClassLevel,
+                EffectType = "SkillHalfProficiency",
+                TargetKey = "AllSkills",
+                Value = "Half",
+                Label = "Jack of All Trades"
+            });
         }
+
+        return grantedEffects;
     }
 
     private void ResetLevelUpChoiceSelections()
