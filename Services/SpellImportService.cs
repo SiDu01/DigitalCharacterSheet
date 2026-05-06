@@ -6,6 +6,10 @@ namespace DigitalCharacterSheet.Services;
 
 public sealed partial class SpellImportService
 {
+#if SEED_BUILDER
+    public static string SeedSourceDataPath { get; set; } = Path.Combine("Resources", "Raw");
+#endif
+
     public async Task<IReadOnlyList<Spell>> LoadBundledSpellsAsync()
     {
         var fileNames = await LoadSpellFileNamesAsync();
@@ -52,7 +56,7 @@ public sealed partial class SpellImportService
     private static async Task<Stream> OpenAssetAsync(string assetPath)
     {
 #if SEED_BUILDER
-        return File.OpenRead(Path.Combine("Resources", "Raw", assetPath));
+        return File.OpenRead(Path.Combine(SeedSourceDataPath, assetPath));
 #else
         try
         {

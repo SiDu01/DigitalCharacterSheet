@@ -58,10 +58,16 @@ The builder asks for the path to your local `5e Tools\data` folder and writes th
 Resources\Raw\seed\digital-character-sheet.db3
 ```
 
+When started from Visual Studio or from the builder's `bin` folder, the builder still resolves the default output folder back to the app project:
+
+```text
+...\DigitalCharacterSheet\Resources\Raw\seed
+```
+
 You can also run it non-interactively:
 
 ```powershell
-dotnet run --project Tools\SeedDatabaseBuilder\SeedDatabaseBuilder.csproj -- --source "D:\Dev\5e Tools\data" --output Resources\Raw\seed\digital-character-sheet.db3
+dotnet run --project Tools\SeedDatabaseBuilder\SeedDatabaseBuilder.csproj -- --source "D:\Dev\5e Tools\data" --output Resources\Raw\seed
 ```
 
 The app copies the seed database only when no app database exists yet. Installing over an existing app keeps existing app data. To force a fresh first-run database copy, clear app data:

@@ -57,6 +57,7 @@ public sealed class SpellDatabase
         if (!string.IsNullOrWhiteSpace(sourceDataPath))
         {
             seedSourceDataPath = sourceDataPath;
+            SpellImportService.SeedSourceDataPath = sourceDataPath;
         }
 #endif
 
