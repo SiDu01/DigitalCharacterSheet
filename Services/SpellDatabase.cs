@@ -94,6 +94,7 @@ public sealed class SpellDatabase
                 await CreateTableAsync<CharacterSpellSlotEntity>("CharacterSpellSlots");
                 await CreateTableAsync<CharacterSavingThrowEntity>("CharacterSavingThrows");
                 await CreateTableAsync<CharacterSkillEntity>("CharacterSkills");
+                await CreateTableAsync<CharacterFightingStyleEntity>("CharacterFightingStyles");
                 await CreateTableAsync<CharacterToolProficiencyEntity>("CharacterToolProficiencies");
                 await CreateTableAsync<CharacterLanguageProficiencyEntity>("CharacterLanguageProficiencies");
                 await CreateTableAsync<RaceDefinitionEntity>("RaceDefinitions");
@@ -170,6 +171,7 @@ public sealed class SpellDatabase
         var feats = await GetAllCharacterFeatsAsync();
         var savingThrows = await GetAllCharacterSavingThrowsAsync();
         var skills = await GetAllCharacterSkillsAsync();
+        var fightingStyles = await GetAllCharacterFightingStylesAsync();
         var toolProficiencies = await GetAllCharacterToolProficienciesAsync();
         var languageProficiencies = await GetAllCharacterLanguageProficienciesAsync();
         var raceDefinitions = await _database.Table<RaceDefinitionEntity>().ToListAsync();
@@ -182,6 +184,7 @@ public sealed class SpellDatabase
                 feats.Where(feat => feat.CharacterId == entity.Id),
                 savingThrows.Where(savingThrow => savingThrow.CharacterId == entity.Id),
                 skills.Where(skill => skill.CharacterId == entity.Id),
+                fightingStyles.Where(style => style.CharacterId == entity.Id),
                 toolProficiencies.Where(tool => tool.CharacterId == entity.Id),
                 languageProficiencies.Where(language => language.CharacterId == entity.Id),
                 raceDefinitions,
@@ -204,12 +207,13 @@ public sealed class SpellDatabase
         var feats = await GetCharacterFeatsAsync(entity.Id);
         var savingThrows = await GetCharacterSavingThrowsAsync(entity.Id);
         var skills = await GetCharacterSkillsAsync(entity.Id);
+        var fightingStyles = await GetCharacterFightingStylesAsync(entity.Id);
         var toolProficiencies = await GetCharacterToolProficienciesAsync(entity.Id);
         var languageProficiencies = await GetCharacterLanguageProficienciesAsync(entity.Id);
         var raceDefinitions = await _database.Table<RaceDefinitionEntity>().ToListAsync();
         var subraceDefinitions = await _database.Table<SubraceDefinitionEntity>().ToListAsync();
         var backgroundDefinitions = await _database.Table<BackgroundDefinitionEntity>().ToListAsync();
-        return ToModel(entity, classes, feats, savingThrows, skills, toolProficiencies, languageProficiencies, raceDefinitions, subraceDefinitions, backgroundDefinitions);
+        return ToModel(entity, classes, feats, savingThrows, skills, fightingStyles, toolProficiencies, languageProficiencies, raceDefinitions, subraceDefinitions, backgroundDefinitions);
     }
 
     public async Task<Character> AddCharacterAsync(Character character)
@@ -269,6 +273,7 @@ public sealed class SpellDatabase
 
         await InsertCharacterSavingThrowsAsync(entity.Id, character.SavingThrows);
         await InsertCharacterSkillsAsync(entity.Id, character.Skills);
+        await InsertCharacterFightingStylesAsync(entity.Id, character.FightingStyles);
         await InsertCharacterToolProficienciesAsync(entity.Id, character.ToolProficiencies);
         await InsertCharacterLanguageProficienciesAsync(entity.Id, character.LanguageProficiencies);
 
@@ -276,12 +281,13 @@ public sealed class SpellDatabase
         var feats = await GetCharacterFeatsAsync(entity.Id);
         var savingThrows = await GetCharacterSavingThrowsAsync(entity.Id);
         var skills = await GetCharacterSkillsAsync(entity.Id);
+        var fightingStyles = await GetCharacterFightingStylesAsync(entity.Id);
         var toolProficiencies = await GetCharacterToolProficienciesAsync(entity.Id);
         var languageProficiencies = await GetCharacterLanguageProficienciesAsync(entity.Id);
         var raceDefinitions = await _database.Table<RaceDefinitionEntity>().ToListAsync();
         var subraceDefinitions = await _database.Table<SubraceDefinitionEntity>().ToListAsync();
         var backgroundDefinitions = await _database.Table<BackgroundDefinitionEntity>().ToListAsync();
-        return ToModel(entity, classes, feats, savingThrows, skills, toolProficiencies, languageProficiencies, raceDefinitions, subraceDefinitions, backgroundDefinitions);
+        return ToModel(entity, classes, feats, savingThrows, skills, fightingStyles, toolProficiencies, languageProficiencies, raceDefinitions, subraceDefinitions, backgroundDefinitions);
     }
 
     public async Task UpdateCharacterAsync(Character character)
@@ -383,6 +389,16 @@ public sealed class SpellDatabase
 
         await InsertCharacterSkillsAsync(character.Id, character.Skills);
 
+        var existingFightingStyles = await _database.Table<CharacterFightingStyleEntity>()
+            .Where(row => row.CharacterId == character.Id)
+            .ToListAsync();
+        foreach (var existingFightingStyle in existingFightingStyles)
+        {
+            await _database.DeleteAsync(existingFightingStyle);
+        }
+
+        await InsertCharacterFightingStylesAsync(character.Id, character.FightingStyles);
+
         var existingTools = await _database.Table<CharacterToolProficiencyEntity>()
             .Where(row => row.CharacterId == character.Id)
             .ToListAsync();
@@ -454,6 +470,14 @@ public sealed class SpellDatabase
         foreach (var skillRow in skillRows)
         {
             await _database.DeleteAsync(skillRow);
+        }
+
+        var fightingStyleRows = await _database.Table<CharacterFightingStyleEntity>()
+            .Where(row => row.CharacterId == characterId)
+            .ToListAsync();
+        foreach (var fightingStyleRow in fightingStyleRows)
+        {
+            await _database.DeleteAsync(fightingStyleRow);
         }
 
         var toolRows = await _database.Table<CharacterToolProficiencyEntity>()
@@ -602,6 +626,14 @@ public sealed class SpellDatabase
 
         var rows = await _database.Table<CharacterSkillEntity>().Where(row => row.CharacterId == characterId).ToListAsync();
         return MergeSkills(rows.Select(ToModel));
+    }
+
+    public async Task<IReadOnlyList<CharacterFightingStyle>> GetCharacterFightingStylesAsync(int characterId)
+    {
+        await InitializeAsync();
+
+        var rows = await _database.Table<CharacterFightingStyleEntity>().Where(row => row.CharacterId == characterId).ToListAsync();
+        return rows.Select(ToModel).ToList();
     }
 
     public async Task<IReadOnlyList<CharacterToolProficiency>> GetCharacterToolProficienciesAsync(int characterId)
@@ -1605,6 +1637,7 @@ public sealed class SpellDatabase
         await EnsureCharacterColumnAsync("BackgroundChoicesJson", "text DEFAULT ''");
         await EnsureCharacterColumnAsync("FeatChoicesJson", "text DEFAULT ''");
         await EnsureSpellColumnAsync("IsFavorite", "integer DEFAULT 0");
+        await EnsureCharacterSkillColumnAsync("ProficiencyLevel", "text DEFAULT 'None'");
     }
 
     private async Task AddGrantedFeatEffectsAsync(CharacterOptionEffects effects, string? featsJson, string sourceName)
@@ -1685,6 +1718,18 @@ public sealed class SpellDatabase
         try
         {
             await _database.ExecuteAsync($"ALTER TABLE Spells ADD COLUMN {columnName} {columnDefinition}");
+        }
+        catch
+        {
+            // Column already exists.
+        }
+    }
+
+    private async Task EnsureCharacterSkillColumnAsync(string columnName, string columnDefinition)
+    {
+        try
+        {
+            await _database.ExecuteAsync($"ALTER TABLE CharacterSkills ADD COLUMN {columnName} {columnDefinition}");
         }
         catch
         {
@@ -2791,12 +2836,12 @@ public sealed class SpellDatabase
 
     private static Character ToModel(CharacterEntity entity)
     {
-        return ToModel(entity, [], [], [], [], [], [], [], [], []);
+        return ToModel(entity, [], [], [], [], [], [], [], [], [], []);
     }
 
     private static Character ToModel(CharacterEntity entity, IEnumerable<CharacterClass> classes)
     {
-        return ToModel(entity, classes, [], [], [], [], [], [], [], []);
+        return ToModel(entity, classes, [], [], [], [], [], [], [], [], []);
     }
 
     private static Character ToModel(
@@ -2805,6 +2850,7 @@ public sealed class SpellDatabase
         IEnumerable<CharacterFeat> feats,
         IEnumerable<CharacterSavingThrow> savingThrows,
         IEnumerable<CharacterSkill> skills,
+        IEnumerable<CharacterFightingStyle> fightingStyles,
         IEnumerable<CharacterToolProficiency> toolProficiencies,
         IEnumerable<CharacterLanguageProficiency> languageProficiencies,
         IReadOnlyList<RaceDefinitionEntity> raceDefinitions,
@@ -2849,6 +2895,11 @@ public sealed class SpellDatabase
             Feats = feats.ToList(),
             SavingThrows = MergeSavingThrows(savingThrows),
             Skills = MergeSkills(skills),
+            FightingStyles = fightingStyles
+                .GroupBy(style => $"{style.Name}|{style.Source}", StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .OrderBy(style => style.Name)
+                .ToList(),
             ToolProficiencies = MergeToolProficiencies(toolProficiencies),
             LanguageProficiencies = MergeLanguageProficiencies(languageProficiencies)
         };
@@ -3015,7 +3066,20 @@ public sealed class SpellDatabase
             AbilityCode = defaultSkill?.AbilityCode ?? "",
             AbilityName = defaultSkill?.AbilityName ?? "",
             IsProficient = entity.IsProficient,
+            ProficiencyLevel = NormalizeSkillProficiencyLevel(entity.ProficiencyLevel, entity.IsProficient),
             RollMode = NormalizeRollMode(entity.RollMode),
+            Notes = entity.Notes
+        };
+    }
+
+    private static CharacterFightingStyle ToModel(CharacterFightingStyleEntity entity)
+    {
+        return new CharacterFightingStyle
+        {
+            Id = entity.Id,
+            CharacterId = entity.CharacterId,
+            Name = entity.Name,
+            Source = entity.Source,
             Notes = entity.Notes
         };
     }
@@ -3229,6 +3293,12 @@ public sealed class SpellDatabase
         return rows.Select(ToModel).ToList();
     }
 
+    private async Task<IReadOnlyList<CharacterFightingStyle>> GetAllCharacterFightingStylesAsync()
+    {
+        var rows = await _database.Table<CharacterFightingStyleEntity>().ToListAsync();
+        return rows.Select(ToModel).ToList();
+    }
+
     private async Task<IReadOnlyList<CharacterToolProficiency>> GetAllCharacterToolProficienciesAsync()
     {
         var rows = await _database.Table<CharacterToolProficiencyEntity>().ToListAsync();
@@ -3268,8 +3338,30 @@ public sealed class SpellDatabase
                 CharacterId = characterId,
                 Name = skill.Name,
                 IsProficient = skill.IsProficient,
+                ProficiencyLevel = NormalizeSkillProficiencyLevel(skill.ProficiencyLevel, skill.IsProficient),
                 RollMode = NormalizeRollMode(skill.RollMode),
                 Notes = skill.Notes.Trim()
+            })
+            .ToList();
+
+        if (entities.Count > 0)
+        {
+            await _database.InsertAllAsync(entities);
+        }
+    }
+
+    private async Task InsertCharacterFightingStylesAsync(int characterId, IEnumerable<CharacterFightingStyle> fightingStyles)
+    {
+        var entities = fightingStyles
+            .Where(style => !string.IsNullOrWhiteSpace(style.Name))
+            .GroupBy(style => $"{style.Name}|{style.Source}", StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .Select(style => new CharacterFightingStyleEntity
+            {
+                CharacterId = characterId,
+                Name = style.Name.Trim(),
+                Source = style.Source.Trim(),
+                Notes = style.Notes.Trim()
             })
             .ToList();
 
@@ -3350,6 +3442,7 @@ public sealed class SpellDatabase
                 defaultValue.Id = savedValue.Id;
                 defaultValue.CharacterId = savedValue.CharacterId;
                 defaultValue.IsProficient = savedValue.IsProficient;
+                defaultValue.ProficiencyLevel = NormalizeSkillProficiencyLevel(savedValue.ProficiencyLevel, savedValue.IsProficient);
                 defaultValue.RollMode = NormalizeRollMode(savedValue.RollMode);
                 defaultValue.Notes = savedValue.Notes;
                 return defaultValue;
@@ -3405,6 +3498,17 @@ public sealed class SpellDatabase
     private static string NormalizeRollMode(string rollMode)
     {
         return rollMode is "Advantage" or "Disadvantage" ? rollMode : "Normal";
+    }
+
+    private static string NormalizeSkillProficiencyLevel(string proficiencyLevel, bool isProficient)
+    {
+        return proficiencyLevel switch
+        {
+            "Half" => "Half",
+            "Proficient" => "Proficient",
+            "Expertise" => "Expertise",
+            _ => isProficient ? "Proficient" : "None"
+        };
     }
 
     private static int? FindProgressionId(IEnumerable<SpellcastingProgressionEntity> progressions, string code)

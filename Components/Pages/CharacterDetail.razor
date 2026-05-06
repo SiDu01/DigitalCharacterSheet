@@ -46,6 +46,7 @@ else
                 }
                 else
                 {
+                    <button class="text-button no-margin" @onclick="LevelUpCharacter">Level Up</button>
                     <button class="text-button no-margin" @onclick="EditCharacter">Edit</button>
                     <button class="danger-action" @onclick="RequestDelete">Delete</button>
                 }
@@ -111,9 +112,13 @@ else
                         @foreach (var skill in character.Skills)
                         {
                             <div class="sheet-check-row">
-                                <span class="prof-dot @(skill.IsProficient ? "active" : "")"></span>
+                                <span class="prof-dot @(SkillHasTraining(skill) ? "active" : "") @(skill.ProficiencyLevel == "Expertise" ? "expertise" : skill.ProficiencyLevel == "Half" ? "half" : "")"></span>
                                 <strong>@FormatModifier(GetSkillModifier(skill))</strong>
                                 <span>@skill.Name <small>@skill.AbilityCode.ToUpperInvariant()</small></span>
+                                @if (skill.ProficiencyLevel is "Half" or "Expertise")
+                                {
+                                    <small>@skill.ProficiencyLevel</small>
+                                }
                                 @if (skill.RollMode is "Advantage" or "Disadvantage")
                                 {
                                     <small>@ShortRollMode(skill.RollMode)</small>
@@ -242,6 +247,19 @@ else
                     else
                     {
                         <div class="side-tab-content">
+                            <section>
+                                <p class="eyebrow">Fighting Styles</p>
+                                <div class="sheet-chip-list">
+                                    @foreach (var fightingStyle in character.FightingStyles)
+                                    {
+                                        <span class="sheet-chip" title="@fightingStyle.Notes">@fightingStyle.DisplayName</span>
+                                    }
+                                    @if (character.FightingStyles.Count == 0)
+                                    {
+                                        <p class="muted compact-hint">No fighting styles selected.</p>
+                                    }
+                                </div>
+                            </section>
                             <section>
                                 <p class="eyebrow">Tools</p>
                                 <div class="sheet-chip-list">
@@ -859,6 +877,11 @@ else
         Navigation.NavigateTo($"characters/{Id}/edit");
     }
 
+    private void LevelUpCharacter()
+    {
+        Navigation.NavigateTo($"characters/{Id}/level-up");
+    }
+
     private void RequestDelete()
     {
         confirmDelete = true;
@@ -979,7 +1002,18 @@ else
 
     private int GetSkillModifier(CharacterSkill skill)
     {
-        return GetAbilityModifier(skill.AbilityCode) + (skill.IsProficient ? ProficiencyBonus : 0);
+        return GetAbilityModifier(skill.AbilityCode) + (skill.ProficiencyLevel switch
+        {
+            "Half" => ProficiencyBonus / 2,
+            "Expertise" => ProficiencyBonus * 2,
+            "Proficient" => ProficiencyBonus,
+            _ => skill.IsProficient ? ProficiencyBonus : 0
+        });
+    }
+
+    private static bool SkillHasTraining(CharacterSkill skill)
+    {
+        return skill.IsProficient || skill.ProficiencyLevel is "Half" or "Proficient" or "Expertise";
     }
 
     private int GetSkillModifierByName(string name)

@@ -8,6 +8,7 @@ public sealed class CharacterSkill
     public string AbilityCode { get; set; } = "";
     public string AbilityName { get; set; } = "";
     public bool IsProficient { get; set; }
+    public string ProficiencyLevel { get; set; } = "None";
     public string RollMode { get; set; } = "Normal";
     public string Notes { get; set; } = "";
 

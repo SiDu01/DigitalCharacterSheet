@@ -2,8 +2,8 @@ using SQLite;
 
 namespace DigitalCharacterSheet.Data;
 
-[Table("CharacterSkills")]
-public sealed class CharacterSkillEntity
+[Table("CharacterFightingStyles")]
+public sealed class CharacterFightingStyleEntity
 {
     [PrimaryKey, AutoIncrement]
     public int Id { get; set; }
@@ -14,8 +14,6 @@ public sealed class CharacterSkillEntity
     [Indexed]
     public string Name { get; set; } = "";
 
-    public bool IsProficient { get; set; }
-    public string ProficiencyLevel { get; set; } = "None";
-    public string RollMode { get; set; } = "Normal";
+    public string Source { get; set; } = "";
     public string Notes { get; set; } = "";
 }

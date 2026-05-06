@@ -29,6 +29,7 @@ public sealed class Character
     public List<CharacterFeat> Feats { get; set; } = [];
     public List<CharacterSavingThrow> SavingThrows { get; set; } = CharacterSavingThrow.CreateDefaults();
     public List<CharacterSkill> Skills { get; set; } = CharacterSkill.CreateDefaults();
+    public List<CharacterFightingStyle> FightingStyles { get; set; } = [];
     public List<CharacterToolProficiency> ToolProficiencies { get; set; } = CharacterToolProficiency.CreateDefaults();
     public List<CharacterLanguageProficiency> LanguageProficiencies { get; set; } = CharacterLanguageProficiency.CreateDefaults();
 

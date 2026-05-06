@@ -1,0 +1,1071 @@
+@page "/characters/{Id:int}/level-up"
+@using System.Text.Json
+@inject SpellDatabase SpellDatabase
+@inject NavigationManager Navigation
+
+<PageTitle>Level Up</PageTitle>
+
+<section class="character-page character-create-page level-up-page">
+    <button class="back-button" title="Back" aria-label="Back" @onclick="OpenCharacter">‹</button>
+
+    <header class="page-header">
+        <div>
+            <p class="eyebrow">Level Up</p>
+            <h1>@(character is null ? "Character" : character.Name)</h1>
+        </div>
+    </header>
+
+    @if (isLoading)
+    {
+        <p class="muted">Level-Up wird vorbereitet...</p>
+    }
+    else if (character is null)
+    {
+        <p class="validation-message">Character not found.</p>
+    }
+    else
+    {
+        <section class="level-up-layout">
+            <section class="sheet-panel level-up-picker">
+                <header>
+                    <p class="eyebrow">Class</p>
+                    <h2>Choose class to advance</h2>
+                </header>
+
+                @foreach (var characterClass in character.Classes.OrderBy(characterClass => characterClass.ClassName))
+                {
+                    var canLevel = characterClass.Level < 20;
+                    <button type="button"
+                            class="level-up-class-card @(SelectedClass?.Id == characterClass.Id ? "active" : "")"
+                            disabled="@(!canLevel || isSaving)"
+                            @onclick="() => SelectClassAsync(characterClass)">
+                        <span>@characterClass.DisplayName</span>
+                        <strong>@characterClass.Level -> @(characterClass.Level + 1)</strong>
+                    </button>
+                }
+
+                @if (character.Classes.Count == 0)
+                {
+                    <p class="muted compact-hint">Add a class in Character Edit before leveling up.</p>
+                }
+
+                @if (AvailableNewClasses.Count > 0)
+                {
+                    <button type="button"
+                            class="level-up-class-card level-up-new-class @(isAddingNewClass && selectedNewClassDefinition is null ? "active" : "")"
+                            disabled="@isSaving"
+                            @onclick="ShowNewClassPicker">
+                        <span>+ New Class</span>
+                        <strong>Level 1</strong>
+                    </button>
+                }
+
+                @if (isAddingNewClass)
+                {
+                    <section class="level-up-new-class-list">
+                        @foreach (var classGroup in AvailableNewClassGroups)
+                        {
+                            var selectedDefinition = classGroup.ResolveVersion(selectedNewClassDefinition?.Id);
+                            var requirement = GetMulticlassRequirement(selectedDefinition.RawJson);
+                            var meetsRequirement = MeetsRequirement(requirement);
+                            <button type="button"
+                                    class="level-up-class-card @(string.Equals(selectedNewClassGroup?.Name, classGroup.Name, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
+                                    disabled="@isSaving"
+                                    @onclick="() => SelectNewClassGroupAsync(classGroup)">
+                                <span>@classGroup.Name</span>
+                                <strong>@(meetsRequirement ? classGroup.SourceDisplay : requirement.DisplayText)</strong>
+                            </button>
+                        }
+                    </section>
+                }
+            </section>
+
+            <section class="sheet-panel level-up-preview">
+                @if (SelectedTargetClassDefinition is null)
+                {
+                    <div class="empty-detail">
+                        <p class="eyebrow">Preview</p>
+                        <h2>@(isAddingNewClass ? "Select a new class" : "Select a class")</h2>
+                        <p class="muted">The new level, features, requirements, and required subclass choice appear here.</p>
+                    </div>
+                }
+                else
+                {
+                    <header class="level-up-summary">
+                        <div>
+                            <p class="eyebrow">Preview</p>
+                            <h2>@PreviewTitle</h2>
+                        </div>
+                        <div class="level-up-summary-meta">
+                            <span>Total level @CurrentTotalLevel -> @(CurrentTotalLevel + 1)</span>
+                            @if (isAddingNewClass && selectedNewClassDefinition is not null)
+                            {
+                                var requirement = GetMulticlassRequirement(selectedNewClassDefinition.RawJson);
+                                <span class="level-up-requirement-badge @(MeetsRequirement(requirement) ? "" : "blocked")">
+                                    @requirement.DisplayText
+                                </span>
+                            }
+                        </div>
+                    </header>
+
+                    @if (isAddingNewClass && selectedNewClassGroup is not null)
+                    {
+                        <div class="source-switcher class-source-switcher level-up-source-switcher" aria-label="Class source versions">
+                            @foreach (var version in selectedNewClassGroup.Versions)
+                            {
+                                <button type="button"
+                                        class="source-version @(version.Id == selectedNewClassDefinition?.Id ? "active" : "")"
+                                        @onclick="async () => await SelectNewClassVersionAsync(version)">
+                                    @version.Source
+                                </button>
+                            }
+                        </div>
+                    }
+
+                    @if (isAddingNewClass && selectedNewClassDefinition is not null)
+                    {
+                        var requirement = GetMulticlassRequirement(selectedNewClassDefinition.RawJson);
+                        <section class="level-up-choice @(MeetsRequirement(requirement) ? "" : "blocked")">
+                            <p class="eyebrow">Requirement Check</p>
+                            <p class="muted compact-hint">@BuildRequirementStatus(requirement)</p>
+                        </section>
+                    }
+
+                    @if (ShouldShowSubclassSelection)
+                    {
+                        <section class="level-up-choice">
+                            <p class="eyebrow">Subclass</p>
+                            <select @bind="selectedSubclassDefinitionId">
+                                <option value="">Select subclass</option>
+                                @foreach (var subclassDefinition in subclassDefinitions)
+                                {
+                                    <option value="@subclassDefinition.Id">@subclassDefinition.DisplayName</option>
+                                }
+                            </select>
+                            <p class="muted compact-hint">This class gains subclass features by level @NextClassLevel.</p>
+                        </section>
+                    }
+
+                    @if (RequiresFeatChoice || RequiresFightingStyleChoice || RequiresExpertiseChoice || GrantsHalfProficiency)
+                    {
+                        <section class="level-up-choice">
+                            <p class="eyebrow">Level-Up Choices</p>
+
+                            @if (RequiresFeatChoice)
+                            {
+                                <label class="stacked-field">
+                                    <span>Feat</span>
+                                    <select @bind="selectedFeatDefinitionId">
+                                        <option value="">Select feat</option>
+                                        @foreach (var featDefinition in AvailableFeatDefinitions)
+                                        {
+                                            <option value="@featDefinition.Id">@featDefinition.DisplayName</option>
+                                        }
+                                    </select>
+                                </label>
+                            }
+
+                            @if (RequiresFightingStyleChoice)
+                            {
+                                <label class="stacked-field">
+                                    <span>Fighting Style</span>
+                                    <select @bind="selectedFightingStyle">
+                                        <option value="">Select fighting style</option>
+                                        @foreach (var fightingStyle in FightingStyleOptions)
+                                        {
+                                            <option value="@fightingStyle">@fightingStyle</option>
+                                        }
+                                    </select>
+                                </label>
+                            }
+
+                            @if (RequiresExpertiseChoice)
+                            {
+                                <p class="muted compact-hint">Select @ExpertiseChoiceCount proficient skill(s) for Expertise.</p>
+                                <div class="level-up-choice-grid">
+                                    @foreach (var skill in EligibleExpertiseSkills)
+                                    {
+                                        <label class="toggle">
+                                            <input type="checkbox"
+                                                   checked="@selectedExpertiseSkills.Contains(skill.Name)"
+                                                   disabled="@(!selectedExpertiseSkills.Contains(skill.Name) && selectedExpertiseSkills.Count >= ExpertiseChoiceCount)"
+                                                   @onchange="args => ToggleExpertiseSkill(skill.Name, args)" />
+                                            @skill.Name
+                                        </label>
+                                    }
+                                </div>
+                            }
+
+                            @if (GrantsHalfProficiency)
+                            {
+                                <p class="muted compact-hint">Half-Proficiency will be applied to skills without proficiency or expertise.</p>
+                            }
+                        </section>
+                    }
+
+                    @if (NewFeatureLevels.Count == 0)
+                    {
+                        <p class="muted compact-hint">No class or subclass features found for this level.</p>
+                    }
+                    else
+                    {
+                        <section class="sheet-feature-list level-up-feature-list">
+                            @foreach (var levelGroup in NewFeatureLevels)
+                            {
+                                <section class="sheet-feature-level">
+                                    <span class="feature-level-badge">Level @levelGroup.Level</span>
+                                    <div>
+                                        @foreach (var feature in levelGroup.Features)
+                                        {
+                                            <details class="feature-detail-toggle">
+                                                <summary class="feature-pill">@feature.Name</summary>
+                                                <div class="feature-detail-body">
+                                                    @if (feature.Paragraphs.Count == 0)
+                                                    {
+                                                        <p class="muted compact-hint">No detail text found.</p>
+                                                    }
+                                                    else
+                                                    {
+                                                        @foreach (var paragraph in feature.Paragraphs.Take(4))
+                                                        {
+                                                            <p><MarkupText Text="@paragraph" /></p>
+                                                        }
+                                                        @if (feature.Paragraphs.Count > 4)
+                                                        {
+                                                            <p class="muted compact-hint">@(feature.Paragraphs.Count - 4) more paragraphs in source data.</p>
+                                                        }
+                                                    }
+                                                </div>
+                                            </details>
+                                        }
+                                    </div>
+                                </section>
+                            }
+                        </section>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(errorMessage))
+                    {
+                        <p class="validation-message">@errorMessage</p>
+                    }
+
+                    <footer class="level-up-actions">
+                        <button type="button" class="primary-action" disabled="@(!CanApplyLevelUp || isSaving)" @onclick="ApplyLevelUp">
+                            @(isSaving ? "Saving..." : isAddingNewClass ? "Add Class" : "Apply Level Up")
+                        </button>
+                    </footer>
+                }
+            </section>
+        </section>
+    }
+</section>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Character? character;
+    private List<ClassDefinition> classDefinitions = [];
+    private List<SubclassDefinition> subclassDefinitions = [];
+    private List<FeatDefinition> featDefinitions = [];
+    private CharacterClass? selectedClass;
+    private ClassGroup? selectedNewClassGroup;
+    private ClassDefinition? selectedNewClassDefinition;
+    private int? selectedSubclassDefinitionId;
+    private int? selectedFeatDefinitionId;
+    private string selectedFightingStyle = "";
+    private HashSet<string> selectedExpertiseSkills = new(StringComparer.OrdinalIgnoreCase);
+    private bool isAddingNewClass;
+    private bool isLoading = true;
+    private bool isSaving;
+    private string errorMessage = "";
+
+    private CharacterClass? SelectedClass => selectedClass;
+    private ClassDefinition? SelectedClassDefinition => SelectedClass is null
+        ? null
+        : classDefinitions.FirstOrDefault(definition => definition.Id == SelectedClass.ClassDefinitionId);
+    private ClassDefinition? SelectedTargetClassDefinition => isAddingNewClass ? selectedNewClassDefinition : SelectedClassDefinition;
+    private SubclassDefinition? SelectedSubclassDefinition => selectedSubclassDefinitionId is null
+        ? null
+        : subclassDefinitions.FirstOrDefault(definition => definition.Id == selectedSubclassDefinitionId.Value);
+    private IReadOnlyList<ClassDefinition> AvailableNewClasses => classDefinitions
+        .Where(definition => character?.Classes.All(characterClass => !string.Equals(characterClass.ClassName, definition.Name, StringComparison.OrdinalIgnoreCase)) ?? true)
+        .OrderBy(definition => definition.Name)
+        .ThenBy(definition => definition.Source)
+        .ToList();
+    private IReadOnlyList<ClassGroup> AvailableNewClassGroups => AvailableNewClasses
+        .GroupBy(definition => definition.Name, StringComparer.OrdinalIgnoreCase)
+        .Select(group => new ClassGroup(group))
+        .OrderBy(group => group.Name)
+        .ToList();
+    private int CurrentTotalLevel => character?.Classes.Sum(characterClass => characterClass.Level) ?? character?.Level ?? 0;
+    private int NextClassLevel => isAddingNewClass ? 1 : (SelectedClass?.Level ?? 0) + 1;
+    private string PreviewTitle => isAddingNewClass && selectedNewClassDefinition is not null
+        ? $"{selectedNewClassDefinition.Name} 1 ({selectedNewClassDefinition.Source})"
+        : SelectedClass is null
+            ? "Class"
+            : $"{SelectedClass.ClassName} {SelectedClass.Level} -> {SelectedClass.Level + 1}";
+    private bool SelectedClassHasSubclass => !isAddingNewClass && SelectedClass is not null
+        && (SelectedClass.SubclassDefinitionId is not null || !string.IsNullOrWhiteSpace(SelectedClass.SubclassName));
+    private bool ShouldShowSubclassSelection => SelectedTargetClassDefinition is not null
+        && !SelectedClassHasSubclass
+        && BuildSubclassGrantLevels(SelectedTargetClassDefinition.RawJson).Any(level => level <= NextClassLevel);
+    private bool RequiresSubclassSelection => ShouldShowSubclassSelection
+        && selectedSubclassDefinitionId is null;
+    private bool CanApplyLevelUp => isAddingNewClass
+        ? selectedNewClassDefinition is not null
+            && MeetsRequirement(GetMulticlassRequirement(selectedNewClassDefinition.RawJson))
+            && (!RequiresSubclassSelection || selectedSubclassDefinitionId is not null)
+            && LevelUpChoicesAreComplete
+        : SelectedClass is not null
+            && SelectedClass.Level < 20
+            && (!RequiresSubclassSelection || selectedSubclassDefinitionId is not null)
+            && LevelUpChoicesAreComplete;
+    private IReadOnlyList<LevelUpFeatureLevel> NewFeatureLevels => BuildNewFeatureLevels().ToList();
+    private IReadOnlyList<LevelUpFeature> NewFeatures => NewFeatureLevels.SelectMany(level => level.Features).ToList();
+    private bool RequiresFeatChoice => NewFeatures.Any(feature => IsFeatChoiceFeature(feature.Name));
+    private bool RequiresFightingStyleChoice => NewFeatures.Any(feature => feature.Name.Contains("Fighting Style", StringComparison.OrdinalIgnoreCase));
+    private bool RequiresExpertiseChoice => NewFeatures.Any(feature => feature.Name.Contains("Expertise", StringComparison.OrdinalIgnoreCase));
+    private bool GrantsHalfProficiency => NewFeatures.Any(feature =>
+        feature.Name.Contains("Jack of All Trades", StringComparison.OrdinalIgnoreCase)
+        || feature.Paragraphs.Any(paragraph => paragraph.Contains("half your Proficiency Bonus", StringComparison.OrdinalIgnoreCase)));
+    private int ExpertiseChoiceCount => 2;
+    private bool LevelUpChoicesAreComplete => (!RequiresFeatChoice || selectedFeatDefinitionId is not null)
+        && (!RequiresFightingStyleChoice || !string.IsNullOrWhiteSpace(selectedFightingStyle))
+        && (!RequiresExpertiseChoice || selectedExpertiseSkills.Count == ExpertiseChoiceCount);
+    private IReadOnlyList<FeatDefinition> AvailableFeatDefinitions => featDefinitions
+        .Where(definition => character?.Feats.All(feat => feat.FeatDefinitionId != definition.Id) ?? true)
+        .OrderBy(definition => definition.Name)
+        .ThenBy(definition => definition.Source)
+        .ToList();
+    private IReadOnlyList<CharacterSkill> EligibleExpertiseSkills => character?.Skills
+        .Where(skill => SkillCanGainExpertise(skill))
+        .OrderBy(skill => skill.Name)
+        .ToList() ?? [];
+    private static readonly string[] FightingStyleOptions =
+    [
+        "Archery",
+        "Blind Fighting",
+        "Defense",
+        "Dueling",
+        "Great Weapon Fighting",
+        "Interception",
+        "Protection",
+        "Superior Technique",
+        "Thrown Weapon Fighting",
+        "Two-Weapon Fighting",
+        "Unarmed Fighting"
+    ];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        character = await SpellDatabase.GetCharacterAsync(Id);
+        classDefinitions = (await SpellDatabase.GetClassDefinitionsAsync()).ToList();
+        featDefinitions = (await SpellDatabase.GetFeatDefinitionsAsync()).ToList();
+        if (character?.Classes.Count == 1)
+        {
+            await SelectClassAsync(character.Classes[0]);
+        }
+
+        isLoading = false;
+    }
+
+    private async Task SelectClassAsync(CharacterClass characterClass)
+    {
+        isAddingNewClass = false;
+        selectedNewClassGroup = null;
+        selectedNewClassDefinition = null;
+        selectedClass = characterClass;
+        selectedSubclassDefinitionId = characterClass.SubclassDefinitionId;
+        ResetLevelUpChoiceSelections();
+        errorMessage = "";
+
+        subclassDefinitions = characterClass.ClassDefinitionId <= 0
+            ? []
+            : (await SpellDatabase.GetSubclassDefinitionsAsync(characterClass.ClassDefinitionId)).ToList();
+        StateHasChanged();
+    }
+
+    private void ShowNewClassPicker()
+    {
+        isAddingNewClass = true;
+        selectedClass = null;
+        selectedNewClassGroup = null;
+        selectedNewClassDefinition = null;
+        selectedSubclassDefinitionId = null;
+        ResetLevelUpChoiceSelections();
+        subclassDefinitions = [];
+        errorMessage = "";
+    }
+
+    private async Task SelectNewClassGroupAsync(ClassGroup classGroup)
+    {
+        selectedNewClassGroup = classGroup;
+        await SelectNewClassVersionAsync(classGroup.Primary);
+    }
+
+    private async Task SelectNewClassVersionAsync(ClassDefinition classDefinition)
+    {
+        isAddingNewClass = true;
+        selectedClass = null;
+        selectedNewClassGroup ??= AvailableNewClassGroups.FirstOrDefault(group => string.Equals(group.Name, classDefinition.Name, StringComparison.OrdinalIgnoreCase));
+        selectedNewClassDefinition = classDefinition;
+        selectedSubclassDefinitionId = null;
+        ResetLevelUpChoiceSelections();
+        errorMessage = "";
+        subclassDefinitions = (await SpellDatabase.GetSubclassDefinitionsAsync(classDefinition.Id)).ToList();
+        StateHasChanged();
+    }
+
+    private async Task ApplyLevelUp()
+    {
+        if (character is null)
+        {
+            return;
+        }
+
+        if (RequiresSubclassSelection && selectedSubclassDefinitionId is null)
+        {
+            errorMessage = "Please select a subclass.";
+            return;
+        }
+
+        if (!LevelUpChoicesAreComplete)
+        {
+            errorMessage = "Please complete all level-up choices.";
+            return;
+        }
+
+        if (isAddingNewClass)
+        {
+            await AddNewClassAsync();
+            return;
+        }
+
+        if (SelectedClass is null)
+        {
+            return;
+        }
+
+        var targetClass = character.Classes.FirstOrDefault(characterClass => characterClass.Id == SelectedClass.Id)
+            ?? character.Classes.FirstOrDefault(characterClass => characterClass.ClassDefinitionId == SelectedClass.ClassDefinitionId);
+        if (targetClass is null)
+        {
+            errorMessage = "Selected class was not found.";
+            return;
+        }
+
+        var grantsHalfProficiency = GrantsHalfProficiency;
+        isSaving = true;
+        targetClass.Level = Math.Clamp(targetClass.Level + 1, 1, 20);
+
+        if (selectedSubclassDefinitionId is not null)
+        {
+            var subclassDefinition = subclassDefinitions.FirstOrDefault(definition => definition.Id == selectedSubclassDefinitionId.Value);
+            if (subclassDefinition is not null)
+            {
+                targetClass.SubclassDefinitionId = subclassDefinition.Id;
+                targetClass.SubclassName = subclassDefinition.Name;
+                targetClass.SubclassSource = subclassDefinition.Source;
+            }
+        }
+
+        ApplyLevelUpChoices(grantsHalfProficiency);
+        character.Level = character.Classes.Sum(characterClass => characterClass.Level);
+        await SpellDatabase.UpdateCharacterAsync(character);
+        Navigation.NavigateTo($"characters/{Id}");
+    }
+
+    private async Task AddNewClassAsync()
+    {
+        if (character is null || selectedNewClassDefinition is null)
+        {
+            return;
+        }
+
+        var requirement = GetMulticlassRequirement(selectedNewClassDefinition.RawJson);
+        if (!MeetsRequirement(requirement))
+        {
+            errorMessage = $"Requirements not met: {requirement.DisplayText}.";
+            return;
+        }
+
+        if (character.Classes.Any(characterClass => string.Equals(characterClass.ClassName, selectedNewClassDefinition.Name, StringComparison.OrdinalIgnoreCase)))
+        {
+            errorMessage = "This class is already added.";
+            return;
+        }
+
+        var subclassDefinition = selectedSubclassDefinitionId is null
+            ? null
+            : subclassDefinitions.FirstOrDefault(definition => definition.Id == selectedSubclassDefinitionId.Value);
+
+        isSaving = true;
+        character.Classes.Add(new CharacterClass
+        {
+            CharacterId = character.Id,
+            ClassDefinitionId = selectedNewClassDefinition.Id,
+            SubclassDefinitionId = subclassDefinition?.Id,
+            ClassName = selectedNewClassDefinition.Name,
+            ClassSource = selectedNewClassDefinition.Source,
+            SubclassName = subclassDefinition?.Name ?? "",
+            SubclassSource = subclassDefinition?.Source ?? "",
+            Level = 1
+        });
+
+        ApplyLevelUpChoices(GrantsHalfProficiency);
+        character.PrimaryClassDefinitionId ??= selectedNewClassDefinition.Id;
+        character.Level = character.Classes.Sum(characterClass => characterClass.Level);
+        await SpellDatabase.UpdateCharacterAsync(character);
+        Navigation.NavigateTo($"characters/{Id}");
+    }
+
+    private void ApplyLevelUpChoices(bool grantsHalfProficiency)
+    {
+        if (character is null)
+        {
+            return;
+        }
+
+        if (selectedFeatDefinitionId is not null
+            && character.Feats.All(feat => feat.FeatDefinitionId != selectedFeatDefinitionId.Value))
+        {
+            var featDefinition = featDefinitions.FirstOrDefault(definition => definition.Id == selectedFeatDefinitionId.Value);
+            if (featDefinition is not null)
+            {
+                character.Feats.Add(new CharacterFeat
+                {
+                    CharacterId = character.Id,
+                    FeatDefinitionId = featDefinition.Id,
+                    FeatName = featDefinition.Name,
+                    FeatSource = featDefinition.Source
+                });
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedFightingStyle)
+            && character.FightingStyles.All(style => !string.Equals(style.Name, selectedFightingStyle, StringComparison.OrdinalIgnoreCase)))
+        {
+            character.FightingStyles.Add(new CharacterFightingStyle
+            {
+                CharacterId = character.Id,
+                Name = selectedFightingStyle,
+                Source = SelectedTargetClassDefinition?.Source ?? "",
+                Notes = $"Chosen during level-up at level {NextClassLevel}."
+            });
+        }
+
+        foreach (var skillName in selectedExpertiseSkills)
+        {
+            var skill = character.Skills.FirstOrDefault(skill => string.Equals(skill.Name, skillName, StringComparison.OrdinalIgnoreCase));
+            if (skill is null)
+            {
+                continue;
+            }
+
+            skill.IsProficient = true;
+            skill.ProficiencyLevel = "Expertise";
+        }
+
+        if (grantsHalfProficiency)
+        {
+            foreach (var skill in character.Skills.Where(skill => skill.ProficiencyLevel is not "Proficient" and not "Expertise" && !skill.IsProficient))
+            {
+                skill.ProficiencyLevel = "Half";
+            }
+        }
+    }
+
+    private void ResetLevelUpChoiceSelections()
+    {
+        selectedFeatDefinitionId = null;
+        selectedFightingStyle = "";
+        selectedExpertiseSkills.Clear();
+    }
+
+    private void ToggleExpertiseSkill(string skillName, ChangeEventArgs args)
+    {
+        if (character?.Skills.FirstOrDefault(skill => string.Equals(skill.Name, skillName, StringComparison.OrdinalIgnoreCase)) is not { } skill
+            || !SkillCanGainExpertise(skill))
+        {
+            selectedExpertiseSkills.Remove(skillName);
+            return;
+        }
+
+        if (args.Value is bool isChecked && isChecked)
+        {
+            if (selectedExpertiseSkills.Count < ExpertiseChoiceCount)
+            {
+                selectedExpertiseSkills.Add(skillName);
+            }
+            return;
+        }
+
+        selectedExpertiseSkills.Remove(skillName);
+    }
+
+    private static bool SkillCanGainExpertise(CharacterSkill skill)
+    {
+        return skill.ProficiencyLevel != "Expertise"
+            && (skill.IsProficient || skill.ProficiencyLevel == "Proficient");
+    }
+
+    private static bool IsFeatChoiceFeature(string featureName)
+    {
+        return featureName.Contains("Ability Score Improvement", StringComparison.OrdinalIgnoreCase)
+            || featureName.Contains("Epic Boon", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(featureName, "Feat", StringComparison.OrdinalIgnoreCase)
+            || featureName.Contains("Feat", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private IReadOnlyList<LevelUpFeatureLevel> BuildNewFeatureLevels()
+    {
+        if (SelectedTargetClassDefinition is null)
+        {
+            return [];
+        }
+
+        var classLevels = BuildFeatureLevelGroups(SelectedTargetClassDefinition.RawJson, "classFeatures")
+            .Where(level => level.Level == NextClassLevel)
+            .ToList();
+
+        var subclassDefinition = SelectedSubclassDefinition;
+        if (subclassDefinition is not null)
+        {
+            var subclassLevels = BuildMappedSubclassFeatureLevels(SelectedTargetClassDefinition.RawJson, subclassDefinition.RawJson)
+                .Where(level => level.Level == NextClassLevel)
+                .ToList();
+            classLevels = MergeFeatureLevels(classLevels, subclassLevels);
+        }
+
+        return classLevels;
+    }
+
+    private void OpenCharacter()
+    {
+        Navigation.NavigateTo($"characters/{Id}");
+    }
+
+    private MulticlassRequirement GetMulticlassRequirement(string rawJson)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            return MulticlassRequirement.None;
+        }
+
+        using var document = JsonDocument.Parse(rawJson);
+        if (!document.RootElement.TryGetProperty("multiclassing", out var multiclassing)
+            || !multiclassing.TryGetProperty("requirements", out var requirements)
+            || requirements.ValueKind != JsonValueKind.Object)
+        {
+            return MulticlassRequirement.None;
+        }
+
+        var groups = ParseRequirementGroups(requirements).ToList();
+        return groups.Count == 0 ? MulticlassRequirement.None : new MulticlassRequirement(groups);
+    }
+
+    private IEnumerable<MulticlassRequirementGroup> ParseRequirementGroups(JsonElement requirements)
+    {
+        foreach (var property in requirements.EnumerateObject())
+        {
+            if (property.NameEquals("or") && property.Value.ValueKind == JsonValueKind.Array)
+            {
+                var options = property.Value
+                    .EnumerateArray()
+                    .Where(option => option.ValueKind == JsonValueKind.Object)
+                    .SelectMany(option => ParseRequirementGroups(option))
+                    .ToList();
+                if (options.Count > 0)
+                {
+                    yield return new MulticlassRequirementGroup(options, true);
+                }
+                continue;
+            }
+
+            if (TryReadAbilityRequirement(property.Name, property.Value, out var requirement))
+            {
+                yield return new MulticlassRequirementGroup([requirement], false);
+            }
+        }
+    }
+
+    private bool MeetsRequirement(MulticlassRequirement requirement)
+    {
+        return requirement.Groups.All(MeetsRequirementGroup);
+    }
+
+    private bool MeetsRequirementGroup(MulticlassRequirementGroup group)
+    {
+        return group.IsOrGroup
+            ? group.Options.Any(MeetsRequirementGroup)
+            : group.Requirements.All(requirement => GetAbilityScore(requirement.AbilityCode) >= requirement.Minimum);
+    }
+
+    private string BuildRequirementStatus(MulticlassRequirement requirement)
+    {
+        if (requirement.Groups.Count == 0)
+        {
+            return "No multiclass ability requirement found in the class data.";
+        }
+
+        return MeetsRequirement(requirement)
+            ? "The character fulfills this requirement."
+            : "The character does not fulfill this requirement yet.";
+    }
+
+    private int GetAbilityScore(string abilityCode)
+    {
+        if (character is null)
+        {
+            return 0;
+        }
+
+        return abilityCode.ToLowerInvariant() switch
+        {
+            "str" => character.Strength,
+            "dex" => character.Dexterity,
+            "con" => character.Constitution,
+            "int" => character.Intelligence,
+            "wis" => character.Wisdom,
+            "cha" => character.Charisma,
+            _ => 0
+        };
+    }
+
+    private static bool TryReadAbilityRequirement(string abilityCode, JsonElement value, out AbilityRequirement requirement)
+    {
+        requirement = default;
+        if (!IsAbilityCode(abilityCode) || value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out var minimum))
+        {
+            return false;
+        }
+
+        requirement = new AbilityRequirement(abilityCode.ToLowerInvariant(), minimum);
+        return true;
+    }
+
+    private static bool IsAbilityCode(string value)
+    {
+        return value is "str" or "dex" or "con" or "int" or "wis" or "cha";
+    }
+
+    private static string FormatAbilityRequirement(AbilityRequirement requirement)
+    {
+        return $"{FormatAbilityName(requirement.AbilityCode)} {requirement.Minimum}";
+    }
+
+    private static string FormatAbilityName(string abilityCode)
+    {
+        return abilityCode.ToLowerInvariant() switch
+        {
+            "str" => "Str",
+            "dex" => "Dex",
+            "con" => "Con",
+            "int" => "Int",
+            "wis" => "Wis",
+            "cha" => "Cha",
+            _ => abilityCode
+        };
+    }
+
+    private static IEnumerable<LevelUpFeatureLevel> BuildFeatureLevelGroups(string rawJson, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            yield break;
+        }
+
+        using var document = JsonDocument.Parse(rawJson);
+        if (!document.RootElement.TryGetProperty(propertyName, out var features) || features.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        var details = BuildFeatureDetailLookup(document.RootElement);
+        foreach (var group in features.EnumerateArray()
+            .Select(feature => ParseFeatureReference(feature, details))
+            .Where(feature => feature is not null)
+            .Select(feature => feature!)
+            .GroupBy(feature => feature.Level)
+            .OrderBy(group => group.Key))
+        {
+            yield return new LevelUpFeatureLevel(
+                group.Key,
+                group
+                    .GroupBy(feature => feature.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .OrderBy(feature => feature.Name)
+                    .ToList());
+        }
+    }
+
+    private static IEnumerable<LevelUpFeatureLevel> BuildMappedSubclassFeatureLevels(string classRawJson, string subclassRawJson)
+    {
+        var subclassLevels = BuildFeatureLevelGroups(subclassRawJson, "subclassFeatures").ToList();
+        var classSubclassLevels = BuildSubclassGrantLevels(classRawJson).ToList();
+        if (subclassLevels.Count == 0 || classSubclassLevels.Count == 0)
+        {
+            return subclassLevels;
+        }
+
+        return subclassLevels
+            .Select((level, index) => new LevelUpFeatureLevel(
+                index < classSubclassLevels.Count ? classSubclassLevels[index] : level.Level,
+                level.Features))
+            .GroupBy(level => level.Level)
+            .OrderBy(group => group.Key)
+            .Select(group => new LevelUpFeatureLevel(
+                group.Key,
+                group.SelectMany(level => level.Features)
+                    .GroupBy(feature => feature.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .OrderBy(feature => feature.Name)
+                    .ToList()))
+            .ToList();
+    }
+
+    private static List<LevelUpFeatureLevel> MergeFeatureLevels(IEnumerable<LevelUpFeatureLevel> first, IEnumerable<LevelUpFeatureLevel> second)
+    {
+        return first.Concat(second)
+            .GroupBy(level => level.Level)
+            .OrderBy(group => group.Key)
+            .Select(group => new LevelUpFeatureLevel(
+                group.Key,
+                group.SelectMany(level => level.Features)
+                    .GroupBy(feature => feature.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .OrderBy(feature => feature.Name)
+                    .ToList()))
+            .ToList();
+    }
+
+    private static IEnumerable<int> BuildSubclassGrantLevels(string classRawJson)
+    {
+        if (string.IsNullOrWhiteSpace(classRawJson))
+        {
+            yield break;
+        }
+
+        using var document = JsonDocument.Parse(classRawJson);
+        if (!document.RootElement.TryGetProperty("classFeatures", out var features) || features.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var feature in features.EnumerateArray())
+        {
+            if (feature.ValueKind != JsonValueKind.Object
+                || !feature.TryGetProperty("gainSubclassFeature", out var gainSubclassFeature)
+                || gainSubclassFeature.ValueKind != JsonValueKind.True
+                || !feature.TryGetProperty("classFeature", out var classFeature))
+            {
+                continue;
+            }
+
+            var level = ParseFeatureReferenceLevel(classFeature.GetString());
+            if (level is >= 1 and <= 20)
+            {
+                yield return level;
+            }
+        }
+    }
+
+    private static Dictionary<string, IReadOnlyList<string>> BuildFeatureDetailLookup(JsonElement root)
+    {
+        var details = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+        if (!root.TryGetProperty("_featureDetails", out var featureDetails) || featureDetails.ValueKind != JsonValueKind.Array)
+        {
+            return details;
+        }
+
+        foreach (var featureDetail in featureDetails.EnumerateArray())
+        {
+            var name = ReadJsonString(featureDetail, "name");
+            if (string.IsNullOrWhiteSpace(name) || !featureDetail.TryGetProperty("level", out var levelElement))
+            {
+                continue;
+            }
+
+            var level = levelElement.ValueKind == JsonValueKind.Number && levelElement.TryGetInt32(out var parsedLevel)
+                ? parsedLevel
+                : 0;
+            if (level is < 1 or > 20)
+            {
+                continue;
+            }
+
+            var paragraphs = featureDetail.TryGetProperty("entries", out var entries)
+                ? ExtractParagraphs(entries).ToList()
+                : [];
+            details[BuildFeatureKey(name, level)] = paragraphs;
+        }
+
+        return details;
+    }
+
+    private static LevelUpFeature? ParseFeatureReference(JsonElement element, IReadOnlyDictionary<string, IReadOnlyList<string>> details)
+    {
+        var reference = element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Object when element.TryGetProperty("classFeature", out var classFeature) => classFeature.GetString(),
+            JsonValueKind.Object when element.TryGetProperty("subclassFeature", out var subclassFeature) => subclassFeature.GetString(),
+            _ => null
+        };
+
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return null;
+        }
+
+        var parts = reference.Split('|', StringSplitOptions.None);
+        var level = ParseFeatureReferenceLevel(reference);
+        if (level == 0)
+        {
+            return null;
+        }
+
+        var name = CleanMarkup(parts[0]);
+        var key = BuildFeatureKey(name, level);
+        return new LevelUpFeature(name, level, key, details.GetValueOrDefault(key) ?? []);
+    }
+
+    private static int ParseFeatureReferenceLevel(string? reference)
+    {
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return 0;
+        }
+
+        return reference
+            .Split('|', StringSplitOptions.None)
+            .Select(part => int.TryParse(part, out var parsed) ? parsed : 0)
+            .LastOrDefault(parsed => parsed is >= 1 and <= 20);
+    }
+
+    private static string BuildFeatureKey(string name, int level)
+    {
+        return $"{CleanMarkup(name).Trim()}|{level}";
+    }
+
+    private static IEnumerable<string> ExtractParagraphs(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.String)
+        {
+            yield return element.GetString() ?? "";
+            yield break;
+        }
+
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("entry", out var entry))
+            {
+                foreach (var value in ExtractParagraphs(entry))
+                {
+                    yield return value;
+                }
+            }
+
+            if (element.TryGetProperty("entries", out var entries))
+            {
+                foreach (var value in ExtractParagraphs(entries))
+                {
+                    yield return value;
+                }
+            }
+
+            if (element.TryGetProperty("items", out var items))
+            {
+                foreach (var value in ExtractParagraphs(items))
+                {
+                    yield return value;
+                }
+            }
+
+            yield break;
+        }
+
+        if (element.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var item in element.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.Object && item.TryGetProperty("name", out var name))
+            {
+                var text = string.Join(" ", ExtractParagraphs(item));
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    yield return $"{name.GetString()}: {text}";
+                }
+                continue;
+            }
+
+            foreach (var value in ExtractParagraphs(item))
+            {
+                yield return value;
+            }
+        }
+    }
+
+    private static string ReadJsonString(JsonElement element, string propertyName)
+    {
+        return element.ValueKind == JsonValueKind.Object
+            && element.TryGetProperty(propertyName, out var property)
+            && property.ValueKind == JsonValueKind.String
+            ? property.GetString() ?? ""
+            : "";
+    }
+
+    private static string CleanMarkup(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "";
+        }
+
+        var cleaned = value.Replace("{@dc ", "DC ");
+        cleaned = System.Text.RegularExpressions.Regex.Replace(
+            cleaned,
+            @"\{@[a-zA-Z]+ ([^|}]+)(?:\|[^}]*)?\}",
+            "$1");
+
+        return cleaned
+            .Replace("|XPHB", "")
+            .Replace("|PHB", "")
+            .Replace("}", "")
+            .Trim();
+    }
+
+    private sealed record MulticlassRequirement(IReadOnlyList<MulticlassRequirementGroup> Groups)
+    {
+        public static MulticlassRequirement None { get; } = new([]);
+
+        public string DisplayText => Groups.Count == 0
+            ? "None"
+            : string.Join(", ", Groups.Select(group => group.DisplayText));
+    }
+
+    private sealed record MulticlassRequirementGroup(IReadOnlyList<AbilityRequirement> Requirements, IReadOnlyList<MulticlassRequirementGroup> Options, bool IsOrGroup)
+    {
+        public MulticlassRequirementGroup(IReadOnlyList<AbilityRequirement> requirements, bool isOrGroup)
+            : this(requirements, [], isOrGroup)
+        {
+        }
+
+        public MulticlassRequirementGroup(IReadOnlyList<MulticlassRequirementGroup> options, bool isOrGroup)
+            : this([], options, isOrGroup)
+        {
+        }
+
+        public string DisplayText => IsOrGroup
+            ? string.Join(" or ", Options.Select(option => option.DisplayText))
+            : string.Join(" and ", Requirements.Select(FormatAbilityRequirement));
+    }
+
+    private readonly record struct AbilityRequirement(string AbilityCode, int Minimum);
+    private sealed record LevelUpFeatureLevel(int Level, IReadOnlyList<LevelUpFeature> Features);
+    private sealed record LevelUpFeature(string Name, int Level, string Key, IReadOnlyList<string> Paragraphs);
+}
