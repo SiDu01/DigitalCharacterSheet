@@ -1,5 +1,5 @@
 @page "/settings"
-@inject SpellDatabase SpellDatabase
+@inject AppDatabase Database
 @inject IJSRuntime JsRuntime
 
 <PageTitle>Settings</PageTitle>
@@ -144,7 +144,7 @@
         try
         {
             isLoadingSources = true;
-            sourceSettings = (await SpellDatabase.GetSourceSettingsAsync()).ToList();
+            sourceSettings = (await Database.GetSourceSettingsAsync()).ToList();
         }
         catch (Exception exception)
         {
@@ -159,7 +159,7 @@
     private async Task SetSourceEnabled(SourceSetting source, bool isEnabled)
     {
         source.IsEnabled = isEnabled;
-        await SpellDatabase.SetSourceEnabledAsync(source.SourceCode, isEnabled);
+        await Database.SetSourceEnabledAsync(source.SourceCode, isEnabled);
         sourceMessage = isEnabled
             ? $"{source.SourceCode} ist aktiv."
             : $"{source.SourceCode} ist deaktiviert.";
@@ -167,14 +167,14 @@
 
     private async Task MoveSource(SourceSetting source, int direction)
     {
-        await SpellDatabase.MoveSourceAsync(source.SourceCode, direction);
+        await Database.MoveSourceAsync(source.SourceCode, direction);
         await LoadSourceSettings();
         sourceMessage = $"{source.SourceCode} Priorität aktualisiert.";
     }
 
     private async Task ResetSources()
     {
-        await SpellDatabase.ResetSourceSettingsAsync();
+        await Database.ResetSourceSettingsAsync();
         await LoadSourceSettings();
         sourceMessage = "Source-Einstellungen zurückgesetzt.";
     }
@@ -187,7 +187,7 @@
             dataMessage = "";
             var fileName = $"characters-{DateTime.Now:yyyyMMdd-HHmmss}.json";
             var exportPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), fileName);
-            var savedPath = await SpellDatabase.ExportCharactersAsync(exportPath);
+            var savedPath = await Database.ExportCharactersAsync(exportPath);
             dataMessage = $"Export saved: {savedPath}";
         }
         catch (Exception exception)

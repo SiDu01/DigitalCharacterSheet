@@ -90,3 +90,5 @@ The app stores database state in the `DatabaseMetadata` table. Important keys ar
 - `LastInitializedUtc`: last initialization timestamp written by the app.
 
 Future schema changes should add a new `DatabaseVersion` value in `SpellDatabase` and a matching migration in `ApplyMigrationAsync`. Migrations must preserve user-owned tables such as characters, character classes, character spells, spell slots, saving throws, skills, and feats.
+
+Runtime builds do not import raw JSON reference data. If any reference-data import version changes (`ImportVersion`, `ClassImportVersion`, `CharacterOptionImportVersion`, `SpellAccessImportVersion`, or `ItemImportVersion`), refresh the seed database before building the app. A future reference-data update flow should copy new reference tables from a fresh seed database while preserving user-owned character tables.

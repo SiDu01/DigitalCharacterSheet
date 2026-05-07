@@ -1,6 +1,6 @@
 @page "/items"
 @implements IAsyncDisposable
-@inject SpellDatabase SpellDatabase
+@inject AppDatabase Database
 @inject IJSRuntime JsRuntime
 
 <PageTitle>Items</PageTitle>
@@ -274,8 +274,8 @@
     {
         try
         {
-            allItems = (await SpellDatabase.GetItemDefinitionsAsync()).ToList();
-            sourcePriorities = await SpellDatabase.GetSourcePriorityMapAsync();
+            allItems = (await Database.GetItemDefinitionsAsync()).ToList();
+            sourcePriorities = await Database.GetSourcePriorityMapAsync();
             itemGroups = GroupItems(allItems);
             filteredItemGroups = itemGroups;
             sources = allItems.Select(item => item.Source).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct().OrderBy(value => value).ToList();

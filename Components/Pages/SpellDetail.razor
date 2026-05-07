@@ -1,5 +1,5 @@
 @page "/spells/{Id:int}"
-@inject SpellDatabase SpellDatabase
+@inject AppDatabase Database
 @inject NavigationManager Navigation
 
 <PageTitle>@spell?.Name</PageTitle>
@@ -28,17 +28,17 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
-        spell = await SpellDatabase.GetSpellAsync(Id);
+        spell = await Database.GetSpellAsync(Id);
         if (spell is not null)
         {
-            versions = (await SpellDatabase.GetSpellVersionsAsync(spell.Name)).ToList();
+            versions = (await Database.GetSpellVersionsAsync(spell.Name)).ToList();
         }
     }
 
     private async Task TogglePrepared(Spell selectedSpell)
     {
         selectedSpell.IsPrepared = !selectedSpell.IsPrepared;
-        await SpellDatabase.SetPreparedAsync(selectedSpell.Id, selectedSpell.IsPrepared);
+        await Database.SetPreparedAsync(selectedSpell.Id, selectedSpell.IsPrepared);
     }
 
     private void SelectVersion(Spell selectedSpell)

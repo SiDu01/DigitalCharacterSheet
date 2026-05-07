@@ -56,7 +56,7 @@ public sealed partial class SpellImportService
     private static async Task<Stream> OpenAssetAsync(string assetPath)
     {
 #if SEED_BUILDER
-        return File.OpenRead(Path.Combine(SeedSourceDataPath, assetPath));
+        return await Task.FromResult<Stream>(File.OpenRead(Path.Combine(SeedSourceDataPath, assetPath)));
 #else
         try
         {

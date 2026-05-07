@@ -1,6 +1,6 @@
 @page "/characters/{Id:int}/edit"
 @using System.Text.Json
-@inject SpellDatabase SpellDatabase
+@inject AppDatabase Database
 @inject NavigationManager Navigation
 
 <PageTitle>Edit Character</PageTitle>
@@ -495,17 +495,17 @@
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
-        classDefinitions = (await SpellDatabase.GetClassDefinitionsAsync()).ToList();
-        raceDefinitions = (await SpellDatabase.GetRaceDefinitionsAsync()).ToList();
-        backgroundDefinitions = (await SpellDatabase.GetBackgroundDefinitionsAsync()).ToList();
-        featDefinitions = (await SpellDatabase.GetFeatDefinitionsAsync()).ToList();
+        classDefinitions = (await Database.GetClassDefinitionsAsync()).ToList();
+        raceDefinitions = (await Database.GetRaceDefinitionsAsync()).ToList();
+        backgroundDefinitions = (await Database.GetBackgroundDefinitionsAsync()).ToList();
+        featDefinitions = (await Database.GetFeatDefinitionsAsync()).ToList();
         classGroups = classDefinitions
             .GroupBy(classDefinition => classDefinition.Name, StringComparer.OrdinalIgnoreCase)
             .Select(group => new ClassGroup(group))
             .OrderBy(group => group.Name)
             .ToList();
 
-        character = await SpellDatabase.GetCharacterAsync(Id);
+        character = await Database.GetCharacterAsync(Id);
         if (character is not null)
         {
             name = character.Name;
@@ -564,7 +564,7 @@
     {
         subclassDefinitions = selectedClassDefinitionId is null
             ? []
-            : (await SpellDatabase.GetSubclassDefinitionsAsync(selectedClassDefinitionId.Value)).ToList();
+            : (await Database.GetSubclassDefinitionsAsync(selectedClassDefinitionId.Value)).ToList();
 
         if (selectedSubclassDefinitionId is not null
             && subclassDefinitions.All(definition => definition.Id != selectedSubclassDefinitionId.Value))
@@ -680,7 +680,7 @@
         try
         {
             isSaving = true;
-            await SpellDatabase.UpdateCharacterAsync(BuildDraftCharacter());
+            await Database.UpdateCharacterAsync(BuildDraftCharacter());
 
             OpenCharacter();
         }
@@ -731,7 +731,7 @@
 
     private async Task RefreshOptionEffectsAsync(bool applyAbilityAndSaveEffects)
     {
-        var effects = await SpellDatabase.GetCharacterOptionEffectsAsync(BuildDraftCharacter());
+        var effects = await Database.GetCharacterOptionEffectsAsync(BuildDraftCharacter());
         if (applyAbilityAndSaveEffects)
         {
             strength = 10 + effects.AbilityBonuses.GetValueOrDefault("str");

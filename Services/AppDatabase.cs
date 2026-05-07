@@ -6,7 +6,7 @@ using System.Text.Json.Nodes;
 
 namespace DigitalCharacterSheet.Services;
 
-public sealed class SpellDatabase
+public sealed class AppDatabase
 {
     private const int DatabaseVersion = 1;
     private const int SchemaVersion = 1;
@@ -18,6 +18,9 @@ public sealed class SpellDatabase
     private const string SeedDatabaseVersion = "seed-v1";
     private const string DatabaseFileName = "digital-character-sheet.db3";
     private const string SeedDatabaseAssetName = "seed/digital-character-sheet.db3";
+#if !SEED_BUILDER
+    private readonly bool _useSeedDatabase;
+#endif
 #if SEED_BUILDER
     private static string seedSourceDataPath = Path.Combine("Resources", "Raw");
 #endif
@@ -26,7 +29,7 @@ public sealed class SpellDatabase
     private readonly SpellImportService _importService;
     private bool _initialized;
 
-    public SpellDatabase(SpellImportService importService)
+    public AppDatabase(SpellImportService importService)
 #if SEED_BUILDER
         : this(importService, Path.Combine("bin", DatabaseFileName))
 #else
@@ -35,9 +38,12 @@ public sealed class SpellDatabase
     {
     }
 
-    public SpellDatabase(SpellImportService importService, string databasePath, bool useSeedDatabase = false)
+    public AppDatabase(SpellImportService importService, string databasePath, bool useSeedDatabase = false)
     {
         _importService = importService;
+#if !SEED_BUILDER
+        _useSeedDatabase = useSeedDatabase;
+#endif
         if (useSeedDatabase)
         {
             TryCopySeedDatabase(databasePath);
@@ -72,7 +78,7 @@ public sealed class SpellDatabase
             Directory.CreateDirectory(directory);
         }
 
-        var database = new SpellDatabase(new SpellImportService(), databasePath);
+        var database = new AppDatabase(new SpellImportService(), databasePath);
         await database.InitializeAsync();
     }
 
@@ -143,6 +149,8 @@ public sealed class SpellDatabase
                 await EnsureSubclassColumnsAsync();
                 initializationStep = "checking database version";
                 await EnsureDatabaseVersionAsync();
+                initializationStep = "checking source data version";
+                await EnsureSourceDataVersionAsync();
                 initializationStep = "importing spells";
                 await EnsureImportedAsync();
                 initializationStep = "importing classes";
@@ -1359,7 +1367,9 @@ public sealed class SpellDatabase
         }
         catch (FileNotFoundException)
         {
-            // Development fallback: if no seed database was bundled, InitializeAsync imports from JSON.
+            throw new InvalidOperationException(
+                $"The bundled seed database asset '{SeedDatabaseAssetName}' was not found. " +
+                "Build the seed database with Tools\\SeedDatabaseBuilder before packaging or running the app.");
         }
 #endif
     }
@@ -1367,7 +1377,7 @@ public sealed class SpellDatabase
     private static async Task<Stream> OpenAssetAsync(string assetPath)
     {
 #if SEED_BUILDER
-        return File.OpenRead(Path.Combine(seedSourceDataPath, assetPath));
+        return await Task.FromResult<Stream>(File.OpenRead(Path.Combine(seedSourceDataPath, assetPath)));
 #else
         try
         {
@@ -1392,6 +1402,13 @@ public sealed class SpellDatabase
         {
             return;
         }
+
+#if !SEED_BUILDER
+        if (_useSeedDatabase)
+        {
+            throw BuildReferenceDataVersionMismatchException("spell", "ImportVersion", import?.Value, ImportVersion);
+        }
+#endif
 
         var spells = await _importService.LoadBundledSpellsAsync();
 
@@ -1439,6 +1456,33 @@ public sealed class SpellDatabase
         {
             await ApplyMigrationsAsync(currentVersion, DatabaseVersion);
         }
+    }
+
+    private async Task EnsureSourceDataVersionAsync()
+    {
+#if SEED_BUILDER
+        await Task.CompletedTask;
+#else
+        if (!_useSeedDatabase)
+        {
+            return;
+        }
+
+        var storedVersion = await _database.FindAsync<DatabaseMetadata>("SourceDataVersion");
+        if (storedVersion is null || string.IsNullOrWhiteSpace(storedVersion.Value))
+        {
+            return;
+        }
+
+        var currentVersion = BuildSourceDataVersion();
+        if (!string.Equals(storedVersion.Value, currentVersion, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"The app database was created with source data version '{storedVersion.Value}', " +
+                $"but this app expects '{currentVersion}'. Runtime JSON imports are disabled because raw 5e Tools data is not packaged. " +
+                "Create a fresh seed database and use a database migration/update path that preserves user-owned character data.");
+        }
+#endif
     }
 
     public async Task<string> ExportCharactersAsync(string filePath)
@@ -1506,6 +1550,22 @@ public sealed class SpellDatabase
             SpellAccessImportVersion,
             ItemImportVersion);
     }
+
+#if !SEED_BUILDER
+    private static InvalidOperationException BuildReferenceDataVersionMismatchException(
+        string dataName,
+        string metadataKey,
+        string? storedVersion,
+        string expectedVersion)
+    {
+        var actualVersion = string.IsNullOrWhiteSpace(storedVersion) ? "<missing>" : storedVersion;
+        return new InvalidOperationException(
+            $"The bundled seed database has outdated or missing {dataName} reference data. " +
+            $"{metadataKey} is '{actualVersion}', but the app expects '{expectedVersion}'. " +
+            "Runtime JSON imports are disabled because raw 5e Tools data is not packaged. " +
+            "Refresh Resources\\Raw\\seed\\digital-character-sheet.db3 with Tools\\SeedDatabaseBuilder before building the app.");
+    }
+#endif
 
     private async Task EnsureSourceSettingsAsync()
     {
@@ -1906,6 +1966,13 @@ public sealed class SpellDatabase
             return;
         }
 
+#if !SEED_BUILDER
+        if (_useSeedDatabase)
+        {
+            throw BuildReferenceDataVersionMismatchException("class", "ClassImportVersion", import?.Value, ClassImportVersion);
+        }
+#endif
+
         await _database.DeleteAllAsync<ClassSpellAccessRuleEntity>();
         await _database.DeleteAllAsync<SubclassSpellAccessRuleEntity>();
         await _database.DeleteAllAsync<SubclassDefinitionEntity>();
@@ -2085,6 +2152,17 @@ public sealed class SpellDatabase
             return;
         }
 
+#if !SEED_BUILDER
+        if (_useSeedDatabase)
+        {
+            throw BuildReferenceDataVersionMismatchException(
+                "character option",
+                "CharacterOptionImportVersion",
+                import?.Value,
+                CharacterOptionImportVersion);
+        }
+#endif
+
         await _database.DeleteAllAsync<RaceDefinitionEntity>();
         await _database.DeleteAllAsync<SubraceDefinitionEntity>();
         await _database.DeleteAllAsync<BackgroundDefinitionEntity>();
@@ -2240,6 +2318,17 @@ public sealed class SpellDatabase
         {
             return;
         }
+
+#if !SEED_BUILDER
+        if (_useSeedDatabase)
+        {
+            throw BuildReferenceDataVersionMismatchException(
+                "spell access",
+                "SpellAccessImportVersion",
+                import?.Value,
+                SpellAccessImportVersion);
+        }
+#endif
 
         await _database.DeleteAllAsync<ClassSpellAccessRuleEntity>();
 

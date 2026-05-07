@@ -1,6 +1,6 @@
 @page "/spells"
 @implements IAsyncDisposable
-@inject SpellDatabase SpellDatabase
+@inject AppDatabase Database
 @inject NavigationManager Navigation
 @inject IJSRuntime JsRuntime
 
@@ -308,10 +308,10 @@
     {
         try
         {
-            allSpells = (await SpellDatabase.GetSpellSummariesAsync()).ToList();
-            sourcePriorities = await SpellDatabase.GetSourcePriorityMapAsync();
-            classNames = (await SpellDatabase.GetSpellcastingClassNamesAsync()).ToList();
-            spellNamesByClass = await SpellDatabase.GetSpellNamesByClassAsync();
+            allSpells = (await Database.GetSpellSummariesAsync()).ToList();
+            sourcePriorities = await Database.GetSourcePriorityMapAsync();
+            classNames = (await Database.GetSpellcastingClassNamesAsync()).ToList();
+            spellNamesByClass = await Database.GetSpellNamesByClassAsync();
             spellGroups = GroupSpells(allSpells);
             filteredSpellGroups = spellGroups;
             schools = allSpells.Select(spell => spell.School).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct().OrderBy(value => value).ToList();
@@ -424,13 +424,13 @@
     private async Task TogglePrepared(Spell spell)
     {
         spell.IsPrepared = !spell.IsPrepared;
-        await SpellDatabase.SetPreparedAsync(spell.Id, spell.IsPrepared);
+        await Database.SetPreparedAsync(spell.Id, spell.IsPrepared);
     }
 
     private async Task ToggleFavorite(Spell spell)
     {
         spell.IsFavorite = !spell.IsFavorite;
-        await SpellDatabase.SetFavoriteAsync(spell.Id, spell.IsFavorite);
+        await Database.SetFavoriteAsync(spell.Id, spell.IsFavorite);
     }
 
     private async Task OpenSpell(SpellGroup group)
@@ -468,7 +468,7 @@
 
     private async Task<SpellGroup> LoadDetailGroup(SpellGroup group)
     {
-        var versions = await SpellDatabase.GetSpellVersionsAsync(group.Name);
+        var versions = await Database.GetSpellVersionsAsync(group.Name);
         return versions.Count == 0 ? group : new SpellGroup(versions, sourcePriorities);
     }
 

@@ -19,7 +19,7 @@ public static class MauiProgram
 
         builder.Services.AddMauiBlazorWebView();
         builder.Services.AddSingleton<SpellImportService>();
-        builder.Services.AddSingleton<SpellDatabase>();
+        builder.Services.AddSingleton<AppDatabase>();
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();

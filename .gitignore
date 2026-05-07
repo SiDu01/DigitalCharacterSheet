@@ -361,4 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Digital Character Sheet local/generated assets
 /Resources/Raw
+*.apk
+*.aab
+*.db3

@@ -1,6 +1,6 @@
 @page "/characters/new"
 @using System.Text.Json
-@inject SpellDatabase SpellDatabase
+@inject AppDatabase Database
 @inject NavigationManager Navigation
 
 <PageTitle>Create Character</PageTitle>
@@ -581,10 +581,10 @@
 
     protected override async Task OnInitializedAsync()
     {
-        classDefinitions = (await SpellDatabase.GetClassDefinitionsAsync()).ToList();
-        raceDefinitions = (await SpellDatabase.GetRaceDefinitionsAsync()).ToList();
-        backgroundDefinitions = (await SpellDatabase.GetBackgroundDefinitionsAsync()).ToList();
-        featDefinitions = (await SpellDatabase.GetFeatDefinitionsAsync()).ToList();
+        classDefinitions = (await Database.GetClassDefinitionsAsync()).ToList();
+        raceDefinitions = (await Database.GetRaceDefinitionsAsync()).ToList();
+        backgroundDefinitions = (await Database.GetBackgroundDefinitionsAsync()).ToList();
+        featDefinitions = (await Database.GetFeatDefinitionsAsync()).ToList();
 
         classGroups = classDefinitions
             .GroupBy(classDefinition => classDefinition.Name, StringComparer.OrdinalIgnoreCase)
@@ -621,7 +621,7 @@
         selectedRaceSize = "";
         subraceDefinitions = raceDefinition is null
             ? []
-            : (await SpellDatabase.GetSubraceDefinitionsAsync(raceDefinition.Id)).ToList();
+            : (await Database.GetSubraceDefinitionsAsync(raceDefinition.Id)).ToList();
         var sizes = RaceSizeOptions;
         if (sizes.Count == 1)
         {
@@ -684,7 +684,7 @@
     {
         subclassDefinitions = selectedClassDefinitionId is null
             ? []
-            : (await SpellDatabase.GetSubclassDefinitionsAsync(selectedClassDefinitionId.Value)).ToList();
+            : (await Database.GetSubclassDefinitionsAsync(selectedClassDefinitionId.Value)).ToList();
 
         if (selectedSubclassDefinitionId is not null
             && subclassDefinitions.All(definition => definition.Id != selectedSubclassDefinitionId.Value))
@@ -800,7 +800,7 @@
         try
         {
             isCreating = true;
-            var character = await SpellDatabase.AddCharacterAsync(BuildDraftCharacter());
+            var character = await Database.AddCharacterAsync(BuildDraftCharacter());
 
             Navigation.NavigateTo($"characters/{character.Id}");
         }
@@ -841,7 +841,7 @@
 
     private async Task ApplyOptionEffects()
     {
-        var effects = await SpellDatabase.GetCharacterOptionEffectsAsync(BuildDraftCharacter());
+        var effects = await Database.GetCharacterOptionEffectsAsync(BuildDraftCharacter());
         strength = 10 + effects.AbilityBonuses.GetValueOrDefault("str");
         dexterity = 10 + effects.AbilityBonuses.GetValueOrDefault("dex");
         constitution = 10 + effects.AbilityBonuses.GetValueOrDefault("con");

@@ -39,7 +39,7 @@ if (string.IsNullOrWhiteSpace(options.OutputPath))
 Console.WriteLine($"Using source data: {Path.GetFullPath(sourceDataPath)}");
 Console.WriteLine($"Writing seed database to: {Path.GetFullPath(outputPath)}");
 
-await SpellDatabase.CreateSeedDatabaseAsync(outputPath, sourceDataPath);
+await AppDatabase.CreateSeedDatabaseAsync(outputPath, sourceDataPath);
 
 Console.WriteLine($"Seed database created: {Path.GetFullPath(outputPath)}");
 

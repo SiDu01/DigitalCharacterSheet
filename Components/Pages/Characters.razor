@@ -1,5 +1,5 @@
 @page "/characters"
-@inject SpellDatabase SpellDatabase
+@inject AppDatabase Database
 @inject NavigationManager Navigation
 
 <PageTitle>Characters</PageTitle>
@@ -51,7 +51,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        characters = (await SpellDatabase.GetCharactersAsync()).ToList();
+        characters = (await Database.GetCharactersAsync()).ToList();
         isLoading = false;
     }
 

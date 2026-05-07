@@ -1,5 +1,5 @@
 @page "/characters/{Id:int}"
-@inject SpellDatabase SpellDatabase
+@inject AppDatabase Database
 @inject NavigationManager Navigation
 @inject IJSRuntime JsRuntime
 
@@ -678,13 +678,13 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
-        character = await SpellDatabase.GetCharacterAsync(Id);
-        allSpells = (await SpellDatabase.GetSpellSummariesAsync()).ToList();
-        sourcePriorities = await SpellDatabase.GetSourcePriorityMapAsync();
-        spellEligibility = (await SpellDatabase.GetSpellEligibilityAsync(Id)).ToDictionary();
+        character = await Database.GetCharacterAsync(Id);
+        allSpells = (await Database.GetSpellSummariesAsync()).ToList();
+        sourcePriorities = await Database.GetSourcePriorityMapAsync();
+        spellEligibility = (await Database.GetSpellEligibilityAsync(Id)).ToDictionary();
         eligibleSpellIds = spellEligibility.Keys.ToHashSet();
-        spellSlots = (await SpellDatabase.GetCharacterSpellSlotsAsync(Id)).ToList();
-        hiddenFeatureKeys = (await SpellDatabase.GetCharacterHiddenFeatureKeysAsync(Id)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        spellSlots = (await Database.GetCharacterSpellSlotsAsync(Id)).ToList();
+        hiddenFeatureKeys = (await Database.GetCharacterHiddenFeatureKeysAsync(Id)).ToHashSet(StringComparer.OrdinalIgnoreCase);
         await LoadCharacterFeatureDefinitions();
         await LoadCharacterSpells();
         ApplySpellFilter();
@@ -692,7 +692,7 @@ else
 
     private async Task LoadCharacterFeatureDefinitions()
     {
-        classDefinitions = (await SpellDatabase.GetClassDefinitionsAsync()).ToList();
+        classDefinitions = (await Database.GetClassDefinitionsAsync()).ToList();
         subclassDefinitions = [];
 
         if (character is null)
@@ -703,7 +703,7 @@ else
 
         foreach (var classDefinitionId in character.Classes.Select(characterClass => characterClass.ClassDefinitionId).Where(id => id > 0).Distinct())
         {
-            subclassDefinitions.AddRange(await SpellDatabase.GetSubclassDefinitionsAsync(classDefinitionId));
+            subclassDefinitions.AddRange(await Database.GetSubclassDefinitionsAsync(classDefinitionId));
         }
 
         subclassDefinitions = subclassDefinitions
@@ -715,8 +715,8 @@ else
 
     private async Task LoadCharacterSpells()
     {
-        characterSpellIds = (await SpellDatabase.GetCharacterSpellIdsAsync(Id)).ToHashSet();
-        characterSpellModes = (await SpellDatabase.GetCharacterSpellModesAsync(Id)).ToDictionary();
+        characterSpellIds = (await Database.GetCharacterSpellIdsAsync(Id)).ToHashSet();
+        characterSpellModes = (await Database.GetCharacterSpellModesAsync(Id)).ToDictionary();
         knownSpells = allSpells
             .Where(spell => characterSpellIds.Contains(spell.Id))
             .OrderBy(spell => spell.Level)
@@ -728,7 +728,7 @@ else
     private async Task ToggleSpell(Spell spell)
     {
         var shouldKnow = !characterSpellIds.Contains(spell.Id);
-        await SpellDatabase.SetCharacterSpellAsync(Id, spell.Id, shouldKnow);
+        await Database.SetCharacterSpellAsync(Id, spell.Id, shouldKnow);
         await LoadCharacterSpells();
         ApplySpellFilter();
     }
@@ -736,20 +736,20 @@ else
     private async Task ToggleSpellMode(Spell spell)
     {
         var nextMode = GetSpellMode(spell.Id) == "Prepared" ? "Known" : "Prepared";
-        await SpellDatabase.SetCharacterSpellModeAsync(Id, spell.Id, nextMode);
+        await Database.SetCharacterSpellModeAsync(Id, spell.Id, nextMode);
         await LoadCharacterSpells();
     }
 
     private async Task UseSlot(SpellSlot slot)
     {
-        await SpellDatabase.SetCharacterSpellSlotUsageAsync(Id, slot.SpellLevel, slot.UsedSlots + 1);
-        spellSlots = (await SpellDatabase.GetCharacterSpellSlotsAsync(Id)).ToList();
+        await Database.SetCharacterSpellSlotUsageAsync(Id, slot.SpellLevel, slot.UsedSlots + 1);
+        spellSlots = (await Database.GetCharacterSpellSlotsAsync(Id)).ToList();
     }
 
     private async Task RestoreSlot(SpellSlot slot)
     {
-        await SpellDatabase.SetCharacterSpellSlotUsageAsync(Id, slot.SpellLevel, slot.UsedSlots - 1);
-        spellSlots = (await SpellDatabase.GetCharacterSpellSlotsAsync(Id)).ToList();
+        await Database.SetCharacterSpellSlotUsageAsync(Id, slot.SpellLevel, slot.UsedSlots - 1);
+        spellSlots = (await Database.GetCharacterSpellSlotsAsync(Id)).ToList();
     }
 
     private void SetActiveTab(string tab)
@@ -785,7 +785,7 @@ else
     private async Task ToggleFeatureHidden(string featureKey)
     {
         var shouldHide = !hiddenFeatureKeys.Contains(featureKey);
-        await SpellDatabase.SetCharacterFeatureHiddenAsync(Id, featureKey, shouldHide);
+        await Database.SetCharacterFeatureHiddenAsync(Id, featureKey, shouldHide);
 
         if (shouldHide)
         {
@@ -831,7 +831,7 @@ else
 
     private async Task<SpellGroup> LoadDetailGroup(SpellGroup group)
     {
-        var versions = await SpellDatabase.GetSpellVersionsAsync(group.Name);
+        var versions = await Database.GetSpellVersionsAsync(group.Name);
         return versions.Count == 0 ? group : new SpellGroup(versions, sourcePriorities);
     }
 
@@ -894,7 +894,7 @@ else
 
     private async Task DeleteCharacter()
     {
-        await SpellDatabase.DeleteCharacterAsync(Id);
+        await Database.DeleteCharacterAsync(Id);
         Navigation.NavigateTo("characters");
     }
 

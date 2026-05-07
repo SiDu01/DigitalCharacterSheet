@@ -1,6 +1,6 @@
 @page "/characters/{Id:int}/level-up"
 @using System.Text.Json
-@inject SpellDatabase SpellDatabase
+@inject AppDatabase Database
 @inject NavigationManager Navigation
 
 <PageTitle>Level Up</PageTitle>
@@ -359,9 +359,9 @@
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
-        character = await SpellDatabase.GetCharacterAsync(Id);
-        classDefinitions = (await SpellDatabase.GetClassDefinitionsAsync()).ToList();
-        featDefinitions = (await SpellDatabase.GetFeatDefinitionsAsync()).ToList();
+        character = await Database.GetCharacterAsync(Id);
+        classDefinitions = (await Database.GetClassDefinitionsAsync()).ToList();
+        featDefinitions = (await Database.GetFeatDefinitionsAsync()).ToList();
         if (character?.Classes.Count == 1)
         {
             await SelectClassAsync(character.Classes[0]);
@@ -382,7 +382,7 @@
 
         subclassDefinitions = characterClass.ClassDefinitionId <= 0
             ? []
-            : (await SpellDatabase.GetSubclassDefinitionsAsync(characterClass.ClassDefinitionId)).ToList();
+            : (await Database.GetSubclassDefinitionsAsync(characterClass.ClassDefinitionId)).ToList();
         StateHasChanged();
     }
 
@@ -413,7 +413,7 @@
         selectedSubclassDefinitionId = null;
         ResetLevelUpChoiceSelections();
         errorMessage = "";
-        subclassDefinitions = (await SpellDatabase.GetSubclassDefinitionsAsync(classDefinition.Id)).ToList();
+        subclassDefinitions = (await Database.GetSubclassDefinitionsAsync(classDefinition.Id)).ToList();
         StateHasChanged();
     }
 
@@ -472,8 +472,8 @@
 
         var grantedEffects = ApplyLevelUpChoices(grantsHalfProficiency);
         character.Level = character.Classes.Sum(characterClass => characterClass.Level);
-        await SpellDatabase.UpdateCharacterAsync(character);
-        await SpellDatabase.AddCharacterGrantedEffectsAsync(character.Id, grantedEffects);
+        await Database.UpdateCharacterAsync(character);
+        await Database.AddCharacterGrantedEffectsAsync(character.Id, grantedEffects);
         Navigation.NavigateTo($"characters/{Id}");
     }
 
@@ -517,8 +517,8 @@
         var grantedEffects = ApplyLevelUpChoices(GrantsHalfProficiency);
         character.PrimaryClassDefinitionId ??= selectedNewClassDefinition.Id;
         character.Level = character.Classes.Sum(characterClass => characterClass.Level);
-        await SpellDatabase.UpdateCharacterAsync(character);
-        await SpellDatabase.AddCharacterGrantedEffectsAsync(character.Id, grantedEffects);
+        await Database.UpdateCharacterAsync(character);
+        await Database.AddCharacterGrantedEffectsAsync(character.Id, grantedEffects);
         Navigation.NavigateTo($"characters/{Id}");
     }
 
