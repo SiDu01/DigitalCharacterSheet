@@ -85,13 +85,14 @@
 
         <!-- Images -->
         <MauiImage Include="Resources\Images\*" />
-        <MauiImage Update="Resources\Images\dotnet_bot.svg" BaseSize="168,208" />
 
         <!-- Custom Fonts -->
         <MauiFont Include="Resources\Fonts\*" />
 
-        <!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
-        <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+        <!-- Bundled seed database. Raw 5e Tools JSON files are intentionally not packaged. -->
+        <MauiAsset Include="Resources\Raw\seed\digital-character-sheet.db3"
+                   LogicalName="seed/digital-character-sheet.db3"
+                   Condition="Exists('Resources\Raw\seed\digital-character-sheet.db3')" />
     </ItemGroup>
 
     <ItemGroup>

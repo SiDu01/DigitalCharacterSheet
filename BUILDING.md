@@ -46,6 +46,8 @@ The bundled seed database lives here:
 Resources\Raw\seed\digital-character-sheet.db3
 ```
 
+Only this seed database is packaged into the app. The raw `5e Tools` JSON files, such as `spells`, `class`, `items.json`, `races.json`, `backgrounds.json`, and `feats.json`, are not bundled into the APK/Windows app.
+
 Build or refresh it with:
 
 ```powershell
