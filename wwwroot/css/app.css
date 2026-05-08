@@ -1545,97 +1545,238 @@ button.source-badge {
 
 .character-combat-sheet {
     display: grid;
-    grid-template-columns: minmax(17rem, 22rem) minmax(0, 1fr);
-    grid-template-areas:
-        "stats actions"
-        "saves actions";
+    grid-template-columns: minmax(18rem, 1fr) minmax(0, 2fr);
     gap: .75rem;
     align-items: stretch;
     min-height: 0;
 }
 
-.combat-stat-grid {
-    grid-area: stats;
+.combat-summary-panel {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: .55rem;
+    align-content: start;
+    gap: .7rem;
     min-height: 0;
+    overflow: auto;
 }
 
-.combat-stat-card {
+.combat-stat-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .45rem;
+}
+
+.combat-quick-stat {
     display: grid;
     align-content: center;
     justify-items: center;
     gap: .15rem;
     min-width: 0;
-    min-height: 5.2rem;
-    padding: .55rem;
+    min-height: 3.75rem;
+    padding: .42rem;
     border: 1px solid #d8dee8;
-    border-radius: 8px;
+    border-radius: 6px;
     color: #111827;
     background: #fff;
     text-align: center;
 }
 
-.combat-stat-card.primary {
+.combat-quick-stat.primary {
     border-color: #cbd5e1;
     background: #f8fafc;
 }
 
-.combat-stat-card strong {
-    font-size: 1.85rem;
+.combat-quick-stat strong {
+    font-size: 1.25rem;
     line-height: 1;
 }
 
-.combat-stat-card span {
+.combat-quick-stat span,
+.combat-quick-stat small {
     max-width: 100%;
     overflow: hidden;
     color: #64748b;
-    font-size: .72rem;
+    font-size: .64rem;
     font-weight: 700;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.combat-save-panel {
-    grid-area: saves;
-}
-
-.combat-save-list {
+.combat-mini-section {
     display: grid;
-    gap: .18rem;
-    min-height: 0;
+    gap: .35rem;
+    min-width: 0;
 }
 
-.combat-action-grid {
-    grid-area: actions;
+.combat-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    color: #64748b;
+    font-size: .68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.combat-section-title small {
+    color: #94a3b8;
+    font-size: .62rem;
+}
+
+.combat-ability-save-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: .75rem;
-    min-height: 0;
+    gap: .3rem;
+}
+
+.combat-ability-save-grid article {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    align-items: center;
+    gap: .25rem;
+    min-width: 0;
+    padding: .28rem .35rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #f8fafc;
+    font-size: .72rem;
+}
+
+.combat-ability-save-grid article > span {
+    color: #475569;
+    font-weight: 800;
+}
+
+.combat-ability-save-grid strong {
+    min-width: 1.7rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.combat-ability-save-grid .prof-dot {
+    width: .48rem;
+    height: .48rem;
+}
+
+.combat-passive-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 1.85rem;
+    padding: .3rem .45rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #f8fafc;
+    font-size: .78rem;
+}
+
+.combat-placeholder-list {
+    display: grid;
+    gap: .25rem;
+    color: #64748b;
+    font-size: .72rem;
+}
+
+.combat-condition-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .25rem;
+}
+
+.combat-condition-grid span {
+    min-width: 0;
+    padding: .22rem .35rem;
+    border: 1px dashed #cbd5e1;
+    border-radius: 999px;
+    color: #64748b;
+    font-size: .68rem;
+    font-weight: 700;
+    text-align: center;
+    white-space: nowrap;
 }
 
 .combat-action-panel {
-    grid-area: actions;
+    display: flex;
+    flex-direction: column;
     min-height: 0;
+}
+
+.combat-action-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: .65rem;
+}
+
+.combat-action-header h2 {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.combat-action-tools {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+}
+
+.combat-action-tools span {
+    color: #64748b;
+    font-size: .72rem;
+    font-weight: 700;
+    white-space: nowrap;
 }
 
 .combat-action-list {
     display: grid;
     align-content: start;
-    gap: .55rem;
+    gap: .45rem;
     min-height: 0;
     overflow: auto;
 }
 
-.combat-action-list article {
-    display: grid;
-    gap: .18rem;
+.combat-action-row {
     min-width: 0;
-    padding: .55rem;
     border: 1px solid #e5e7eb;
-    border-radius: 8px;
+    border-radius: 6px;
     background: #f8fafc;
+}
+
+.combat-action-row summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    align-items: center;
+    gap: .5rem;
+    min-width: 0;
+    padding: .5rem .6rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.combat-action-row.hidden-combat-action {
+    opacity: .55;
+}
+
+.combat-action-row summary::-webkit-details-marker {
+    display: none;
+}
+
+.combat-action-row summary::after {
+    content: "+";
+    color: #64748b;
+    font-size: .72rem;
+    transition: transform .12s ease;
+}
+
+.combat-action-row[open] summary::after {
+    content: "-";
+}
+
+.combat-action-main {
+    display: grid;
+    gap: .12rem;
+    min-width: 0;
 }
 
 .combat-action-list strong {
@@ -1647,6 +1788,46 @@ button.source-badge {
     color: #64748b;
     font-size: .78rem;
     line-height: 1.25;
+}
+
+.combat-action-badges {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: .25rem;
+    max-width: 20rem;
+}
+
+.combat-action-badges span {
+    padding: .14rem .38rem;
+    border: 1px solid #d8dee8;
+    border-radius: 999px;
+    color: #475569;
+    background: #fff;
+    font-size: .64rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.combat-action-row p {
+    margin: 0;
+    padding: 0 .6rem .6rem;
+    color: #475569;
+    font-size: .78rem;
+    line-height: 1.35;
+}
+
+.combat-hide-button {
+    min-height: 1.35rem;
+    min-width: 3.2rem;
+    padding-inline: .35rem;
+    font-size: .72rem;
+}
+
+.combat-action-list strong,
+.combat-action-list span,
+.combat-action-row p {
+    min-width: 0;
 }
 
 .prof-dot {
@@ -2958,6 +3139,7 @@ button.source-badge {
 [data-theme="leather"] .creation-step,
 [data-theme="leather"] .sheet-panel,
 [data-theme="leather"] .combat-stat-card,
+[data-theme="leather"] .combat-quick-stat,
 [data-theme="leather"] .spell-count,
 [data-theme="leather"] .character-chip,
 [data-theme="leather"] .spell-row,
@@ -2999,20 +3181,40 @@ button.source-badge {
 }
 
 [data-theme="leather"] .combat-stat-card.primary,
-[data-theme="leather"] .combat-action-list article {
+[data-theme="leather"] .combat-quick-stat.primary,
+[data-theme="leather"] .combat-ability-save-grid article,
+[data-theme="leather"] .combat-passive-row,
+[data-theme="leather"] .combat-action-row {
     border-color: var(--app-border);
     color: var(--app-text);
     background: var(--app-panel-soft);
 }
 
 [data-theme="leather"] .combat-stat-card strong,
+[data-theme="leather"] .combat-quick-stat strong,
+[data-theme="leather"] .combat-ability-save-grid strong,
 [data-theme="leather"] .combat-action-list strong {
     color: var(--app-text);
 }
 
 [data-theme="leather"] .combat-stat-card span,
-[data-theme="leather"] .combat-action-list span {
+[data-theme="leather"] .combat-quick-stat span,
+[data-theme="leather"] .combat-quick-stat small,
+[data-theme="leather"] .combat-section-title,
+[data-theme="leather"] .combat-section-title small,
+[data-theme="leather"] .combat-placeholder-list,
+[data-theme="leather"] .combat-condition-grid span,
+[data-theme="leather"] .combat-action-tools span,
+[data-theme="leather"] .combat-action-list span,
+[data-theme="leather"] .combat-action-row p,
+[data-theme="leather"] .combat-action-row summary::after {
     color: var(--app-muted);
+}
+
+[data-theme="leather"] .combat-action-badges span {
+    border-color: var(--app-border);
+    color: var(--app-primary-text);
+    background: var(--app-primary);
 }
 
 [data-theme="leather"] .feature-edit-toolbar span {

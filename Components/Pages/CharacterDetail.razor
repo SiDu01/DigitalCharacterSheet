@@ -516,66 +516,150 @@ else
         else if (activeTab == "Combat")
         {
             <section class="character-combat-sheet">
-                <section class="combat-stat-grid">
-                    <article class="combat-stat-card primary">
-                        <p class="eyebrow">Armor Class</p>
-                        <strong>@ArmorClass</strong>
-                        <span>@ArmorClassSource</span>
-                    </article>
-                    <article class="combat-stat-card">
-                        <p class="eyebrow">Initiative</p>
-                        <strong>@FormatModifier(InitiativeModifier)</strong>
-                        <span>Dexterity</span>
-                    </article>
-                    <article class="combat-stat-card">
-                        <p class="eyebrow">Speed</p>
-                        <strong>--</strong>
-                        <span>Race movement not connected</span>
-                    </article>
-                    <article class="combat-stat-card">
-                        <p class="eyebrow">Hit Points</p>
-                        <strong>--</strong>
-                        <span>HP tracking not connected</span>
-                    </article>
-                    <article class="combat-stat-card">
-                        <p class="eyebrow">Passive Perception</p>
-                        <strong>@PassivePerception</strong>
-                        <span>Perception</span>
-                    </article>
-                    <article class="combat-stat-card">
-                        <p class="eyebrow">Proficiency</p>
-                        <strong>@FormatModifier(ProficiencyBonus)</strong>
-                        <span>Level @character.Level</span>
-                    </article>
-                </section>
-
-                <section class="sheet-panel combat-save-panel">
+                <section class="sheet-panel combat-summary-panel">
                     <header>
-                        <p class="eyebrow">Combat Saves</p>
+                        <p class="eyebrow">Combat</p>
                     </header>
-                    <div class="combat-save-list">
-                        @foreach (var savingThrow in character.SavingThrows.Where(IsCombatSavingThrow))
-                        {
-                            <div class="sheet-check-row">
-                                <span class="prof-dot @(savingThrow.IsProficient ? "active" : "")"></span>
-                                <strong>@FormatModifier(GetSavingThrowModifier(savingThrow))</strong>
-                                <span>@savingThrow.AbilityName</span>
-                                @if (savingThrow.RollMode is "Advantage" or "Disadvantage")
-                                {
-                                    <small>@ShortRollMode(savingThrow.RollMode)</small>
-                                }
-                            </div>
-                        }
+
+                    <div class="combat-stat-strip">
+                        <article class="combat-quick-stat primary">
+                            <span>AC</span>
+                            <strong>@ArmorClass</strong>
+                            <small>@ArmorClassSource</small>
+                        </article>
+                        <article class="combat-quick-stat">
+                            <span>HP</span>
+                            <strong>--</strong>
+                            <small>not tracked</small>
+                        </article>
+                        <article class="combat-quick-stat">
+                            <span>Temp</span>
+                            <strong>--</strong>
+                            <small>not tracked</small>
+                        </article>
+                        <article class="combat-quick-stat">
+                            <span>Init</span>
+                            <strong>@FormatModifier(InitiativeModifier)</strong>
+                            <small>DEX</small>
+                        </article>
+                        <article class="combat-quick-stat">
+                            <span>Speed</span>
+                            <strong>--</strong>
+                            <small>later</small>
+                        </article>
+                        <article class="combat-quick-stat">
+                            <span>Prof</span>
+                            <strong>@FormatModifier(ProficiencyBonus)</strong>
+                            <small>Level @character.Level</small>
+                        </article>
                     </div>
+
+                    <section class="combat-mini-section">
+                        <div class="combat-section-title">
+                            <span>Abilities / Saves</span>
+                            <small>Check / Save</small>
+                        </div>
+                        <div class="combat-ability-save-grid">
+                        @foreach (var ability in CombatAbilitySaves)
+                        {
+                            <article>
+                                <span>@ability.Label</span>
+                                <strong>@FormatModifier(ability.AbilityModifier)</strong>
+                                <strong>@FormatModifier(ability.SaveModifier)</strong>
+                                <small class="prof-dot @(ability.IsSaveProficient ? "active" : "")"></small>
+                            </article>
+                        }
+                        </div>
+                    </section>
+
+                    <section class="combat-mini-section">
+                        <div class="combat-section-title">
+                            <span>Passive</span>
+                        </div>
+                        <div class="combat-passive-row">
+                            <span>Perception</span>
+                            <strong>@PassivePerception</strong>
+                        </div>
+                    </section>
+
+                    <section class="combat-mini-section">
+                        <div class="combat-section-title">
+                            <span>Resistances / Immunities</span>
+                        </div>
+                        <div class="combat-placeholder-list">
+                            <span>Resistances will be derived from features and items later.</span>
+                            <span>Immunities will be shown here.</span>
+                        </div>
+                    </section>
+
+                    <section class="combat-mini-section">
+                        <div class="combat-section-title">
+                            <span>Conditions</span>
+                        </div>
+                        <div class="combat-condition-grid">
+                            @foreach (var condition in CombatConditionPlaceholders)
+                            {
+                                <span>@condition</span>
+                            }
+                        </div>
+                    </section>
                 </section>
 
                 <section class="sheet-panel combat-action-panel">
+                    <div class="combat-action-header">
+                        <div>
+                            <p class="eyebrow">Turn Options</p>
+                            <h2>@FormatCombatActionTab(activeCombatActionTab)</h2>
+                        </div>
+                        <div class="combat-action-tools">
+                            @if (hiddenCombatActionKeys.Count > 0)
+                            {
+                                <span>@hiddenCombatActionKeys.Count hidden</span>
+                            }
+                            <button type="button" class="text-button no-margin" @onclick="ToggleCombatEditMode">
+                                @(combatEditMode ? "Done" : "Edit")
+                            </button>
+                        </div>
                     <nav class="subtab-bar compact-side-tabs" aria-label="Combat action types">
                         <button type="button" class="subtab-button @(activeCombatActionTab == "Actions" ? "active" : "")" @onclick='() => SetActiveCombatActionTab("Actions")'>Actions</button>
-                        <button type="button" class="subtab-button @(activeCombatActionTab == "BonusActions" ? "active" : "")" @onclick='() => SetActiveCombatActionTab("BonusActions")'>Bonus Actions</button>
+                        <button type="button" class="subtab-button @(activeCombatActionTab == "BonusActions" ? "active" : "")" @onclick='() => SetActiveCombatActionTab("BonusActions")'>Bonus</button>
                         <button type="button" class="subtab-button @(activeCombatActionTab == "Reactions" ? "active" : "")" @onclick='() => SetActiveCombatActionTab("Reactions")'>Reactions</button>
                     </nav>
+                    </div>
 
+                    <div class="combat-action-list">
+                        @foreach (var action in CurrentCombatActions)
+                        {
+                            var isHidden = hiddenCombatActionKeys.Contains(action.Key);
+                            <details class="combat-action-row @(isHidden ? "hidden-combat-action" : "")">
+                                <summary>
+                                    <div class="combat-action-main">
+                                        <strong>@action.Name</strong>
+                                        <span>@action.Summary</span>
+                                    </div>
+                                    <div class="combat-action-badges">
+                                        @foreach (var badge in action.Badges)
+                                        {
+                                            <span>@badge</span>
+                                        }
+                                    </div>
+                                    @if (combatEditMode)
+                                    {
+                                        <button type="button"
+                                                class="mini-button combat-hide-button @(isHidden ? "active" : "")"
+                                                title="@(isHidden ? "Show action" : "Hide action")"
+                                                @onclick="async () => await ToggleCombatActionHidden(action.Key)"
+                                                @onclick:stopPropagation>
+                                            @(isHidden ? "Show" : "Hide")
+                                        </button>
+                                    }
+                                </summary>
+                                <p>@action.Description</p>
+                            </details>
+                        }
+                    </div>
+
+                    @*
                     @if (activeCombatActionTab == "Actions")
                     {
                         <div class="combat-action-list">
@@ -646,6 +730,7 @@ else
                             </article>
                         </div>
                     }
+                    *@
                 </section>
             </section>
         }
@@ -855,6 +940,7 @@ else
     private List<SubclassDefinition> subclassDefinitions = [];
     private List<SheetFeatureGroup> sheetFeatureGroups = [];
     private HashSet<string> hiddenFeatureKeys = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> hiddenCombatActionKeys = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<int> eligibleSpellIds = [];
     private Dictionary<int, SpellEligibility> spellEligibility = [];
     private string searchText = "";
@@ -866,6 +952,7 @@ else
     private string activeMainPanelTab = "Features";
     private string activeCombatActionTab = "Actions";
     private bool featureEditMode;
+    private bool combatEditMode;
     private bool spellSlotsExpanded;
     private Spell? selectedSpell;
     private SpellGroup? selectedSpellGroup;
@@ -899,6 +986,9 @@ else
         .OrderBy(spell => spell.Level)
         .ThenBy(spell => spell.Name)
         .ToList();
+    private IReadOnlyList<CombatActionOption> CurrentCombatActions => BuildCombatActions(activeCombatActionTab)
+        .Where(action => combatEditMode || !hiddenCombatActionKeys.Contains(action.Key))
+        .ToList();
     private string SpellSlotSummary => spellSlots.Count == 0
         ? "No slots"
         : string.Join(" · ", spellSlots.Select(slot => $"{FormatSpellLevel(slot.SpellLevel)} {slot.RemainingSlots}/{slot.MaxSlots}"));
@@ -918,6 +1008,33 @@ else
             ("WIS", character.Wisdom),
             ("CHA", character.Charisma)
         ];
+    private IReadOnlyList<CombatAbilitySave> CombatAbilitySaves => character is null
+        ? []
+        : AbilityScores
+            .Select(ability =>
+            {
+                var abilityCode = ability.Label.ToLowerInvariant();
+                var savingThrow = character.SavingThrows.FirstOrDefault(save => string.Equals(save.AbilityCode, abilityCode, StringComparison.OrdinalIgnoreCase));
+                return new CombatAbilitySave(
+                    ability.Label,
+                    GetAbilityCheckModifier(abilityCode),
+                    savingThrow is null ? GetAbilityModifier(abilityCode) : GetSavingThrowModifier(savingThrow),
+                    savingThrow?.IsProficient == true);
+            })
+            .ToList();
+    private static readonly string[] CombatConditionPlaceholders =
+    [
+        "Blinded",
+        "Charmed",
+        "Frightened",
+        "Grappled",
+        "Incapacitated",
+        "Invisible",
+        "Poisoned",
+        "Prone",
+        "Restrained",
+        "Stunned"
+    ];
     private IReadOnlyList<InventoryCategoryTile> InventoryCategoryTiles => GroupItems(allItemDefinitions)
         .GroupBy(group => group.Primary.Category)
         .Select(group => new InventoryCategoryTile(group.Key, group.Count(), DescribeInventoryCategory(group.Key)))
@@ -933,7 +1050,13 @@ else
         spellEligibility = (await Database.GetSpellEligibilityAsync(Id)).ToDictionary();
         eligibleSpellIds = spellEligibility.Keys.ToHashSet();
         spellSlots = (await Database.GetCharacterSpellSlotsAsync(Id)).ToList();
-        hiddenFeatureKeys = (await Database.GetCharacterHiddenFeatureKeysAsync(Id)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var hiddenKeys = await Database.GetCharacterHiddenFeatureKeysAsync(Id);
+        hiddenFeatureKeys = hiddenKeys
+            .Where(key => !IsCombatActionKey(key))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        hiddenCombatActionKeys = hiddenKeys
+            .Where(IsCombatActionKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         await LoadInventory();
         allItemDefinitions = (await Database.GetItemDefinitionsAsync()).ToList();
         await LoadCharacterFeatureDefinitions();
@@ -1149,6 +1272,11 @@ else
         featureEditMode = !featureEditMode;
     }
 
+    private void ToggleCombatEditMode()
+    {
+        combatEditMode = !combatEditMode;
+    }
+
     private async Task ToggleFeatureHidden(string featureKey)
     {
         var shouldHide = !hiddenFeatureKeys.Contains(featureKey);
@@ -1161,6 +1289,21 @@ else
         else
         {
             hiddenFeatureKeys.Remove(featureKey);
+        }
+    }
+
+    private async Task ToggleCombatActionHidden(string actionKey)
+    {
+        var shouldHide = !hiddenCombatActionKeys.Contains(actionKey);
+        await Database.SetCharacterFeatureHiddenAsync(Id, actionKey, shouldHide);
+
+        if (shouldHide)
+        {
+            hiddenCombatActionKeys.Add(actionKey);
+        }
+        else
+        {
+            hiddenCombatActionKeys.Remove(actionKey);
         }
     }
 
@@ -1479,6 +1622,113 @@ else
         return string.Join(" / ", parts.Where(part => !string.IsNullOrWhiteSpace(part)));
     }
 
+    private string BuildWeaponActionDescription(CharacterInventoryItem item)
+    {
+        var definition = item.ItemDefinition;
+        if (definition?.WeaponStats is null)
+        {
+            return "Equipped weapon attack.";
+        }
+
+        var parts = new List<string>
+        {
+            $"Attack bonus: {FormatModifier(GetWeaponAttackBonus(definition))}.",
+            $"Damage: {BuildWeaponDamage(definition)}."
+        };
+
+        if (!string.IsNullOrWhiteSpace(definition.WeaponStats.VersatileDamageDisplay))
+        {
+            parts.Add($"Versatile: {definition.WeaponStats.VersatileDamageDisplay}.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(definition.WeaponStats.RangeDisplay))
+        {
+            parts.Add($"Range: {definition.WeaponStats.RangeDisplay}.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(definition.WeaponStats.Mastery))
+        {
+            parts.Add($"Mastery: {definition.WeaponStats.Mastery}.");
+        }
+
+        if (definition.Properties.Count > 0)
+        {
+            parts.Add($"Properties: {string.Join(", ", definition.Properties)}.");
+        }
+
+        return string.Join(" ", parts);
+    }
+
+    private IEnumerable<string> BuildWeaponActionBadges(CharacterInventoryItem item)
+    {
+        var definition = item.ItemDefinition;
+        if (definition?.WeaponStats is null)
+        {
+            yield return "Weapon";
+            yield break;
+        }
+
+        yield return "Weapon";
+        yield return $"Hit {FormatModifier(GetWeaponAttackBonus(definition))}";
+        var damage = BuildWeaponDamage(definition);
+        if (!string.IsNullOrWhiteSpace(damage))
+        {
+            yield return damage;
+        }
+
+        if (!string.IsNullOrWhiteSpace(definition.WeaponStats.RangeDisplay))
+        {
+            yield return definition.WeaponStats.RangeDisplay;
+        }
+
+        if (!string.IsNullOrWhiteSpace(definition.WeaponStats.Mastery))
+        {
+            yield return $"Mastery {definition.WeaponStats.Mastery}";
+        }
+    }
+
+    private static string BuildSpellActionSummary(Spell spell)
+    {
+        var parts = new List<string>
+        {
+            spell.LevelDisplay,
+            spell.CastingTimeDisplay,
+            spell.RangeDisplay
+        };
+
+        if (spell.RequiresConcentration)
+        {
+            parts.Add("Concentration");
+        }
+
+        return string.Join(" / ", parts.Where(part => !string.IsNullOrWhiteSpace(part)));
+    }
+
+    private static IEnumerable<string> BuildSpellActionBadges(Spell spell)
+    {
+        yield return spell.Level == 0 ? "Cantrip" : $"Level {spell.Level}";
+        yield return "Spell";
+        if (!string.IsNullOrWhiteSpace(spell.RangeDisplay))
+        {
+            yield return spell.RangeDisplay;
+        }
+
+        if (spell.SpellAttackTypes.Count > 0)
+        {
+            yield return "Attack";
+        }
+
+        foreach (var save in spell.SavingThrows.Take(2))
+        {
+            yield return $"{save.ToUpperInvariant()} save";
+        }
+
+        foreach (var damageType in spell.DamageTypes.Take(2))
+        {
+            yield return damageType;
+        }
+    }
+
     private int GetWeaponAttackBonus(ItemDefinition item)
     {
         return ProficiencyBonus + GetWeaponAbilityModifier(item) + GetItemBonus(item, "Weapon", "WeaponAttack");
@@ -1749,6 +1999,122 @@ else
     private static string ShortRollMode(string rollMode)
     {
         return rollMode == "Advantage" ? "ADV" : "DIS";
+    }
+
+    private static string FormatCombatActionTab(string actionTab)
+    {
+        return actionTab switch
+        {
+            "BonusActions" => "Bonus Actions",
+            "Reactions" => "Reactions",
+            _ => "Actions"
+        };
+    }
+
+    private static string BuildCombatActionKey(string actionTab, string source, string name)
+    {
+        return $"CombatAction|{actionTab}|{source}|{name}";
+    }
+
+    private static bool IsCombatActionKey(string key)
+    {
+        return key.StartsWith("CombatAction|", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private IEnumerable<CombatActionOption> BuildCombatActions(string actionTab)
+    {
+        if (actionTab == "Actions")
+        {
+            yield return new CombatActionOption(
+                BuildCombatActionKey(actionTab, "Common", "Attack"),
+                "Attack",
+                "Make one attack, or more if a feature grants Extra Attack.",
+                "Use an equipped weapon, an unarmed strike, or another attack option available to the character.",
+                ["Common"]);
+
+            foreach (var weapon in EquippedWeapons)
+            {
+                yield return new CombatActionOption(
+                    BuildCombatActionKey(actionTab, "Weapon", weapon.DisplayName),
+                    weapon.DisplayName,
+                    FormatWeaponAction(weapon),
+                    BuildWeaponActionDescription(weapon),
+                    BuildWeaponActionBadges(weapon).ToList());
+            }
+        }
+
+        foreach (var feature in CombatFeatureActions.Where(feature => feature.ActionType == actionTab))
+        {
+            yield return new CombatActionOption(
+                BuildCombatActionKey(actionTab, "Feature", feature.Name),
+                feature.Name,
+                feature.Summary,
+                feature.Summary,
+                ["Feature"]);
+        }
+
+        foreach (var spell in CombatPreparedSpells.Where(spell => SpellMatchesCombatActionTab(spell, actionTab)))
+        {
+            yield return new CombatActionOption(
+                BuildCombatActionKey(actionTab, "Spell", $"{spell.Name}|{spell.Source}"),
+                spell.Name,
+                BuildSpellActionSummary(spell),
+                string.IsNullOrWhiteSpace(spell.Description) ? BuildSpellActionSummary(spell) : CleanMarkup(spell.Description),
+                BuildSpellActionBadges(spell).ToList());
+        }
+
+        if (actionTab == "Actions")
+        {
+            foreach (var action in BuildCommonActionOptions())
+            {
+                yield return action;
+            }
+        }
+        else if (actionTab == "Reactions")
+        {
+            yield return new CombatActionOption(
+                BuildCombatActionKey(actionTab, "Common", "Opportunity Attack"),
+                "Opportunity Attack",
+                "Make a melee attack when a hostile creature leaves your reach.",
+                "Use your reaction to make one melee attack against the provoking creature.",
+                ["Common"]);
+            yield return new CombatActionOption(
+                BuildCombatActionKey(actionTab, "Common", "Readied Action"),
+                "Readied Action",
+                "Use the reaction trigger from a previously readied action.",
+                "When the trigger occurs before the start of your next turn, you can use your reaction to complete the readied action.",
+                ["Common"]);
+        }
+        else if (!CombatFeatureActions.Any(feature => feature.ActionType == actionTab)
+            && !CombatPreparedSpells.Any(spell => SpellMatchesCombatActionTab(spell, actionTab)))
+        {
+            yield return new CombatActionOption(
+                BuildCombatActionKey(actionTab, "Info", "No detected options"),
+                "No detected options",
+                "No matching feature or spell actions detected yet.",
+                "More options will appear here as features, spells, and item activations are mapped.",
+                ["Info"]);
+        }
+    }
+
+    private static IEnumerable<CombatActionOption> BuildCommonActionOptions()
+    {
+        yield return new CombatActionOption(BuildCombatActionKey("Actions", "Common", "Dodge"), "Dodge", "Attack rolls against you have disadvantage; DEX saves have advantage.", "Until the start of your next turn, attack rolls against you have disadvantage if you can see the attacker, and you make Dexterity saving throws with advantage.", ["Common"]);
+        yield return new CombatActionOption(BuildCombatActionKey("Actions", "Common", "Dash"), "Dash", "Gain extra movement for the current turn.", "The increase equals your speed, after applying modifiers.", ["Common"]);
+        yield return new CombatActionOption(BuildCombatActionKey("Actions", "Common", "Disengage"), "Disengage", "Your movement does not provoke opportunity attacks this turn.", "Useful when leaving enemy reach without spending a reaction from them.", ["Common"]);
+        yield return new CombatActionOption(BuildCombatActionKey("Actions", "Common", "Help / Hide / Ready / Search"), "Help / Hide / Ready / Search", "Other common actions.", "Use the appropriate common action when the situation calls for support, stealth, delayed action, or investigation.", ["Common"]);
+    }
+
+    private static bool SpellMatchesCombatActionTab(Spell spell, string actionTab)
+    {
+        var unit = spell.CastingTimeUnit.ToLowerInvariant();
+        var condition = spell.CastingTimeCondition.ToLowerInvariant();
+        return actionTab switch
+        {
+            "BonusActions" => unit.Contains("bonus") || condition.Contains("bonus"),
+            "Reactions" => unit.Contains("reaction") || condition.Contains("reaction"),
+            _ => unit.Contains("action") && !unit.Contains("bonus") && !unit.Contains("reaction")
+        };
     }
 
     private IEnumerable<SheetFeature> GetVisibleFeatures(SheetFeatureGroup group, SheetFeatureLevel level)
@@ -2127,7 +2493,9 @@ else
     private sealed record SheetFeatureGroup(string Kind, string Title, IReadOnlyList<SheetFeatureLevel> Levels);
     private sealed record SheetFeatureLevel(int Level, IReadOnlyList<SheetFeature> Features);
     private sealed record SheetFeature(string Name, int Level, string Key, IReadOnlyList<string> Paragraphs);
+    private sealed record CombatAbilitySave(string Label, int AbilityModifier, int SaveModifier, bool IsSaveProficient);
     private sealed record CombatFeatureAction(string Name, string ActionType, string Summary);
+    private sealed record CombatActionOption(string Key, string Name, string Summary, string Description, IReadOnlyList<string> Badges);
     private sealed record ArmorCalculation(int Value, string Source);
     private sealed record InventoryCategoryTile(string Name, int Count, string Description);
 }
