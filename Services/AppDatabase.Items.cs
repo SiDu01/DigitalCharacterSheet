@@ -6,6 +6,21 @@ namespace DigitalCharacterSheet.Services;
 
 public sealed partial class AppDatabase
 {
+    private static readonly IReadOnlyDictionary<string, string> ItemBonusFields = new Dictionary<string, string>
+    {
+        ["bonusWeapon"] = "Weapon",
+        ["bonusWeaponAttack"] = "WeaponAttack",
+        ["bonusWeaponDamage"] = "WeaponDamage",
+        ["bonusAc"] = "ArmorClass",
+        ["bonusSavingThrow"] = "SavingThrow",
+        ["bonusSavingThrowConcentration"] = "ConcentrationSavingThrow",
+        ["bonusAbilityCheck"] = "AbilityCheck",
+        ["bonusSpellAttack"] = "SpellAttack",
+        ["bonusSpellSaveDc"] = "SpellSaveDc",
+        ["bonusSpellDamage"] = "SpellDamage",
+        ["bonusProficiencyBonus"] = "ProficiencyBonus"
+    };
+
     public async Task<IReadOnlyList<ItemDefinition>> GetItemDefinitionsAsync()
     {
         await InitializeAsync();
@@ -68,6 +83,7 @@ public sealed partial class AppDatabase
         await ImportItemBaseDataAsync();
         await ImportMagicItemsAsync();
         await ImportMagicItemVariantsAsync();
+        await EnsureGeneratedMagicVariantItemsAsync();
         await ImportItemFluffAsync();
         await LinkItemReferencesAsync();
 
@@ -186,6 +202,8 @@ public sealed partial class AppDatabase
             SourceNameKey = BuildItemDefinitionKey(name, source, itemKind, itemElement),
             Page = ReadInt(itemElement, "page"),
             ItemKind = itemKind,
+            VariantGroupName = "",
+            VariantBaseName = "",
             TypeCode = typeParts.Code,
             TypeSource = typeParts.Source,
             Rarity = ReadString(itemElement, "rarity"),
@@ -195,7 +213,7 @@ public sealed partial class AppDatabase
             Weight = ReadDouble(itemElement, "weight"),
             ValueCopper = ReadInt(itemElement, "value"),
             IsWeapon = ReadBool(itemElement, "weapon"),
-            IsArmor = ReadBool(itemElement, "armor"),
+            IsArmor = ReadBool(itemElement, "armor") || typeParts.Code == "S" || itemElement.TryGetProperty("ac", out _),
             IsWondrous = ReadBool(itemElement, "wondrous"),
             IsConsumable = IsConsumableItem(itemElement),
             IsStaff = ReadBool(itemElement, "staff") || typeParts.Code == "ST",
@@ -286,16 +304,7 @@ public sealed partial class AppDatabase
 
     private async Task ImportItemBonusesAsync(int itemDefinitionId, JsonElement itemElement)
     {
-        var bonusFields = new Dictionary<string, string>
-        {
-            ["bonusWeapon"] = "Weapon",
-            ["bonusAc"] = "ArmorClass",
-            ["bonusSpellAttack"] = "SpellAttack",
-            ["bonusSpellSaveDc"] = "SpellSaveDc",
-            ["bonusSavingThrow"] = "SavingThrow"
-        };
-
-        foreach (var bonusField in bonusFields)
+        foreach (var bonusField in ItemBonusFields)
         {
             var value = ReadStringOrNumber(itemElement, bonusField.Key);
             if (string.IsNullOrWhiteSpace(value))
@@ -438,7 +447,7 @@ public sealed partial class AppDatabase
                 Rarity = ReadString(inherits, "rarity"),
                 Tier = ReadString(inherits, "tier"),
                 RequiresAttunement = HasAttunement(inherits),
-                BonusWeapon = ReadStringOrNumber(inherits, "bonusWeapon"),
+                BonusWeapon = FirstNonEmpty(ReadStringOrNumber(inherits, "bonusWeapon"), ReadStringOrNumber(inherits, "bonusWeaponAttack")),
                 BonusAc = ReadStringOrNumber(inherits, "bonusAc"),
                 Description = ExtractEntryText(inherits),
                 RequiresJson = ReadRawJson(variantElement, "requires"),
@@ -446,6 +455,249 @@ public sealed partial class AppDatabase
                 InheritsJson = inherits.ValueKind == JsonValueKind.Undefined ? "" : inherits.GetRawText(),
                 RawJson = variantElement.GetRawText()
             });
+        }
+    }
+
+    private async Task ApplyItemBonusCompatibilityMigrationAsync()
+    {
+        var items = await _database.Table<ItemDefinitionEntity>().ToListAsync();
+        foreach (var item in items.Where(item => !string.IsNullOrWhiteSpace(item.RawJson)))
+        {
+            using var document = JsonDocument.Parse(item.RawJson);
+            foreach (var bonusField in ItemBonusFields)
+            {
+                var value = ReadStringOrNumber(document.RootElement, bonusField.Key);
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    continue;
+                }
+
+                await UpsertGeneratedItemBonusAsync(item.Id, bonusField.Value, value);
+            }
+        }
+    }
+
+    private async Task ApplyMagicVariantItemMigrationAsync()
+    {
+        await _database.ExecuteAsync("UPDATE ItemDefinitions SET IsArmor = 1 WHERE TypeCode = 'S' OR Id IN (SELECT ItemDefinitionId FROM ItemArmorStats)");
+#if SEED_BUILDER
+        await EnsureGeneratedMagicVariantItemsAsync();
+#else
+        await Task.CompletedTask;
+#endif
+    }
+
+    private async Task EnsureGeneratedMagicVariantItemsAsync()
+    {
+        var variants = (await _database.Table<MagicItemVariantEntity>().ToListAsync())
+            .Where(variant => HasSupportedMagicVariantInheritance(variant))
+            .ToList();
+        if (variants.Count == 0)
+        {
+            return;
+        }
+
+        var baseItems = (await _database.Table<ItemDefinitionEntity>().ToListAsync())
+            .Where(item => item.ItemKind == "BaseItem")
+            .ToList();
+        if (baseItems.Count == 0)
+        {
+            return;
+        }
+
+        var weaponStatsByItemId = (await _database.Table<ItemWeaponStatEntity>().ToListAsync()).ToDictionary(stat => stat.ItemDefinitionId);
+        var armorStatsByItemId = (await _database.Table<ItemArmorStatEntity>().ToListAsync()).ToDictionary(stat => stat.ItemDefinitionId);
+        var propertyLinksByItemId = (await _database.Table<ItemDefinitionPropertyEntity>().ToListAsync())
+            .GroupBy(link => link.ItemDefinitionId)
+            .ToDictionary(group => group.Key, group => group.ToList());
+
+        foreach (var variant in variants)
+        {
+            foreach (var baseItem in baseItems.Where(item => VariantAppliesToBaseItem(variant, item, weaponStatsByItemId.GetValueOrDefault(item.Id))))
+            {
+                var generatedName = BuildGeneratedVariantItemName(variant, baseItem);
+                var existing = await _database.Table<ItemDefinitionEntity>()
+                    .Where(item => item.Name == generatedName && item.Source == variant.Source && item.TypeCode == baseItem.TypeCode)
+                    .FirstOrDefaultAsync();
+                if (existing is not null)
+                {
+                    existing.IsArmor = existing.IsArmor || baseItem.IsArmor || baseItem.TypeCode == "S";
+                    await _database.UpdateAsync(existing);
+                    await EnsureGeneratedVariantDetailsAsync(
+                        existing.Id,
+                        baseItem,
+                        weaponStatsByItemId.GetValueOrDefault(baseItem.Id),
+                        armorStatsByItemId.GetValueOrDefault(baseItem.Id),
+                        propertyLinksByItemId.GetValueOrDefault(baseItem.Id) ?? [],
+                        variant);
+                    continue;
+                }
+
+                var sourceNameKey = BuildGeneratedItemDefinitionKey(generatedName, variant.Source, "MagicItem", baseItem.TypeCode, variant.Page);
+                var entity = new ItemDefinitionEntity
+                {
+                    Name = generatedName,
+                    Source = variant.Source,
+                    SourceNameKey = sourceNameKey,
+                    Page = variant.Page,
+                    ItemKind = "MagicItem",
+                    VariantGroupName = variant.Name.Replace("(*)", "", StringComparison.Ordinal).Replace("*", "", StringComparison.Ordinal).Trim(),
+                    VariantBaseName = baseItem.Name,
+                    TypeCode = baseItem.TypeCode,
+                    TypeSource = baseItem.Source,
+                    Rarity = variant.Rarity,
+                    Tier = variant.Tier,
+                    RequiresAttunement = variant.RequiresAttunement,
+                    AttunementText = "",
+                    Weight = baseItem.Weight,
+                    ValueCopper = baseItem.ValueCopper,
+                    IsWeapon = baseItem.IsWeapon,
+                    IsArmor = baseItem.IsArmor || baseItem.TypeCode == "S",
+                    IsWondrous = baseItem.IsWondrous,
+                    IsConsumable = baseItem.IsConsumable,
+                    IsStaff = baseItem.IsStaff,
+                    IsWand = baseItem.IsWand,
+                    IsPotion = baseItem.IsPotion,
+                    IsRod = baseItem.IsRod,
+                    IsAmmunition = baseItem.IsAmmunition,
+                    HasFluff = false,
+                    HasFluffImages = false,
+                    IsSrd = baseItem.IsSrd,
+                    IsBasicRules = baseItem.IsBasicRules,
+                    IsSrd2024 = baseItem.IsSrd2024,
+                    IsBasicRules2024 = baseItem.IsBasicRules2024,
+                    Description = BuildGeneratedVariantDescription(variant),
+                    RawJson = variant.RawJson
+                };
+
+                await _database.InsertAsync(entity);
+                await EnsureGeneratedVariantDetailsAsync(
+                    entity.Id,
+                    baseItem,
+                    weaponStatsByItemId.GetValueOrDefault(baseItem.Id),
+                    armorStatsByItemId.GetValueOrDefault(baseItem.Id),
+                    propertyLinksByItemId.GetValueOrDefault(baseItem.Id) ?? [],
+                    variant);
+            }
+        }
+    }
+
+    private async Task EnsureGeneratedVariantDetailsAsync(
+        int itemDefinitionId,
+        ItemDefinitionEntity baseItem,
+        ItemWeaponStatEntity? baseWeapon,
+        ItemArmorStatEntity? baseArmor,
+        IReadOnlyList<ItemDefinitionPropertyEntity> basePropertyLinks,
+        MagicItemVariantEntity variant)
+    {
+        if (baseWeapon is not null)
+        {
+            var weapon = await _database.Table<ItemWeaponStatEntity>()
+                .Where(row => row.ItemDefinitionId == itemDefinitionId)
+                .FirstOrDefaultAsync();
+            if (weapon is null)
+            {
+                await _database.InsertAsync(new ItemWeaponStatEntity
+                {
+                    ItemDefinitionId = itemDefinitionId,
+                    WeaponCategory = baseWeapon.WeaponCategory,
+                    DamageOne = baseWeapon.DamageOne,
+                    DamageTwo = baseWeapon.DamageTwo,
+                    DamageTypeCode = baseWeapon.DamageTypeCode,
+                    RangeNormal = baseWeapon.RangeNormal,
+                    RangeLong = baseWeapon.RangeLong,
+                    AmmoType = baseWeapon.AmmoType,
+                    Reload = baseWeapon.Reload,
+                    Mastery = baseWeapon.Mastery
+                });
+            }
+        }
+
+        if (baseArmor is not null || baseItem.TypeCode == "S")
+        {
+            var armor = await _database.Table<ItemArmorStatEntity>()
+                .Where(row => row.ItemDefinitionId == itemDefinitionId)
+                .FirstOrDefaultAsync();
+            if (armor is null)
+            {
+                await _database.InsertAsync(new ItemArmorStatEntity
+                {
+                    ItemDefinitionId = itemDefinitionId,
+                    ArmorClass = baseArmor?.ArmorClass ?? (baseItem.TypeCode == "S" ? 2 : null),
+                    StrengthRequirement = baseArmor?.StrengthRequirement ?? "",
+                    HasStealthDisadvantage = baseArmor?.HasStealthDisadvantage ?? false,
+                    ArmorCategory = baseArmor?.ArmorCategory ?? baseItem.TypeCode
+                });
+            }
+        }
+
+        foreach (var propertyLink in basePropertyLinks)
+        {
+            var existingLink = await _database.Table<ItemDefinitionPropertyEntity>()
+                .Where(row => row.ItemDefinitionId == itemDefinitionId && row.ItemPropertyId == propertyLink.ItemPropertyId)
+                .FirstOrDefaultAsync();
+            if (existingLink is null)
+            {
+                await _database.InsertAsync(new ItemDefinitionPropertyEntity
+                {
+                    ItemDefinitionId = itemDefinitionId,
+                    ItemPropertyId = propertyLink.ItemPropertyId
+                });
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(variant.BonusAc))
+        {
+            await UpsertGeneratedItemBonusAsync(itemDefinitionId, "ArmorClass", variant.BonusAc);
+        }
+
+        if (!string.IsNullOrWhiteSpace(variant.BonusWeapon))
+        {
+            await UpsertGeneratedItemBonusAsync(itemDefinitionId, "Weapon", variant.BonusWeapon);
+        }
+    }
+
+    private async Task PopulateMagicVariantGroupingAsync()
+    {
+        var generatedItems = (await _database.Table<ItemDefinitionEntity>().ToListAsync())
+            .Where(item => item.ItemKind == "MagicItem"
+                && !string.IsNullOrWhiteSpace(item.RawJson)
+                && string.IsNullOrWhiteSpace(item.VariantGroupName))
+            .ToList();
+
+        foreach (var item in generatedItems)
+        {
+            if (!TryReadMagicVariantGrouping(item.RawJson, item.Name, out var groupName, out var baseName))
+            {
+                continue;
+            }
+
+            item.VariantGroupName = groupName;
+            item.VariantBaseName = baseName;
+            await _database.UpdateAsync(item);
+        }
+    }
+
+    private async Task UpsertGeneratedItemBonusAsync(int itemDefinitionId, string bonusType, string value)
+    {
+        var bonus = await _database.Table<ItemBonusEntity>()
+            .Where(row => row.ItemDefinitionId == itemDefinitionId && row.BonusType == bonusType)
+            .FirstOrDefaultAsync();
+        if (bonus is null)
+        {
+            await _database.InsertAsync(new ItemBonusEntity
+            {
+                ItemDefinitionId = itemDefinitionId,
+                BonusType = bonusType,
+                Value = value
+            });
+            return;
+        }
+
+        if (!string.Equals(bonus.Value, value, StringComparison.Ordinal))
+        {
+            bonus.Value = value;
+            await _database.UpdateAsync(bonus);
         }
     }
 
@@ -513,6 +765,8 @@ public sealed partial class AppDatabase
             Source = entity.Source,
             Page = entity.Page,
             ItemKind = entity.ItemKind,
+            VariantGroupName = entity.VariantGroupName,
+            VariantBaseName = entity.VariantBaseName,
             TypeCode = entity.TypeCode,
             Rarity = entity.Rarity,
             Tier = entity.Tier,
@@ -589,6 +843,16 @@ public sealed partial class AppDatabase
     {
         var type = SplitSourceCode(ReadString(itemElement, "type")).Code;
         var page = ReadInt(itemElement, "page")?.ToString() ?? "";
+        return BuildGeneratedItemDefinitionKey(name, source, itemKind, type, page);
+    }
+
+    private static string BuildGeneratedItemDefinitionKey(string name, string source, string itemKind, string type, int? page)
+    {
+        return BuildGeneratedItemDefinitionKey(name, source, itemKind, type, page?.ToString() ?? "");
+    }
+
+    private static string BuildGeneratedItemDefinitionKey(string name, string source, string itemKind, string type, string page)
+    {
         return string.Join(
             "|",
             NormalizeSlugPart(itemKind),
@@ -596,6 +860,196 @@ public sealed partial class AppDatabase
             NormalizeSlugPart(source),
             NormalizeSlugPart(type),
             NormalizeSlugPart(page));
+    }
+
+    private static bool HasSupportedMagicVariantInheritance(MagicItemVariantEntity variant)
+    {
+        return (!string.IsNullOrWhiteSpace(variant.NamePrefix) || !string.IsNullOrWhiteSpace(variant.NameSuffix))
+            && (!string.IsNullOrWhiteSpace(variant.RequiresJson))
+            && (!string.IsNullOrWhiteSpace(variant.BonusAc)
+                || !string.IsNullOrWhiteSpace(variant.BonusWeapon)
+                || !string.IsNullOrWhiteSpace(variant.Description)
+                || !string.IsNullOrWhiteSpace(variant.Rarity));
+    }
+
+    private static string BuildGeneratedVariantItemName(MagicItemVariantEntity variant, ItemDefinitionEntity baseItem)
+    {
+        var prefix = variant.NamePrefix.Trim();
+        var suffix = variant.NameSuffix.Trim();
+        return string.Join(
+            " ",
+            new[] { prefix, baseItem.Name, suffix }.Where(part => !string.IsNullOrWhiteSpace(part)));
+    }
+
+    private static string BuildGeneratedVariantDescription(MagicItemVariantEntity variant)
+    {
+        var description = variant.Description;
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(variant.BonusWeapon))
+            {
+                parts.Add($"You have a {variant.BonusWeapon} bonus to attack and damage rolls made with this magic weapon.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(variant.BonusAc))
+            {
+                parts.Add($"You have a {variant.BonusAc} bonus to AC.");
+            }
+
+            description = string.Join(Environment.NewLine + Environment.NewLine, parts);
+        }
+
+        return description
+            .Replace("{=bonusAc}", variant.BonusAc, StringComparison.OrdinalIgnoreCase)
+            .Replace("{=bonusWeapon}", variant.BonusWeapon, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryReadMagicVariantGrouping(string rawJson, string generatedName, out string groupName, out string baseName)
+    {
+        groupName = "";
+        baseName = "";
+
+        try
+        {
+            using var document = JsonDocument.Parse(rawJson);
+            groupName = ReadString(document.RootElement, "name")
+                .Replace("(*)", "", StringComparison.Ordinal)
+                .Replace("*", "", StringComparison.Ordinal)
+                .Trim();
+            if (string.IsNullOrWhiteSpace(groupName))
+            {
+                return false;
+            }
+
+            var inherits = document.RootElement.TryGetProperty("inherits", out var inheritsElement) ? inheritsElement : default;
+            var prefix = ReadString(inherits, "namePrefix");
+            var suffix = ReadString(inherits, "nameSuffix");
+            baseName = generatedName;
+
+            if (!string.IsNullOrWhiteSpace(prefix) && baseName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                baseName = baseName[prefix.Length..].Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(suffix) && baseName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            {
+                baseName = baseName[..^suffix.Length].Trim();
+            }
+
+            return !string.IsNullOrWhiteSpace(baseName)
+                && !string.Equals(baseName, generatedName, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            groupName = "";
+            baseName = "";
+            return false;
+        }
+    }
+
+    private static bool VariantAppliesToBaseItem(MagicItemVariantEntity variant, ItemDefinitionEntity baseItem, ItemWeaponStatEntity? weaponStats)
+    {
+        if (!string.IsNullOrWhiteSpace(variant.ExcludesJson) && VariantExcludesBaseItem(variant.ExcludesJson, baseItem))
+        {
+            return false;
+        }
+
+        using var document = JsonDocument.Parse(variant.RequiresJson);
+        return document.RootElement.ValueKind == JsonValueKind.Array
+            && document.RootElement.EnumerateArray().Any(requirement => RequirementMatchesBaseItem(requirement, baseItem, weaponStats));
+    }
+
+    private static bool RequirementMatchesBaseItem(JsonElement requirement, ItemDefinitionEntity baseItem, ItemWeaponStatEntity? weaponStats)
+    {
+        var requiredName = ReadString(requirement, "name");
+        if (!string.IsNullOrWhiteSpace(requiredName)
+            && !string.Equals(requiredName, baseItem.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var requiredSource = ReadString(requirement, "source");
+        if (!string.IsNullOrWhiteSpace(requiredSource)
+            && !string.Equals(requiredSource, baseItem.Source, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var requiredType = SplitSourceCode(ReadString(requirement, "type"));
+        if (!string.IsNullOrWhiteSpace(requiredType.Code))
+        {
+            if (!string.Equals(requiredType.Code, baseItem.TypeCode, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(requiredType.Source)
+                && !string.Equals(requiredType.Source, baseItem.Source, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        if (ReadBool(requirement, "armor"))
+        {
+            return baseItem.IsArmor && baseItem.TypeCode != "S";
+        }
+
+        if (ReadBool(requirement, "weapon"))
+        {
+            return baseItem.IsWeapon || weaponStats is not null;
+        }
+
+        if (ReadBool(requirement, "sword"))
+        {
+            return baseItem.Name.Contains("sword", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (ReadBool(requirement, "net"))
+        {
+            return baseItem.Name.Equals("Net", StringComparison.OrdinalIgnoreCase);
+        }
+
+        var requiredWeaponCategory = ReadString(requirement, "weaponCategory");
+        if (!string.IsNullOrWhiteSpace(requiredWeaponCategory))
+        {
+            return weaponStats?.WeaponCategory.Contains(requiredWeaponCategory, StringComparison.OrdinalIgnoreCase) == true;
+        }
+
+        return false;
+    }
+
+    private static bool VariantExcludesBaseItem(string excludesJson, ItemDefinitionEntity baseItem)
+    {
+        using var document = JsonDocument.Parse(excludesJson);
+        var excludes = document.RootElement;
+
+        if (ReadBool(excludes, "net") && baseItem.Name.Equals("Net", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!excludes.TryGetProperty("name", out var name))
+        {
+            return false;
+        }
+
+        if (name.ValueKind == JsonValueKind.String)
+        {
+            return string.Equals(name.GetString(), baseItem.Name, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return name.ValueKind == JsonValueKind.Array
+            && name.EnumerateArray().Any(value => value.ValueKind == JsonValueKind.String
+                && string.Equals(value.GetString(), baseItem.Name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string FirstNonEmpty(params string[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? "";
     }
 
     private static bool HasAttunement(JsonElement element)

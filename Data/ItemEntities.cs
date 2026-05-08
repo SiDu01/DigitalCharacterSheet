@@ -23,6 +23,11 @@ public sealed class ItemDefinitionEntity
     public string ItemKind { get; set; } = "";
 
     [Indexed]
+    public string VariantGroupName { get; set; } = "";
+
+    public string VariantBaseName { get; set; } = "";
+
+    [Indexed]
     public string TypeCode { get; set; } = "";
 
     public string TypeSource { get; set; } = "";

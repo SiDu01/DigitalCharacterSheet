@@ -4,7 +4,7 @@
         <header class="detail-header">
             <div>
                 <div class="source-switcher" aria-label="Item source versions">
-                    @foreach (var version in SourceVersions)
+                    @foreach (var version in ActiveSourceVersions)
                     {
                         <button class="source-version @(version.Id == Item.Id ? "active" : "")"
                                 title="@BuildSourceTitle(version)"
@@ -13,7 +13,20 @@
                         </button>
                     }
                 </div>
-                <h1>@Item.Name</h1>
+                @if (VariantVersions.Count > 1)
+                {
+                    <div class="source-switcher variant-switcher" aria-label="Item variants">
+                        @foreach (var version in VariantVersions)
+                        {
+                            <button class="source-version @(version.Id == Item.Id ? "active" : "")"
+                                    title="@BuildVariantTitle(version)"
+                                    @onclick="() => SelectVersion(version)">
+                                @version.VariantLabel
+                            </button>
+                        }
+                    </div>
+                }
+                <h1>@Item.ListName</h1>
                 <p>@BuildSubtitle(Item)</p>
             </div>
         </header>
@@ -124,6 +137,18 @@
     [Parameter] public EventCallback<ItemDefinition> OnSelectVersion { get; set; }
 
     private IReadOnlyList<ItemDefinition> SourceVersions => Versions is { Count: > 0 } ? Versions : Item is null ? [] : [Item];
+    private IReadOnlyList<ItemDefinition> ActiveSourceVersions => SelectedBaseSourceVersions.Count > 0 ? SelectedBaseSourceVersions : SourceVersions;
+    private IReadOnlyList<ItemDefinition> VariantVersions => SourceVersions
+        .GroupBy(item => string.IsNullOrWhiteSpace(item.VariantBaseName) ? item.Name : item.VariantBaseName, StringComparer.OrdinalIgnoreCase)
+        .Select(group => group.First())
+        .OrderBy(item => item.VariantLabel)
+        .ToList();
+    private IReadOnlyList<ItemDefinition> SelectedBaseSourceVersions => Item is null
+        ? []
+        : SourceVersions
+            .Where(item => string.Equals(item.VariantLabel, Item.VariantLabel, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(item => item.Source)
+            .ToList();
 
     private async Task SelectVersion(ItemDefinition version)
     {
@@ -133,6 +158,11 @@
     private static string BuildSourceTitle(ItemDefinition item)
     {
         return item.Page is null ? item.Source : $"{item.Source} page {item.Page}";
+    }
+
+    private static string BuildVariantTitle(ItemDefinition item)
+    {
+        return string.IsNullOrWhiteSpace(item.VariantBaseName) ? item.Name : item.VariantBaseName;
     }
 
     private static string BuildSubtitle(ItemDefinition item)

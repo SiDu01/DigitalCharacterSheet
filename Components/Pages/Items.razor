@@ -497,7 +497,7 @@
     private List<ItemGroup> GroupItems(IEnumerable<ItemDefinition> items)
     {
         return items
-            .GroupBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(item => item.ListName, StringComparer.OrdinalIgnoreCase)
             .Select(group => new ItemGroup(group, sourcePriorities))
             .OrderBy(group => group.Primary.Category)
             .ThenBy(group => RaritySortKey(group.Rarity))

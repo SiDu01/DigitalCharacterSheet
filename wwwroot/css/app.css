@@ -1199,6 +1199,217 @@ main {
     overflow: hidden;
 }
 
+.inventory-tab-content {
+    grid-template-rows: minmax(0, 1fr);
+}
+
+.inventory-tab-content.add-mode {
+    grid-template-rows: auto minmax(0, 1fr);
+}
+
+.inventory-toolbar {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    min-width: 0;
+}
+
+.inventory-add-toolbar .compact-search {
+    flex: 1 1 auto;
+}
+
+.compact-search {
+    min-height: 2rem;
+}
+
+.inventory-add-list,
+.inventory-list {
+    display: grid;
+    gap: .45rem;
+    min-height: 0;
+}
+
+.inventory-list {
+    overflow: auto;
+    padding-right: .15rem;
+}
+
+.inventory-add-list {
+    max-height: 12rem;
+    overflow: auto;
+    padding-right: .15rem;
+}
+
+.inventory-add-list.expanded {
+    max-height: none;
+}
+
+.inventory-category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: .5rem;
+    min-height: 0;
+    overflow: auto;
+    padding-right: .15rem;
+}
+
+.inventory-category-tile {
+    min-height: 4.7rem;
+}
+
+.inventory-add-row,
+.inventory-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .45rem;
+    min-width: 0;
+    padding: .45rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.inventory-add-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.inventory-add-row.expanded {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+}
+
+.inventory-add-row.expanded .inventory-source-list {
+    justify-content: flex-start;
+    max-width: none;
+}
+
+.inventory-add-row.expanded > .mini-button {
+    justify-self: end;
+}
+
+.character-item-add-page {
+    width: 100%;
+    max-width: none;
+    min-height: 0;
+    padding: 0;
+    align-self: stretch;
+}
+
+.compact-add-header {
+    width: 100%;
+    margin-bottom: .75rem;
+}
+
+.character-item-add-master-detail {
+    width: 100%;
+    min-height: 0;
+}
+
+.character-item-add-page > .item-category-grid {
+    width: 100%;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    align-content: start;
+}
+
+.character-item-add-page > .spell-toolbar {
+    width: 100%;
+}
+
+.inventory-add-detail-actions {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    gap: .65rem;
+}
+
+.inventory-add-detail-actions .item-detail-content {
+    min-height: 0;
+    overflow: auto;
+}
+
+.inventory-add-primary {
+    align-self: flex-end;
+    flex: 0 0 auto;
+}
+
+@media (min-width: 980px) {
+    .inventory-add-row.expanded {
+        grid-template-columns: minmax(0, 1fr) minmax(8rem, auto) minmax(7rem, auto) auto;
+        align-items: center;
+    }
+
+    .inventory-add-row.expanded .inventory-source-list {
+        justify-content: flex-end;
+    }
+}
+
+.inventory-add-row > button:first-child,
+.inventory-main {
+    display: grid;
+    gap: .12rem;
+    min-width: 0;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+}
+
+.inventory-add-row strong,
+.inventory-main strong {
+    min-width: 0;
+    overflow: hidden;
+    color: #111827;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .88rem;
+}
+
+.inventory-add-row span,
+.inventory-main span,
+.inventory-main small {
+    min-width: 0;
+    overflow: hidden;
+    color: #64748b;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .74rem;
+    font-weight: 700;
+}
+
+.inventory-controls,
+.inventory-source-list {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: .3rem;
+    min-width: 0;
+}
+
+.inventory-source-list {
+    flex-wrap: wrap;
+    max-width: 10rem;
+}
+
+button.source-badge {
+    cursor: pointer;
+}
+
+.source-badge.active {
+    border-color: #b45309;
+    color: #92400e;
+    background: #fffbeb;
+}
+
+.inventory-quantity {
+    min-width: 1.4rem;
+    color: #111827;
+    text-align: center;
+    font-size: .78rem;
+    font-weight: 800;
+}
+
 .sheet-feature-list {
     display: grid;
     gap: .7rem;
@@ -2754,6 +2965,8 @@ main {
 [data-theme="leather"] .detail-grid div,
 [data-theme="leather"] .feature-level-row,
 [data-theme="leather"] .sheet-feature-level,
+[data-theme="leather"] .inventory-row,
+[data-theme="leather"] .inventory-add-row,
 [data-theme="leather"] .progression-details,
 [data-theme="leather"] .spell-detail-pane,
 [data-theme="leather"] .creation-detail-pane,
@@ -2771,6 +2984,18 @@ main {
 
 [data-theme="leather"] .sheet-feature-group h3 {
     color: var(--app-text);
+}
+
+[data-theme="leather"] .inventory-main strong,
+[data-theme="leather"] .inventory-add-row strong,
+[data-theme="leather"] .inventory-quantity {
+    color: var(--app-text);
+}
+
+[data-theme="leather"] .inventory-main span,
+[data-theme="leather"] .inventory-main small,
+[data-theme="leather"] .inventory-add-row span {
+    color: var(--app-muted);
 }
 
 [data-theme="leather"] .combat-stat-card.primary,

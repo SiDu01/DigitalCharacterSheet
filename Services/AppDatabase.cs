@@ -8,7 +8,7 @@ namespace DigitalCharacterSheet.Services;
 
 public sealed partial class AppDatabase
 {
-    private const int DatabaseVersion = 2;
+    private const int DatabaseVersion = 6;
     private const int SchemaVersion = 1;
     private const string ImportVersion = "spells-v1";
     private const string ClassImportVersion = "classes-v5";
@@ -140,6 +140,7 @@ public sealed partial class AppDatabase
                 await CreateTableAsync<ItemGroupMemberEntity>("ItemGroupMembers");
                 await CreateTableAsync<MagicItemVariantEntity>("MagicItemVariants");
                 await CreateTableAsync<ItemFluffEntity>("ItemFluff");
+                await CreateTableAsync<CharacterInventoryItemEntity>("CharacterInventoryItems");
 
                 initializationStep = "applying database migrations";
                 await EnsureDatabaseVersionAsync();

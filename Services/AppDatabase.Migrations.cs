@@ -73,6 +73,18 @@ public sealed partial class AppDatabase
             case 2:
                 await ApplyLegacyColumnCompatibilityMigrationAsync();
                 return;
+            case 3:
+                await _database.CreateTableAsync<CharacterInventoryItemEntity>();
+                return;
+            case 4:
+                await ApplyMagicVariantItemMigrationAsync();
+                return;
+            case 5:
+                await ApplyMagicVariantGroupingMigrationAsync();
+                return;
+            case 6:
+                await ApplyItemBonusCompatibilityMigrationAsync();
+                return;
             default:
                 throw new InvalidOperationException($"No migration is defined for database version {version}.");
         }

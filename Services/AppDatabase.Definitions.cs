@@ -146,51 +146,28 @@ public sealed partial class AppDatabase
             return;
         }
 
-        await using var indexStream = await OpenAssetAsync("class/index.json");
-        using var indexDocument = await JsonDocument.ParseAsync(indexStream);
-
-        foreach (var fileProperty in indexDocument.RootElement.EnumerateObject())
+        if (string.IsNullOrWhiteSpace(classDefinition.RawJson))
         {
-            var fileName = fileProperty.Value.GetString();
-            if (string.IsNullOrWhiteSpace(fileName))
+            return;
+        }
+
+        using var classDocument = JsonDocument.Parse(classDefinition.RawJson);
+        var classElement = classDocument.RootElement;
+        if (classElement.TryGetProperty("proficiency", out var savingThrows) && savingThrows.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var savingThrow in savingThrows.EnumerateArray())
             {
-                continue;
-            }
-
-            await using var classStream = await OpenAssetAsync($"class/{fileName}");
-            using var classDocument = await JsonDocument.ParseAsync(classStream);
-            if (!classDocument.RootElement.TryGetProperty("class", out var classes))
-            {
-                continue;
-            }
-
-            foreach (var classElement in classes.EnumerateArray())
-            {
-                if (!string.Equals(ReadString(classElement, "name"), classDefinition.Name, StringComparison.OrdinalIgnoreCase)
-                    || !string.Equals(ReadString(classElement, "source"), classDefinition.Source, StringComparison.OrdinalIgnoreCase))
+                if (savingThrow.ValueKind == JsonValueKind.String)
                 {
-                    continue;
+                    effects.SavingThrowProficiencies.Add(savingThrow.GetString() ?? "");
                 }
-
-                if (classElement.TryGetProperty("proficiency", out var savingThrows) && savingThrows.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var savingThrow in savingThrows.EnumerateArray())
-                    {
-                        if (savingThrow.ValueKind == JsonValueKind.String)
-                        {
-                            effects.SavingThrowProficiencies.Add(savingThrow.GetString() ?? "");
-                        }
-                    }
-                }
-
-                if (classElement.TryGetProperty("startingProficiencies", out var startingProficiencies)
-                    && startingProficiencies.TryGetProperty("skills", out var skills))
-                {
-                    AddSkillProficiencies(effects, skills, "Class");
-                }
-
-                return;
             }
+        }
+
+        if (classElement.TryGetProperty("startingProficiencies", out var startingProficiencies)
+            && startingProficiencies.TryGetProperty("skills", out var skills))
+        {
+            AddSkillProficiencies(effects, skills, "Class");
         }
     }
 

@@ -352,6 +352,8 @@ public sealed partial class AppDatabase
             await _database.DeleteAsync(languageRow);
         }
 
+        await DeleteCharacterInventoryAsync(characterId);
+
         var character = await _database.Table<CharacterEntity>()
             .Where(entity => entity.Id == characterId)
             .FirstOrDefaultAsync();

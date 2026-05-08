@@ -841,51 +841,64 @@
 
     private async Task ApplyOptionEffects()
     {
-        var effects = await Database.GetCharacterOptionEffectsAsync(BuildDraftCharacter());
-        strength = 10 + effects.AbilityBonuses.GetValueOrDefault("str");
-        dexterity = 10 + effects.AbilityBonuses.GetValueOrDefault("dex");
-        constitution = 10 + effects.AbilityBonuses.GetValueOrDefault("con");
-        intelligence = 10 + effects.AbilityBonuses.GetValueOrDefault("int");
-        wisdom = 10 + effects.AbilityBonuses.GetValueOrDefault("wis");
-        charisma = 10 + effects.AbilityBonuses.GetValueOrDefault("cha");
+        errorMessage = "";
 
-        foreach (var savingThrow in savingThrows)
+        try
         {
-            savingThrow.IsProficient = effects.SavingThrowProficiencies.Contains(savingThrow.AbilityCode);
-        }
+            var effects = await Database.GetCharacterOptionEffectsAsync(BuildDraftCharacter());
+            strength = 10 + effects.AbilityBonuses.GetValueOrDefault("str");
+            dexterity = 10 + effects.AbilityBonuses.GetValueOrDefault("dex");
+            constitution = 10 + effects.AbilityBonuses.GetValueOrDefault("con");
+            intelligence = 10 + effects.AbilityBonuses.GetValueOrDefault("int");
+            wisdom = 10 + effects.AbilityBonuses.GetValueOrDefault("wis");
+            charisma = 10 + effects.AbilityBonuses.GetValueOrDefault("cha");
 
-        optionEffectMessages = effects.DeferredChoices.Count == 0
-            ? []
-            : [$"Manual choices still needed: {string.Join(", ", effects.DeferredChoices.Distinct())}"];
-        optionChoiceHints = effects.ChoiceHints;
-        automaticSkillProficiencies = effects.SkillProficiencies.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        automaticToolProficiencies = effects.ToolProficiencies.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        automaticLanguageProficiencies = effects.LanguageProficiencies.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        selectedManualSkillChoices.RemoveWhere(skillName => automaticSkillProficiencies.Contains(skillName));
-        selectedManualToolChoices.RemoveWhere(toolName => automaticToolProficiencies.Contains(toolName));
-        selectedManualLanguageChoices.RemoveWhere(languageName => automaticLanguageProficiencies.Contains(languageName));
-        if (selectedManualSkillChoices.Count > SkillChoiceLimit)
-        {
-            selectedManualSkillChoices = selectedManualSkillChoices.Take(SkillChoiceLimit).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var savingThrow in savingThrows)
+            {
+                savingThrow.IsProficient = effects.SavingThrowProficiencies.Contains(savingThrow.AbilityCode);
+            }
+
+            optionEffectMessages = effects.DeferredChoices.Count == 0
+                ? []
+                : [$"Manual choices still needed: {string.Join(", ", effects.DeferredChoices.Distinct())}"];
+            optionChoiceHints = effects.ChoiceHints;
+            automaticSkillProficiencies = effects.SkillProficiencies.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            automaticToolProficiencies = effects.ToolProficiencies.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            automaticLanguageProficiencies = effects.LanguageProficiencies.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            selectedManualSkillChoices.RemoveWhere(skillName => automaticSkillProficiencies.Contains(skillName));
+            selectedManualToolChoices.RemoveWhere(toolName => automaticToolProficiencies.Contains(toolName));
+            selectedManualLanguageChoices.RemoveWhere(languageName => automaticLanguageProficiencies.Contains(languageName));
+            if (selectedManualSkillChoices.Count > SkillChoiceLimit)
+            {
+                selectedManualSkillChoices = selectedManualSkillChoices.Take(SkillChoiceLimit).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            }
+            if (selectedManualToolChoices.Count > ToolChoiceLimit)
+            {
+                selectedManualToolChoices = selectedManualToolChoices.Take(ToolChoiceLimit).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            }
+            if (selectedManualLanguageChoices.Count > LanguageChoiceLimit)
+            {
+                selectedManualLanguageChoices = selectedManualLanguageChoices.Take(LanguageChoiceLimit).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            }
+            foreach (var skill in skills)
+            {
+                skill.IsProficient = automaticSkillProficiencies.Contains(skill.Name)
+                    || selectedManualSkillChoices.Contains(skill.Name);
+            }
+            foreach (var tool in toolProficiencies)
+            {
+                tool.IsProficient = automaticToolProficiencies.Contains(tool.Name)
+                    || selectedManualToolChoices.Contains(tool.Name);
+            }
+            foreach (var language in languageProficiencies)
+            {
+                language.IsProficient = automaticLanguageProficiencies.Contains(language.Name)
+                    || selectedManualLanguageChoices.Contains(language.Name);
+            }
         }
-        if (selectedManualLanguageChoices.Count > LanguageChoiceLimit)
+        catch (Exception ex)
         {
-            selectedManualLanguageChoices = selectedManualLanguageChoices.Take(LanguageChoiceLimit).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        }
-        foreach (var skill in skills)
-        {
-            skill.IsProficient = automaticSkillProficiencies.Contains(skill.Name)
-                || selectedManualSkillChoices.Contains(skill.Name);
-        }
-        foreach (var tool in toolProficiencies)
-        {
-            tool.IsProficient = automaticToolProficiencies.Contains(tool.Name)
-                || selectedManualToolChoices.Contains(tool.Name);
-        }
-        foreach (var language in languageProficiencies)
-        {
-            language.IsProficient = automaticLanguageProficiencies.Contains(language.Name)
-                || selectedManualLanguageChoices.Contains(language.Name);
+            errorMessage = $"Could not apply option bonuses: {ex.Message}";
         }
     }
 

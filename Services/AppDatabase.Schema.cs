@@ -25,6 +25,17 @@ public sealed partial class AppDatabase
         await AddColumnIfMissingAsync("SubclassDefinitions", "RawJson", "text DEFAULT ''");
     }
 
+    private async Task ApplyMagicVariantGroupingMigrationAsync()
+    {
+        await AddColumnIfMissingAsync("ItemDefinitions", "VariantGroupName", "text DEFAULT ''");
+        await AddColumnIfMissingAsync("ItemDefinitions", "VariantBaseName", "text DEFAULT ''");
+#if SEED_BUILDER
+        await PopulateMagicVariantGroupingAsync();
+#else
+        await Task.CompletedTask;
+#endif
+    }
+
     private async Task AddColumnIfMissingAsync(string tableName, string columnName, string columnDefinition)
     {
         var columns = await _database.QueryAsync<TableColumnInfo>($"PRAGMA table_info({tableName})");

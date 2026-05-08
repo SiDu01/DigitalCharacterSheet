@@ -7,6 +7,8 @@ public sealed class ItemDefinition
     public string Source { get; set; } = "";
     public int? Page { get; set; }
     public string ItemKind { get; set; } = "";
+    public string VariantGroupName { get; set; } = "";
+    public string VariantBaseName { get; set; } = "";
     public string TypeCode { get; set; } = "";
     public string Rarity { get; set; } = "";
     public string Tier { get; set; } = "";
@@ -25,6 +27,8 @@ public sealed class ItemDefinition
     public List<ItemBonus> Bonuses { get; set; } = [];
     public List<string> AttachedSpells { get; set; } = [];
     public List<string> AttunementRequirements { get; set; } = [];
+    public string ListName => string.IsNullOrWhiteSpace(VariantGroupName) ? Name : VariantGroupName;
+    public string VariantLabel => string.IsNullOrWhiteSpace(VariantBaseName) ? Source : VariantBaseName;
 
     public string Category
     {

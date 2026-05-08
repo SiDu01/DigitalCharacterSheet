@@ -97,6 +97,9 @@ Current database migration baseline:
 
 - `DatabaseVersion = 1`: original schema/version marker.
 - `DatabaseVersion = 2`: consolidates legacy column compatibility into the migration flow. This adds missing columns idempotently for older local databases without touching user-owned character data.
+- `DatabaseVersion = 3`: adds `CharacterInventoryItems` for per-character inventory state such as quantity, equipped, attuned, notes and charges.
+- `DatabaseVersion = 4`: marks shield-like items as armor and creates concrete magic item definitions from supported generic magic variants.
+- `DatabaseVersion = 5`: adds magic variant grouping fields so generated variants appear as families such as `Cast-Off Armor`.
 
 For future schema changes:
 

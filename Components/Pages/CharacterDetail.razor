@@ -59,7 +59,102 @@ else
             <button type="button" class="tab-button @(activeTab == "Spells" ? "active" : "")" @onclick='() => SetActiveTab("Spells")'>Spells</button>
         </nav>
 
-        @if (activeTab == "Main")
+        @if (inventoryAddMode)
+        {
+            <section class="spell-page item-page character-item-add-page">
+                <header class="page-header compact-add-header">
+                    <div>
+                        <p class="eyebrow">Inventory</p>
+                        <h1>Add Items</h1>
+                    </div>
+                    <div class="header-actions">
+                        @if (!string.IsNullOrWhiteSpace(selectedInventoryCategory))
+                        {
+                            <button type="button" class="text-button no-margin" @onclick="ShowInventoryCategories">Categories</button>
+                        }
+                        <button type="button" class="text-button no-margin" @onclick="ToggleInventoryAddMode">Done</button>
+                    </div>
+                </header>
+
+                @if (string.IsNullOrWhiteSpace(selectedInventoryCategory))
+                {
+                    <section class="item-category-grid">
+                        @foreach (var category in InventoryCategoryTiles)
+                        {
+                            <button type="button" class="item-category-tile" @onclick="() => OpenInventoryCategory(category.Name)">
+                                <span class="item-category-count">@category.Count</span>
+                                <strong>@category.Name</strong>
+                                <small>@category.Description</small>
+                            </button>
+                        }
+                    </section>
+                }
+                else
+                {
+                    <section class="spell-toolbar">
+                        <input class="search-input" placeholder="Item suchen" @bind="inventorySearchText" @bind:event="oninput" @bind:after="ApplyInventoryFilter" />
+                    </section>
+
+                    <section class="spell-master-detail character-item-add-master-detail">
+                        <section class="spell-list spell-list-pane">
+                            @foreach (var rarityGroup in availableItemGroups.GroupBy(group => group.Rarity))
+                            {
+                                <div class="spell-level-separator">@FormatItemRarity(rarityGroup.Key)</div>
+                                @foreach (var group in rarityGroup)
+                                {
+                                    var item = group.ResolveVersion(selectedInventoryDefinition);
+                                    <article class="spell-row @(selectedInventoryDefinition is not null && group.Versions.Any(version => version.Id == selectedInventoryDefinition.Id) ? "selected" : "")"
+                                             @onclick="() => SelectInventoryItem(group)">
+                                        <div class="spell-main">
+                                            <div class="spell-title">
+                                                <h2>@group.Name</h2>
+                                                <span class="rarity-badge">@FormatItemRarity(group.Rarity)</span>
+                                            </div>
+                                            <div class="spell-meta">
+                                                <span>@DisplayItemValue(group.TypeCode)</span>
+                                                @if (group.RequiresAttunement)
+                                                {
+                                                    <span>Attunement</span>
+                                                }
+                                                @foreach (var source in group.Versions.Select(version => version.Source).Distinct())
+                                                {
+                                                    <span class="source-badge">@source</span>
+                                                }
+                                            </div>
+                                        </div>
+                                    </article>
+                                }
+                            }
+                        </section>
+
+                        <aside class="spell-detail-pane">
+                            @if (selectedInventoryDefinition is null)
+                            {
+                                <div class="empty-detail">
+                                    <p class="eyebrow">Details</p>
+                                    <h2>Select an item</h2>
+                                    <p class="muted">Choose a concrete variant and source before adding it to the character.</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="inventory-add-detail-actions">
+                                    <ItemDetailContent Item="selectedInventoryDefinition"
+                                                       Versions="selectedInventoryGroup?.Versions"
+                                                       OnSelectVersion="SelectInventoryVersion" />
+                                    <button type="button"
+                                            class="primary-action inventory-add-primary"
+                                            @onclick="async () => await AddInventoryItem(selectedInventoryDefinition)">
+                                        Add to Inventory
+                                    </button>
+                                </div>
+                            }
+                        </aside>
+                    </section>
+                }
+            </section>
+        }
+        else if (activeTab == "Main")
         {
             <section class="character-main-sheet">
                 <section class="main-left-stack">
@@ -71,7 +166,7 @@ else
                             @foreach (var ability in AbilityScores)
                             {
                                 <div class="sheet-ability">
-                                    <strong>@FormatModifier(AbilityModifier(ability.Value))</strong>
+                                    <strong>@FormatModifier(GetAbilityCheckModifier(ability.Label.ToLowerInvariant()))</strong>
                                     <span>@ability.Label</span>
                                     <small>@ability.Value</small>
                                 </div>
@@ -148,6 +243,14 @@ else
                                 }
                                 <button type="button" class="text-button no-margin" @onclick="ToggleFeatureEditMode">
                                     @(featureEditMode ? "Done" : "Edit")
+                                </button>
+                            </div>
+                        }
+                        else if (activeMainPanelTab == "Items")
+                        {
+                            <div class="feature-edit-toolbar">
+                                <button type="button" class="text-button no-margin" @onclick="ToggleInventoryAddMode">
+                                    @(inventoryAddMode ? "Done" : "Add")
                                 </button>
                             </div>
                         }
@@ -240,8 +343,127 @@ else
                     }
                     else if (activeMainPanelTab == "Items")
                     {
-                        <div class="side-tab-content">
-                            <p class="muted compact-hint">Character inventory is not connected yet.</p>
+                        <div class="side-tab-content inventory-tab-content @(inventoryAddMode ? "add-mode" : "")">
+                            @if (inventoryAddMode)
+                            {
+                                <section class="inventory-toolbar inventory-add-toolbar">
+                                    <input class="search-input compact-search"
+                                           placeholder="Item suchen"
+                                           @bind="inventorySearchText"
+                                           @bind:event="oninput"
+                                           @bind:after="ApplyInventoryFilter" />
+                                    @if (!string.IsNullOrWhiteSpace(selectedInventoryCategory))
+                                    {
+                                        <button type="button" class="text-button no-margin" @onclick="ShowInventoryCategories">Categories</button>
+                                    }
+                                </section>
+
+                                @if (string.IsNullOrWhiteSpace(selectedInventoryCategory) && string.IsNullOrWhiteSpace(inventorySearchText))
+                                {
+                                    <section class="inventory-category-grid">
+                                        @foreach (var category in InventoryCategoryTiles)
+                                        {
+                                            <button type="button" class="item-category-tile inventory-category-tile" @onclick="() => OpenInventoryCategory(category.Name)">
+                                                <span class="item-category-count">@category.Count</span>
+                                                <strong>@category.Name</strong>
+                                                <small>@category.Description</small>
+                                            </button>
+                                        }
+                                    </section>
+                                }
+                                else
+                                {
+                                    <section class="inventory-add-list expanded">
+                                        @foreach (var group in availableItemGroups.Take(80))
+                                        {
+                                            var item = group.ResolveVersion(selectedInventoryDefinition);
+                                            <article class="inventory-add-row expanded">
+                                                <button type="button" @onclick="() => SelectInventoryItem(group)">
+                                                    <strong>@group.Name</strong>
+                                                    <span>@FormatItemMeta(item)</span>
+                                                </button>
+                                                <div class="inventory-source-list">
+                                                    @foreach (var versionGroup in BuildInventoryVersionChoices(group))
+                                                    {
+                                                        var version = versionGroup.ResolveVersion(item);
+                                                        <button type="button"
+                                                                class="source-badge @(item.Id == version.Id ? "active" : "")"
+                                                                title="@BuildInventoryVersionTitle(version)"
+                                                                @onclick="() => SelectInventoryVersion(version)">
+                                                            @BuildInventoryVersionLabel(version)
+                                                        </button>
+                                                    }
+                                                </div>
+                                                <div class="inventory-source-list">
+                                                    @foreach (var version in BuildInventorySourceChoices(group, item))
+                                                    {
+                                                        <button type="button"
+                                                                class="source-badge @(item.Id == version.Id ? "active" : "")"
+                                                                title="@version.Source"
+                                                                @onclick="() => SelectInventoryVersion(version)">
+                                                            @version.Source
+                                                        </button>
+                                                    }
+                                                </div>
+                                                <button type="button"
+                                                        class="mini-button active"
+                                                        title="Add item"
+                                                        @onclick="async () => await AddInventoryItem(item)">+</button>
+                                            </article>
+                                        }
+                                        @if (availableItemGroups.Count == 0)
+                                        {
+                                            <p class="muted compact-hint">No matching items.</p>
+                                        }
+                                    </section>
+                                }
+                            }
+                            else
+                            {
+                                <section class="inventory-list">
+                                    @if (inventoryItems.Count == 0)
+                                    {
+                                        <p class="muted compact-hint">No items in this inventory yet.</p>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var item in inventoryItems)
+                                        {
+                                            <article class="inventory-row">
+                                                <div class="inventory-main">
+                                                    <strong>@item.DisplayName</strong>
+                                                    <span>@FormatInventoryMeta(item)</span>
+                                                    @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                                    {
+                                                        <small>@item.Notes</small>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(BuildInventoryStats(item)))
+                                                    {
+                                                        <small>@BuildInventoryStats(item)</small>
+                                                    }
+                                                </div>
+                                                <div class="inventory-controls">
+                                                    <button type="button" class="mini-button" title="Decrease quantity" @onclick="async () => await ChangeInventoryQuantity(item, -1)">-</button>
+                                                    <span class="inventory-quantity">@item.Quantity</span>
+                                                    <button type="button" class="mini-button" title="Increase quantity" @onclick="async () => await ChangeInventoryQuantity(item, 1)">+</button>
+                                                    <button type="button"
+                                                            class="mode-button @(item.IsEquipped ? "active" : "")"
+                                                            title="Toggle equipped"
+                                                            @onclick="async () => await ToggleInventoryEquipped(item)">Equip</button>
+                                                    @if (item.RequiresAttunement)
+                                                    {
+                                                        <button type="button"
+                                                                class="mode-button @(item.IsAttuned ? "active" : "")"
+                                                                title="Toggle attunement"
+                                                                @onclick="async () => await ToggleInventoryAttuned(item)">Attune</button>
+                                                    }
+                                                    <button type="button" class="mini-button" title="Remove item" @onclick="async () => await RemoveInventoryItem(item)">x</button>
+                                                </div>
+                                            </article>
+                                        }
+                                    }
+                                </section>
+                            }
                         </div>
                     }
                     else
@@ -298,7 +520,7 @@ else
                     <article class="combat-stat-card primary">
                         <p class="eyebrow">Armor Class</p>
                         <strong>@ArmorClass</strong>
-                        <span>Unarmored base</span>
+                        <span>@ArmorClassSource</span>
                     </article>
                     <article class="combat-stat-card">
                         <p class="eyebrow">Initiative</p>
@@ -359,8 +581,15 @@ else
                         <div class="combat-action-list">
                             <article>
                                 <strong>Attack</strong>
-                                <span>Weapon attacks will use equipped items once inventory is connected.</span>
+                                <span>Common attack action</span>
                             </article>
+                            @foreach (var weapon in EquippedWeapons)
+                            {
+                                <article>
+                                    <strong>@weapon.DisplayName</strong>
+                                    <span>@FormatWeaponAction(weapon)</span>
+                                </article>
+                            }
                             @foreach (var feature in CombatFeatureActions.Where(feature => feature.ActionType == "Actions"))
                             {
                                 <article>
@@ -612,6 +841,9 @@ else
 
     private Character? character;
     private List<Spell> allSpells = [];
+    private List<ItemDefinition> allItemDefinitions = [];
+    private List<CharacterInventoryItem> inventoryItems = [];
+    private List<ItemGroup> availableItemGroups = [];
     private List<Spell> knownSpells = [];
     private List<SpellGroup> knownSpellGroups = [];
     private List<SpellGroup> availableSpellGroups = [];
@@ -637,10 +869,21 @@ else
     private bool spellSlotsExpanded;
     private Spell? selectedSpell;
     private SpellGroup? selectedSpellGroup;
+    private ItemDefinition? selectedInventoryDefinition;
+    private ItemGroup? selectedInventoryGroup;
+    private string inventorySearchText = "";
+    private string selectedInventoryCategory = "";
+    private bool inventoryAddMode;
     private int PreparedCount => characterSpellModes.Values.Count(mode => mode == "Prepared");
-    private int ArmorClass => 10 + GetAbilityModifier("dex");
-    private int InitiativeModifier => GetAbilityModifier("dex");
+    private ArmorCalculation CurrentArmor => CalculateArmorClass();
+    private int ArmorClass => CurrentArmor.Value;
+    private string ArmorClassSource => CurrentArmor.Source;
+    private int InitiativeModifier => GetAbilityCheckModifier("dex");
     private int PassivePerception => 10 + GetSkillModifierByName("Perception");
+    private IReadOnlyList<CharacterInventoryItem> EquippedWeapons => inventoryItems
+        .Where(item => item.IsEquipped && item.ItemDefinition?.WeaponStats is not null)
+        .OrderBy(item => item.DisplayName)
+        .ToList();
     private IReadOnlyList<CombatFeatureAction> CombatFeatureActions => sheetFeatureGroups
         .SelectMany(group => group.Levels)
         .SelectMany(level => level.Features)
@@ -675,6 +918,12 @@ else
             ("WIS", character.Wisdom),
             ("CHA", character.Charisma)
         ];
+    private IReadOnlyList<InventoryCategoryTile> InventoryCategoryTiles => GroupItems(allItemDefinitions)
+        .GroupBy(group => group.Primary.Category)
+        .Select(group => new InventoryCategoryTile(group.Key, group.Count(), DescribeInventoryCategory(group.Key)))
+        .OrderBy(tile => InventoryCategorySortKey(tile.Name))
+        .ThenBy(tile => tile.Name)
+        .ToList();
 
     protected override async Task OnParametersSetAsync()
     {
@@ -685,9 +934,12 @@ else
         eligibleSpellIds = spellEligibility.Keys.ToHashSet();
         spellSlots = (await Database.GetCharacterSpellSlotsAsync(Id)).ToList();
         hiddenFeatureKeys = (await Database.GetCharacterHiddenFeatureKeysAsync(Id)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        await LoadInventory();
+        allItemDefinitions = (await Database.GetItemDefinitionsAsync()).ToList();
         await LoadCharacterFeatureDefinitions();
         await LoadCharacterSpells();
         ApplySpellFilter();
+        ApplyInventoryFilter();
     }
 
     private async Task LoadCharacterFeatureDefinitions()
@@ -765,6 +1017,121 @@ else
     private void SetActiveMainPanelTab(string tab)
     {
         activeMainPanelTab = tab;
+    }
+
+    private void ToggleInventoryAddMode()
+    {
+        inventoryAddMode = !inventoryAddMode;
+        if (inventoryAddMode)
+        {
+            ApplyInventoryFilter();
+            selectedInventoryGroup = availableItemGroups.FirstOrDefault();
+            selectedInventoryDefinition = selectedInventoryGroup?.Primary;
+        }
+    }
+
+    private void OpenInventoryCategory(string category)
+    {
+        selectedInventoryCategory = category;
+        ApplyInventoryFilter();
+    }
+
+    private void ShowInventoryCategories()
+    {
+        selectedInventoryCategory = "";
+        inventorySearchText = "";
+        ApplyInventoryFilter();
+    }
+
+    private void ApplyInventoryFilter()
+    {
+        var query = allItemDefinitions.AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(selectedInventoryCategory))
+        {
+            query = query.Where(item => item.Category == selectedInventoryCategory);
+        }
+
+        if (!string.IsNullOrWhiteSpace(inventorySearchText))
+        {
+            var search = inventorySearchText.Trim();
+            query = query.Where(item =>
+                item.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || item.Category.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || item.TypeCode.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || item.Source.Contains(search, StringComparison.OrdinalIgnoreCase));
+        }
+        else if (string.IsNullOrWhiteSpace(selectedInventoryCategory))
+        {
+            availableItemGroups = [];
+            selectedInventoryDefinition = null;
+            return;
+        }
+
+        availableItemGroups = GroupItems(query)
+            .OrderBy(group => group.Name)
+            .ToList();
+        selectedInventoryGroup = availableItemGroups.FirstOrDefault(group => selectedInventoryDefinition is not null && group.Versions.Any(version => version.Id == selectedInventoryDefinition.Id))
+            ?? availableItemGroups.FirstOrDefault();
+        selectedInventoryDefinition = selectedInventoryGroup?.ResolveVersion(selectedInventoryDefinition);
+    }
+
+    private void SelectInventoryItem(ItemGroup group)
+    {
+        selectedInventoryGroup = group;
+        selectedInventoryDefinition = group.ResolveVersion(selectedInventoryDefinition);
+    }
+
+    private void SelectInventoryVersion(ItemDefinition item)
+    {
+        selectedInventoryDefinition = item;
+    }
+
+    private async Task AddInventoryItem(ItemDefinition item)
+    {
+        await Database.AddCharacterInventoryItemAsync(Id, item.Id);
+        await LoadInventory();
+        inventoryAddMode = false;
+        inventorySearchText = "";
+        selectedInventoryCategory = "";
+        availableItemGroups = [];
+        selectedInventoryDefinition = null;
+        selectedInventoryGroup = null;
+    }
+
+    private async Task ChangeInventoryQuantity(CharacterInventoryItem item, int delta)
+    {
+        item.Quantity = Math.Max(1, item.Quantity + delta);
+        await Database.UpdateCharacterInventoryItemAsync(item);
+        await LoadInventory();
+    }
+
+    private async Task ToggleInventoryEquipped(CharacterInventoryItem item)
+    {
+        item.IsEquipped = !item.IsEquipped;
+        await Database.UpdateCharacterInventoryItemAsync(item);
+        await LoadInventory();
+    }
+
+    private async Task ToggleInventoryAttuned(CharacterInventoryItem item)
+    {
+        item.IsAttuned = !item.IsAttuned;
+        await Database.UpdateCharacterInventoryItemAsync(item);
+        await LoadInventory();
+    }
+
+    private async Task RemoveInventoryItem(CharacterInventoryItem item)
+    {
+        await Database.RemoveCharacterInventoryItemAsync(item.Id);
+        await LoadInventory();
+    }
+
+    private async Task LoadInventory()
+    {
+        inventoryItems = (await Database.GetCharacterInventoryAsync(Id))
+            .OrderByDescending(item => item.IsEquipped)
+            .ThenBy(item => item.Category)
+            .ThenBy(item => item.DisplayName)
+            .ToList();
     }
 
     private void SetActiveCombatActionTab(string tab)
@@ -944,6 +1311,292 @@ else
             .ToList();
     }
 
+    private List<ItemGroup> GroupItems(IEnumerable<ItemDefinition> items)
+    {
+        return items
+            .GroupBy(item => item.ListName, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new ItemGroup(group, sourcePriorities))
+            .ToList();
+    }
+
+    private static string FormatItemMeta(ItemDefinition item)
+    {
+        var parts = new List<string> { item.Category };
+        if (!string.IsNullOrWhiteSpace(item.Rarity))
+        {
+            parts.Add(FormatItemRarity(item.Rarity));
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.Source))
+        {
+            parts.Add(item.Source);
+        }
+
+        return string.Join(" / ", parts.Where(part => !string.IsNullOrWhiteSpace(part)));
+    }
+
+    private static string DisplayItemValue(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+
+    private static string FormatInventoryMeta(CharacterInventoryItem item)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(item.Category))
+        {
+            parts.Add(item.Category);
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.Rarity))
+        {
+            parts.Add(FormatItemRarity(item.Rarity));
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.Source))
+        {
+            parts.Add(item.Source);
+        }
+
+        if (item.IsEquipped)
+        {
+            parts.Add("Equipped");
+        }
+
+        if (item.IsAttuned)
+        {
+            parts.Add("Attuned");
+        }
+
+        return parts.Count == 0 ? "Custom item" : string.Join(" / ", parts);
+    }
+
+    private static string BuildInventoryVersionLabel(ItemDefinition item)
+    {
+        return string.IsNullOrWhiteSpace(item.VariantGroupName) ? item.Source : item.VariantLabel;
+    }
+
+    private static string BuildInventoryVersionTitle(ItemDefinition item)
+    {
+        return string.IsNullOrWhiteSpace(item.VariantGroupName)
+            ? item.Source
+            : $"{item.VariantLabel} / {item.Source}";
+    }
+
+    private static IReadOnlyList<ItemGroup> BuildInventoryVersionChoices(ItemGroup group)
+    {
+        return group.Versions
+            .GroupBy(item => item.VariantLabel, StringComparer.OrdinalIgnoreCase)
+            .Select(versions => new ItemGroup(versions))
+            .OrderBy(choice => choice.Primary.VariantLabel)
+            .ToList();
+    }
+
+    private static IReadOnlyList<ItemDefinition> BuildInventorySourceChoices(ItemGroup group, ItemDefinition selectedItem)
+    {
+        return group.Versions
+            .Where(item => string.Equals(item.VariantLabel, selectedItem.VariantLabel, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(item => item.Source, StringComparer.OrdinalIgnoreCase)
+            .Select(sourceGroup => sourceGroup.First())
+            .OrderBy(item => item.Source)
+            .ToList();
+    }
+
+    private static int InventoryCategorySortKey(string category)
+    {
+        return category switch
+        {
+            "Weapons" => 0,
+            "Armor" => 1,
+            "Magic Items" => 2,
+            "Consumables" => 3,
+            "Tools" => 4,
+            "Spellcasting Focus" => 5,
+            "Adventuring Gear" => 6,
+            "Item Groups" => 7,
+            _ => 100
+        };
+    }
+
+    private static string DescribeInventoryCategory(string category)
+    {
+        return category switch
+        {
+            "Weapons" => "Damage, mastery and properties",
+            "Armor" => "AC, category and stealth rules",
+            "Magic Items" => "Attunement, bonuses and charges",
+            "Consumables" => "Potions, ammunition and expendables",
+            "Tools" => "Kits, instruments and proficiencies",
+            "Spellcasting Focus" => "Arcane, divine and class foci",
+            "Adventuring Gear" => "General equipment and gear",
+            "Item Groups" => "Grouped item families",
+            _ => "Items"
+        };
+    }
+
+    private string BuildInventoryStats(CharacterInventoryItem item)
+    {
+        var definition = item.ItemDefinition;
+        if (definition?.WeaponStats is not null)
+        {
+            return $"Attack {FormatModifier(GetWeaponAttackBonus(definition))} / {BuildWeaponDamage(definition)}";
+        }
+
+        if (definition?.ArmorStats is not null)
+        {
+            return IsShield(definition)
+                ? $"+{GetShieldArmorBonus(definition)} AC"
+                : $"AC {BuildArmorValueDisplay(definition)}";
+        }
+
+        return "";
+    }
+
+    private string FormatWeaponAction(CharacterInventoryItem item)
+    {
+        var definition = item.ItemDefinition;
+        if (definition?.WeaponStats is null)
+        {
+            return "";
+        }
+
+        var parts = new List<string>
+        {
+            $"Hit {FormatModifier(GetWeaponAttackBonus(definition))}",
+            BuildWeaponDamage(definition)
+        };
+
+        if (!string.IsNullOrWhiteSpace(definition.WeaponStats.RangeDisplay))
+        {
+            parts.Add(definition.WeaponStats.RangeDisplay);
+        }
+
+        if (!string.IsNullOrWhiteSpace(definition.WeaponStats.Mastery))
+        {
+            parts.Add($"Mastery {definition.WeaponStats.Mastery}");
+        }
+
+        return string.Join(" / ", parts.Where(part => !string.IsNullOrWhiteSpace(part)));
+    }
+
+    private int GetWeaponAttackBonus(ItemDefinition item)
+    {
+        return ProficiencyBonus + GetWeaponAbilityModifier(item) + GetItemBonus(item, "Weapon", "WeaponAttack");
+    }
+
+    private int GetWeaponAbilityModifier(ItemDefinition item)
+    {
+        return item.AttackAbilityRule switch
+        {
+            "DEX" => GetAbilityModifier("dex"),
+            "STR or DEX" => Math.Max(GetAbilityModifier("str"), GetAbilityModifier("dex")),
+            _ => GetAbilityModifier("str")
+        };
+    }
+
+    private string BuildWeaponDamage(ItemDefinition item)
+    {
+        if (item.WeaponStats is null)
+        {
+            return "";
+        }
+
+        var damage = item.WeaponStats.DamageDisplay;
+        if (string.IsNullOrWhiteSpace(damage))
+        {
+            return "";
+        }
+
+        var modifier = GetWeaponAbilityModifier(item) + GetItemBonus(item, "Weapon", "WeaponDamage");
+        return $"{damage} {FormatModifier(modifier)}".Trim();
+    }
+
+    private ArmorCalculation CalculateArmorClass()
+    {
+        var dexterityModifier = GetAbilityModifier("dex");
+        var itemArmorBonus = GetActiveItemBonus("ArmorClass", item => item.ItemDefinition is not null && !IsShield(item.ItemDefinition) && item.ItemDefinition.ArmorStats is null);
+        var shieldBonus = inventoryItems
+            .Where(item => item.IsEquipped && item.ItemDefinition is not null && IsShield(item.ItemDefinition))
+            .Sum(item => GetShieldArmorBonus(item.ItemDefinition!));
+
+        var baseArmor = inventoryItems
+            .Where(item => item.IsEquipped && item.ItemDefinition?.ArmorStats is not null && !IsShield(item.ItemDefinition))
+            .Select(item => new ArmorCalculation(
+                CalculateArmorItemClass(item.ItemDefinition!, dexterityModifier) + shieldBonus + itemArmorBonus,
+                $"{item.DisplayName}{(shieldBonus > 0 ? " + shield" : "")}{(itemArmorBonus != 0 ? " + magic" : "")}"))
+            .OrderByDescending(result => result.Value)
+            .FirstOrDefault();
+
+        if (baseArmor is not null)
+        {
+            return baseArmor;
+        }
+
+        return new ArmorCalculation(
+            10 + dexterityModifier + shieldBonus + itemArmorBonus,
+            $"{(shieldBonus > 0 ? "Unarmored + shield" : "Unarmored base")}{(itemArmorBonus != 0 ? " + magic" : "")}");
+    }
+
+    private static int CalculateArmorItemClass(ItemDefinition item, int dexterityModifier)
+    {
+        var armorClass = item.ArmorStats?.ArmorClass ?? 10;
+        armorClass += item.ArmorStats?.ArmorCategory switch
+        {
+            "LA" => dexterityModifier,
+            "MA" => Math.Min(dexterityModifier, 2),
+            "HA" => 0,
+            _ => dexterityModifier
+        };
+
+        return armorClass + ParseSignedBonus(item.Bonuses.FirstOrDefault(bonus => bonus.BonusType == "ArmorClass")?.Value);
+    }
+
+    private static int GetShieldArmorBonus(ItemDefinition item)
+    {
+        var baseBonus = item.ArmorStats?.ArmorClass ?? 2;
+        return baseBonus + ParseSignedBonus(item.Bonuses.FirstOrDefault(bonus => bonus.BonusType == "ArmorClass")?.Value);
+    }
+
+    private static bool IsShield(ItemDefinition item)
+    {
+        return item.ArmorStats?.ArmorCategory == "S"
+            || item.TypeCode == "S"
+            || item.Name.Contains("shield", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildArmorValueDisplay(ItemDefinition item)
+    {
+        if (item.ArmorStats is null)
+        {
+            return "";
+        }
+
+        var bonus = ParseSignedBonus(item.Bonuses.FirstOrDefault(bonus => bonus.BonusType == "ArmorClass")?.Value);
+        var bonusText = bonus == 0 ? "" : $" {FormatModifier(bonus)}";
+        return $"{item.ArmorStats.ArmorClass}{bonusText}".Trim();
+    }
+
+    private static int ParseSignedBonus(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return 0;
+        }
+
+        var cleaned = value.Trim().Replace("+", "");
+        return int.TryParse(cleaned, out var parsed) ? parsed : 0;
+    }
+
+    private static string FormatItemRarity(string rarity)
+    {
+        return rarity switch
+        {
+            "" => "",
+            "none" => "Common",
+            _ => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(rarity.Replace("_", " "))
+        };
+    }
+
     private static int AbilityModifier(int abilityScore)
     {
         return (int)Math.Floor((abilityScore - 10) / 2.0);
@@ -997,7 +1650,9 @@ else
 
     private int GetSavingThrowModifier(CharacterSavingThrow savingThrow)
     {
-        return GetAbilityModifier(savingThrow.AbilityCode) + (savingThrow.IsProficient ? ProficiencyBonus : 0);
+        return GetAbilityModifier(savingThrow.AbilityCode)
+            + (savingThrow.IsProficient ? ProficiencyBonus : 0)
+            + GetActiveItemBonus("SavingThrow");
     }
 
     private int GetSkillModifier(CharacterSkill skill)
@@ -1008,7 +1663,7 @@ else
             "Expertise" => ProficiencyBonus * 2,
             "Proficient" => ProficiencyBonus,
             _ => skill.IsProficient ? ProficiencyBonus : 0
-        });
+        }) + GetActiveItemBonus("AbilityCheck");
     }
 
     private static bool SkillHasTraining(CharacterSkill skill)
@@ -1020,6 +1675,11 @@ else
     {
         var skill = character?.Skills.FirstOrDefault(skill => string.Equals(skill.Name, name, StringComparison.OrdinalIgnoreCase));
         return skill is null ? 0 : GetSkillModifier(skill);
+    }
+
+    private int GetAbilityCheckModifier(string abilityCode)
+    {
+        return GetAbilityModifier(abilityCode) + GetActiveItemBonus("AbilityCheck");
     }
 
     private int GetAbilityModifier(string abilityCode)
@@ -1041,6 +1701,39 @@ else
         };
 
         return AbilityModifier(score);
+    }
+
+    private int GetActiveItemBonus(string bonusType)
+    {
+        return GetActiveItemBonus(bonusType, _ => true);
+    }
+
+    private int GetActiveItemBonus(string bonusType, Func<CharacterInventoryItem, bool> itemFilter)
+    {
+        return inventoryItems
+            .Where(IsItemBonusActive)
+            .Where(itemFilter)
+            .Select(item => item.ItemDefinition)
+            .Where(item => item is not null)
+            .Sum(item => GetItemBonus(item!, bonusType));
+    }
+
+    private static int GetItemBonus(ItemDefinition item, params string[] bonusTypes)
+    {
+        return bonusTypes
+            .Select(bonusType => item.Bonuses.FirstOrDefault(bonus => string.Equals(bonus.BonusType, bonusType, StringComparison.OrdinalIgnoreCase))?.Value)
+            .Select(ParseSignedBonus)
+            .FirstOrDefault(value => value != 0);
+    }
+
+    private static bool IsItemBonusActive(CharacterInventoryItem item)
+    {
+        if (!item.IsCarried || item.ItemDefinition is null)
+        {
+            return false;
+        }
+
+        return item.RequiresAttunement ? item.IsAttuned : item.IsEquipped;
     }
 
     private int ProficiencyBonus => character?.Level switch
@@ -1435,4 +2128,6 @@ else
     private sealed record SheetFeatureLevel(int Level, IReadOnlyList<SheetFeature> Features);
     private sealed record SheetFeature(string Name, int Level, string Key, IReadOnlyList<string> Paragraphs);
     private sealed record CombatFeatureAction(string Name, string ActionType, string Summary);
+    private sealed record ArmorCalculation(int Value, string Source);
+    private sealed record InventoryCategoryTile(string Name, int Count, string Description);
 }
