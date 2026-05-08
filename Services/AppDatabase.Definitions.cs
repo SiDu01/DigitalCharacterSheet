@@ -1,0 +1,1021 @@
+using DigitalCharacterSheet.Data;
+using DigitalCharacterSheet.Models;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace DigitalCharacterSheet.Services;
+
+public sealed partial class AppDatabase
+{
+    public async Task<IReadOnlyList<ClassDefinition>> GetClassDefinitionsAsync()
+    {
+        await InitializeAsync();
+
+        var entities = await _database.Table<ClassDefinitionEntity>().OrderBy(classDefinition => classDefinition.Name).ToListAsync();
+        return entities.Select(ToModel).ToList();
+    }
+
+    public async Task<IReadOnlyList<RaceDefinition>> GetRaceDefinitionsAsync()
+    {
+        await InitializeAsync();
+
+        var entities = await _database.Table<RaceDefinitionEntity>().OrderBy(definition => definition.Name).ToListAsync();
+        return entities.Select(ToModel).ToList();
+    }
+
+    public async Task<IReadOnlyList<BackgroundDefinition>> GetBackgroundDefinitionsAsync()
+    {
+        await InitializeAsync();
+
+        var entities = await _database.Table<BackgroundDefinitionEntity>().OrderBy(definition => definition.Name).ToListAsync();
+        return entities.Select(ToModel).ToList();
+    }
+
+    public async Task<IReadOnlyList<SubraceDefinition>> GetSubraceDefinitionsAsync(int raceDefinitionId)
+    {
+        await InitializeAsync();
+
+        var raceDefinition = await _database.Table<RaceDefinitionEntity>()
+            .Where(definition => definition.Id == raceDefinitionId)
+            .FirstOrDefaultAsync();
+        if (raceDefinition is null)
+        {
+            return [];
+        }
+
+        var entities = await _database.Table<SubraceDefinitionEntity>()
+            .Where(definition => definition.RaceName == raceDefinition.Name && definition.RaceSource == raceDefinition.Source)
+            .OrderBy(definition => definition.Name)
+            .ToListAsync();
+
+        return entities.Select(ToModel).ToList();
+    }
+
+    public async Task<IReadOnlyList<FeatDefinition>> GetFeatDefinitionsAsync()
+    {
+        await InitializeAsync();
+
+        var entities = await _database.Table<FeatDefinitionEntity>().OrderBy(definition => definition.Name).ToListAsync();
+        return entities.Select(ToModel).ToList();
+    }
+
+    public async Task<IReadOnlyList<SubclassDefinition>> GetSubclassDefinitionsAsync(int classDefinitionId)
+    {
+        await InitializeAsync();
+
+        var classDefinition = await _database.Table<ClassDefinitionEntity>()
+            .Where(definition => definition.Id == classDefinitionId)
+            .FirstOrDefaultAsync();
+        if (classDefinition is null)
+        {
+            return [];
+        }
+
+        var classDefinitionIds = (await _database.Table<ClassDefinitionEntity>()
+                .Where(definition => definition.Name == classDefinition.Name)
+                .ToListAsync())
+            .Select(definition => definition.Id)
+            .ToHashSet();
+
+        var entities = await _database.Table<SubclassDefinitionEntity>()
+            .OrderBy(subclassDefinition => subclassDefinition.Name)
+            .ToListAsync();
+
+        return entities
+            .Where(subclassDefinition => classDefinitionIds.Contains(subclassDefinition.ClassDefinitionId))
+            .Select(ToModel)
+            .ToList();
+    }
+
+    public async Task<CharacterOptionEffects> GetCharacterOptionEffectsAsync(Character character)
+    {
+        await InitializeAsync();
+
+        var effects = new CharacterOptionEffects();
+
+        if (character.RaceDefinitionId is not null)
+        {
+            var race = await _database.Table<RaceDefinitionEntity>()
+                .Where(row => row.Id == character.RaceDefinitionId.Value)
+                .FirstOrDefaultAsync();
+            AddOptionEffects(effects, race?.RawJson, "Race");
+        }
+
+        if (character.SubraceDefinitionId is not null)
+        {
+            var subrace = await _database.Table<SubraceDefinitionEntity>()
+                .Where(row => row.Id == character.SubraceDefinitionId.Value)
+                .FirstOrDefaultAsync();
+            AddOptionEffects(effects, subrace?.RawJson, "Race version");
+        }
+
+        if (character.BackgroundDefinitionId is not null)
+        {
+            var background = await _database.Table<BackgroundDefinitionEntity>()
+                .Where(row => row.Id == character.BackgroundDefinitionId.Value)
+                .FirstOrDefaultAsync();
+            AddOptionEffects(effects, background?.RawJson, string.IsNullOrWhiteSpace(background?.Name) ? "Background" : $"Background {background.Name}");
+            await AddGrantedFeatEffectsAsync(effects, background?.FeatsJson, background?.Name ?? "Background");
+        }
+
+        foreach (var feat in character.Feats.Where(feat => feat.FeatDefinitionId > 0))
+        {
+            var featDefinition = await _database.Table<FeatDefinitionEntity>()
+                .Where(row => row.Id == feat.FeatDefinitionId)
+                .FirstOrDefaultAsync();
+            AddOptionEffects(effects, featDefinition?.RawJson, string.IsNullOrWhiteSpace(featDefinition?.Name) ? "Feat" : $"Feat {featDefinition.Name}");
+        }
+
+        foreach (var characterClass in character.Classes.Where(characterClass =>
+                     characterClass.ClassDefinitionId > 0
+                     && characterClass.ClassDefinitionId == character.PrimaryClassDefinitionId))
+        {
+            await AddClassOptionEffectsAsync(effects, characterClass.ClassDefinitionId);
+        }
+
+        return effects;
+    }
+
+    private async Task AddClassOptionEffectsAsync(CharacterOptionEffects effects, int classDefinitionId)
+    {
+        var classDefinition = await _database.Table<ClassDefinitionEntity>()
+            .Where(row => row.Id == classDefinitionId)
+            .FirstOrDefaultAsync();
+        if (classDefinition is null)
+        {
+            return;
+        }
+
+        await using var indexStream = await OpenAssetAsync("class/index.json");
+        using var indexDocument = await JsonDocument.ParseAsync(indexStream);
+
+        foreach (var fileProperty in indexDocument.RootElement.EnumerateObject())
+        {
+            var fileName = fileProperty.Value.GetString();
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                continue;
+            }
+
+            await using var classStream = await OpenAssetAsync($"class/{fileName}");
+            using var classDocument = await JsonDocument.ParseAsync(classStream);
+            if (!classDocument.RootElement.TryGetProperty("class", out var classes))
+            {
+                continue;
+            }
+
+            foreach (var classElement in classes.EnumerateArray())
+            {
+                if (!string.Equals(ReadString(classElement, "name"), classDefinition.Name, StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(ReadString(classElement, "source"), classDefinition.Source, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (classElement.TryGetProperty("proficiency", out var savingThrows) && savingThrows.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var savingThrow in savingThrows.EnumerateArray())
+                    {
+                        if (savingThrow.ValueKind == JsonValueKind.String)
+                        {
+                            effects.SavingThrowProficiencies.Add(savingThrow.GetString() ?? "");
+                        }
+                    }
+                }
+
+                if (classElement.TryGetProperty("startingProficiencies", out var startingProficiencies)
+                    && startingProficiencies.TryGetProperty("skills", out var skills))
+                {
+                    AddSkillProficiencies(effects, skills, "Class");
+                }
+
+                return;
+            }
+        }
+    }
+
+    private async Task AddGrantedFeatEffectsAsync(CharacterOptionEffects effects, string? featsJson, string sourceName)
+    {
+        if (string.IsNullOrWhiteSpace(featsJson))
+        {
+            return;
+        }
+
+        using var document = JsonDocument.Parse(featsJson);
+        if (document.RootElement.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        var featDefinitions = await _database.Table<FeatDefinitionEntity>().ToListAsync();
+        foreach (var featReference in ReadGrantedFeatReferences(document.RootElement))
+        {
+            var featDefinition = featDefinitions.FirstOrDefault(definition =>
+                string.Equals(definition.Name, featReference.Name, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(definition.Source, featReference.Source, StringComparison.OrdinalIgnoreCase));
+            if (featDefinition is null)
+            {
+                continue;
+            }
+
+            AddChoiceHint(
+                effects,
+                "Feats",
+                $"Background {sourceName}",
+                1,
+                $"Grants {featDefinition.Name} ({featDefinition.Source}).");
+            AddOptionEffects(effects, featDefinition.RawJson, $"Feat {featDefinition.Name}");
+        }
+    }
+
+    private static IEnumerable<(string Name, string Source)> ReadGrantedFeatReferences(JsonElement featsElement)
+    {
+        foreach (var entry in featsElement.EnumerateArray())
+        {
+            if (entry.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            foreach (var property in entry.EnumerateObject())
+            {
+                if (property.Value.ValueKind != JsonValueKind.True)
+                {
+                    continue;
+                }
+
+                var parts = property.Name.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (parts.Length == 0)
+                {
+                    continue;
+                }
+
+                yield return (parts[0], parts.Length > 1 ? parts[1].ToUpperInvariant() : "");
+            }
+        }
+    }
+
+    private async Task EnsureClassDataImportedAsync()
+    {
+        var import = await _database.FindAsync<DatabaseMetadata>("ClassImportVersion");
+        var count = await _database.Table<ClassDefinitionEntity>().CountAsync();
+
+        if (import?.Value == ClassImportVersion && count > 0)
+        {
+            return;
+        }
+
+#if !SEED_BUILDER
+        if (_useSeedDatabase)
+        {
+            throw BuildReferenceDataVersionMismatchException("class", "ClassImportVersion", import?.Value, ClassImportVersion);
+        }
+#endif
+
+        await _database.DeleteAllAsync<ClassSpellAccessRuleEntity>();
+        await _database.DeleteAllAsync<SubclassSpellAccessRuleEntity>();
+        await _database.DeleteAllAsync<SubclassDefinitionEntity>();
+        await _database.DeleteAllAsync<ClassDefinitionEntity>();
+        await _database.DeleteAllAsync<SpellcastingProgressionEntity>();
+
+        await SeedSpellcastingProgressionsAsync();
+        var progressions = await _database.Table<SpellcastingProgressionEntity>().ToListAsync();
+
+        await using var stream = await OpenAssetAsync("class/index.json");
+        using var document = await JsonDocument.ParseAsync(stream);
+
+        foreach (var fileProperty in document.RootElement.EnumerateObject())
+        {
+            var fileName = fileProperty.Value.GetString();
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                continue;
+            }
+
+            await ImportClassFileAsync(fileName, progressions);
+        }
+
+        await _database.InsertOrReplaceAsync(new DatabaseMetadata { Key = "ClassImportVersion", Value = ClassImportVersion });
+    }
+
+    private async Task SeedSpellcastingProgressionsAsync()
+    {
+        var progressions = new[]
+        {
+            new SpellcastingProgressionEntity { Code = "none", Name = "None", MulticlassWeight = 0, RoundingRule = "None", UsesPactMagic = false },
+            new SpellcastingProgressionEntity { Code = "full", Name = "Full", MulticlassWeight = 1, RoundingRule = "Down", UsesPactMagic = false },
+            new SpellcastingProgressionEntity { Code = "1/2", Name = "Half", MulticlassWeight = 0.5, RoundingRule = "Down", UsesPactMagic = false },
+            new SpellcastingProgressionEntity { Code = "artificer", Name = "Half Round Up", MulticlassWeight = 0.5, RoundingRule = "Up", UsesPactMagic = false },
+            new SpellcastingProgressionEntity { Code = "1/3", Name = "Third", MulticlassWeight = 1.0 / 3.0, RoundingRule = "Down", UsesPactMagic = false },
+            new SpellcastingProgressionEntity { Code = "pact", Name = "Pact", MulticlassWeight = 0, RoundingRule = "None", UsesPactMagic = true }
+        };
+
+        await _database.InsertAllAsync(progressions);
+    }
+
+    private async Task ImportClassFileAsync(string fileName, IReadOnlyList<SpellcastingProgressionEntity> progressions)
+    {
+        await using var stream = await OpenAssetAsync($"class/{fileName}");
+        using var document = await JsonDocument.ParseAsync(stream);
+
+        var classDefinitionsByNaturalKey = new Dictionary<string, ClassDefinitionEntity>(StringComparer.OrdinalIgnoreCase);
+
+        if (document.RootElement.TryGetProperty("class", out var classes))
+        {
+            foreach (var classElement in classes.EnumerateArray())
+            {
+                var entity = new ClassDefinitionEntity
+                {
+                    Name = ReadString(classElement, "name"),
+                    Source = ReadString(classElement, "source"),
+                    Slug = BuildSlug(ReadString(classElement, "name"), ReadString(classElement, "source")),
+                    SpellcastingProgressionId = FindProgressionId(progressions, ReadString(classElement, "casterProgression")),
+                    RawJson = BuildClassRawJson(document.RootElement, classElement)
+                };
+
+                await _database.InsertAsync(entity);
+                classDefinitionsByNaturalKey[$"{entity.Name}|{entity.Source}"] = entity;
+            }
+        }
+
+        if (!document.RootElement.TryGetProperty("subclass", out var subclasses))
+        {
+            return;
+        }
+
+        var importedSubclassSlugs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var subclassElement in subclasses.EnumerateArray())
+        {
+            var className = ReadString(subclassElement, "className");
+            var classSource = ReadString(subclassElement, "classSource");
+            if (!classDefinitionsByNaturalKey.TryGetValue($"{className}|{classSource}", out var classDefinition))
+            {
+                continue;
+            }
+
+            var subclassSlug = BuildSubclassSlug(classDefinition.Slug, ReadString(subclassElement, "name"), ReadString(subclassElement, "source"));
+            if (!importedSubclassSlugs.Add(subclassSlug))
+            {
+                continue;
+            }
+
+            await _database.InsertAsync(new SubclassDefinitionEntity
+            {
+                ClassDefinitionId = classDefinition.Id,
+                Name = ReadString(subclassElement, "name"),
+                Source = ReadString(subclassElement, "source"),
+                Slug = subclassSlug,
+                SpellcastingProgressionId = FindProgressionId(progressions, ReadString(subclassElement, "casterProgression")),
+                RawJson = BuildSubclassRawJson(document.RootElement, subclassElement)
+            });
+        }
+    }
+
+    private static string BuildClassRawJson(JsonElement root, JsonElement classElement)
+    {
+        var enriched = JsonNode.Parse(classElement.GetRawText())?.AsObject();
+        if (enriched is null)
+        {
+            return classElement.GetRawText();
+        }
+
+        var className = ReadString(classElement, "name");
+        var classSource = ReadString(classElement, "source");
+        var featureDetails = new JsonArray();
+
+        if (root.TryGetProperty("classFeature", out var features) && features.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var feature in features.EnumerateArray())
+            {
+                if (string.Equals(ReadString(feature, "className"), className, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(ReadString(feature, "classSource"), classSource, StringComparison.OrdinalIgnoreCase))
+                {
+                    featureDetails.Add(JsonNode.Parse(feature.GetRawText()));
+                }
+            }
+        }
+
+        enriched["_featureDetails"] = featureDetails;
+        return enriched.ToJsonString();
+    }
+
+    private static string BuildSubclassRawJson(JsonElement root, JsonElement subclassElement)
+    {
+        var enriched = JsonNode.Parse(subclassElement.GetRawText())?.AsObject();
+        if (enriched is null)
+        {
+            return subclassElement.GetRawText();
+        }
+
+        var className = ReadString(subclassElement, "className");
+        var classSource = ReadString(subclassElement, "classSource");
+        var subclassName = ReadString(subclassElement, "shortName");
+        if (string.IsNullOrWhiteSpace(subclassName))
+        {
+            subclassName = ReadString(subclassElement, "name");
+        }
+
+        var subclassSource = ReadString(subclassElement, "source");
+        var featureDetails = new JsonArray();
+
+        if (root.TryGetProperty("subclassFeature", out var features) && features.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var feature in features.EnumerateArray())
+            {
+                if (string.Equals(ReadString(feature, "className"), className, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(ReadString(feature, "classSource"), classSource, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(ReadString(feature, "subclassShortName"), subclassName, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(ReadString(feature, "subclassSource"), subclassSource, StringComparison.OrdinalIgnoreCase))
+                {
+                    featureDetails.Add(JsonNode.Parse(feature.GetRawText()));
+                }
+            }
+        }
+
+        enriched["_featureDetails"] = featureDetails;
+        return enriched.ToJsonString();
+    }
+
+    private async Task EnsureCharacterOptionsImportedAsync()
+    {
+        var import = await _database.FindAsync<DatabaseMetadata>("CharacterOptionImportVersion");
+        var raceCount = await _database.Table<RaceDefinitionEntity>().CountAsync();
+        var backgroundCount = await _database.Table<BackgroundDefinitionEntity>().CountAsync();
+        var featCount = await _database.Table<FeatDefinitionEntity>().CountAsync();
+
+        if (import?.Value == CharacterOptionImportVersion
+            && raceCount > 0
+            && backgroundCount > 0
+            && featCount > 0)
+        {
+            return;
+        }
+
+#if !SEED_BUILDER
+        if (_useSeedDatabase)
+        {
+            throw BuildReferenceDataVersionMismatchException(
+                "character option",
+                "CharacterOptionImportVersion",
+                import?.Value,
+                CharacterOptionImportVersion);
+        }
+#endif
+
+        await _database.DeleteAllAsync<RaceDefinitionEntity>();
+        await _database.DeleteAllAsync<SubraceDefinitionEntity>();
+        await _database.DeleteAllAsync<BackgroundDefinitionEntity>();
+        await _database.DeleteAllAsync<FeatDefinitionEntity>();
+
+        await ImportRaceDefinitionsAsync();
+        await ImportSubraceDefinitionsAsync();
+        await ImportBackgroundDefinitionsAsync();
+        await ImportFeatDefinitionsAsync();
+
+        await _database.InsertOrReplaceAsync(new DatabaseMetadata { Key = "CharacterOptionImportVersion", Value = CharacterOptionImportVersion });
+    }
+
+    private async Task ImportRaceDefinitionsAsync()
+    {
+        await using var stream = await OpenAssetAsync("races.json");
+        using var document = await JsonDocument.ParseAsync(stream);
+
+        if (!document.RootElement.TryGetProperty("race", out var races))
+        {
+            return;
+        }
+
+        foreach (var raceElement in races.EnumerateArray())
+        {
+            await _database.InsertAsync(new RaceDefinitionEntity
+            {
+                Name = ReadString(raceElement, "name"),
+                Source = ReadString(raceElement, "source"),
+                Slug = BuildSlug(ReadString(raceElement, "name"), ReadString(raceElement, "source")),
+                Page = ReadInt(raceElement, "page"),
+                SizeJson = ReadRawJson(raceElement, "size"),
+                SpeedJson = ReadRawJson(raceElement, "speed"),
+                AbilityJson = ReadRawJson(raceElement, "ability"),
+                LanguageProficienciesJson = ReadRawJson(raceElement, "languageProficiencies"),
+                TraitTagsJson = ReadRawJson(raceElement, "traitTags"),
+                RawJson = raceElement.GetRawText()
+            });
+        }
+    }
+
+    private async Task ImportSubraceDefinitionsAsync()
+    {
+        await using var stream = await OpenAssetAsync("races.json");
+        using var document = await JsonDocument.ParseAsync(stream);
+
+        if (!document.RootElement.TryGetProperty("subrace", out var subraces))
+        {
+            return;
+        }
+
+        var raceDefinitions = await _database.Table<RaceDefinitionEntity>().ToListAsync();
+        foreach (var subraceElement in subraces.EnumerateArray())
+        {
+            var copyElement = subraceElement.TryGetProperty("_copy", out var copy) ? copy : default;
+            var raceName = ReadString(subraceElement, "raceName");
+            var raceSource = ReadString(subraceElement, "raceSource");
+            if (string.IsNullOrWhiteSpace(raceName) && copyElement.ValueKind == JsonValueKind.Object)
+            {
+                raceName = ReadString(copyElement, "name");
+                raceSource = ReadString(copyElement, "source");
+            }
+
+            if (string.IsNullOrWhiteSpace(raceName) || string.IsNullOrWhiteSpace(raceSource))
+            {
+                continue;
+            }
+
+            var name = ReadString(subraceElement, "name");
+            var source = ReadString(subraceElement, "source");
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(source))
+            {
+                continue;
+            }
+
+            var raceDefinition = raceDefinitions.FirstOrDefault(definition =>
+                string.Equals(definition.Name, raceName, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(definition.Source, raceSource, StringComparison.OrdinalIgnoreCase));
+
+            await _database.InsertAsync(new SubraceDefinitionEntity
+            {
+                RaceDefinitionId = raceDefinition?.Id,
+                RaceName = raceName,
+                RaceSource = raceSource,
+                Name = name,
+                Source = source,
+                Slug = BuildSubraceSlug(raceName, raceSource, name, source),
+                Page = ReadInt(subraceElement, "page"),
+                RawJson = subraceElement.GetRawText()
+            });
+        }
+    }
+
+    private async Task ImportBackgroundDefinitionsAsync()
+    {
+        await using var stream = await OpenAssetAsync("backgrounds.json");
+        using var document = await JsonDocument.ParseAsync(stream);
+
+        if (!document.RootElement.TryGetProperty("background", out var backgrounds))
+        {
+            return;
+        }
+
+        foreach (var backgroundElement in backgrounds.EnumerateArray())
+        {
+            await _database.InsertAsync(new BackgroundDefinitionEntity
+            {
+                Name = ReadString(backgroundElement, "name"),
+                Source = ReadString(backgroundElement, "source"),
+                Slug = BuildSlug(ReadString(backgroundElement, "name"), ReadString(backgroundElement, "source")),
+                Page = ReadInt(backgroundElement, "page"),
+                AbilityJson = ReadRawJson(backgroundElement, "ability"),
+                FeatsJson = ReadRawJson(backgroundElement, "feats"),
+                SkillProficienciesJson = ReadRawJson(backgroundElement, "skillProficiencies"),
+                ToolProficienciesJson = ReadRawJson(backgroundElement, "toolProficiencies"),
+                RawJson = backgroundElement.GetRawText()
+            });
+        }
+    }
+
+    private async Task ImportFeatDefinitionsAsync()
+    {
+        await using var stream = await OpenAssetAsync("feats.json");
+        using var document = await JsonDocument.ParseAsync(stream);
+
+        if (!document.RootElement.TryGetProperty("feat", out var feats))
+        {
+            return;
+        }
+
+        foreach (var featElement in feats.EnumerateArray())
+        {
+            await _database.InsertAsync(new FeatDefinitionEntity
+            {
+                Name = ReadString(featElement, "name"),
+                Source = ReadString(featElement, "source"),
+                Slug = BuildSlug(ReadString(featElement, "name"), ReadString(featElement, "source")),
+                Page = ReadInt(featElement, "page"),
+                Category = ReadString(featElement, "category"),
+                PrerequisiteJson = ReadRawJson(featElement, "prerequisite"),
+                AdditionalSpellsJson = ReadRawJson(featElement, "additionalSpells"),
+                RawJson = featElement.GetRawText()
+            });
+        }
+    }
+
+    private static RaceDefinition ToModel(RaceDefinitionEntity entity)
+    {
+        return new RaceDefinition
+        {
+            Id = entity.Id,
+            Name = entity.Name,
+            Source = entity.Source,
+            Page = entity.Page,
+            Slug = entity.Slug,
+            SizeJson = entity.SizeJson,
+            SpeedJson = entity.SpeedJson,
+            AbilityJson = entity.AbilityJson,
+            LanguageProficienciesJson = entity.LanguageProficienciesJson,
+            TraitTagsJson = entity.TraitTagsJson,
+            RawJson = entity.RawJson
+        };
+    }
+
+    private static SubraceDefinition ToModel(SubraceDefinitionEntity entity)
+    {
+        return new SubraceDefinition
+        {
+            Id = entity.Id,
+            RaceDefinitionId = entity.RaceDefinitionId,
+            RaceName = entity.RaceName,
+            RaceSource = entity.RaceSource,
+            Name = entity.Name,
+            Source = entity.Source,
+            Page = entity.Page,
+            Slug = entity.Slug,
+            RawJson = entity.RawJson
+        };
+    }
+
+    private static BackgroundDefinition ToModel(BackgroundDefinitionEntity entity)
+    {
+        return new BackgroundDefinition
+        {
+            Id = entity.Id,
+            Name = entity.Name,
+            Source = entity.Source,
+            Page = entity.Page,
+            Slug = entity.Slug,
+            AbilityJson = entity.AbilityJson,
+            FeatsJson = entity.FeatsJson,
+            SkillProficienciesJson = entity.SkillProficienciesJson,
+            ToolProficienciesJson = entity.ToolProficienciesJson,
+            RawJson = entity.RawJson
+        };
+    }
+
+    private static FeatDefinition ToModel(FeatDefinitionEntity entity)
+    {
+        return new FeatDefinition
+        {
+            Id = entity.Id,
+            Name = entity.Name,
+            Source = entity.Source,
+            Page = entity.Page,
+            Category = entity.Category,
+            Slug = entity.Slug,
+            PrerequisiteJson = entity.PrerequisiteJson,
+            AdditionalSpellsJson = entity.AdditionalSpellsJson,
+            RawJson = entity.RawJson
+        };
+    }
+
+    private static ClassDefinition ToModel(ClassDefinitionEntity entity)
+    {
+        return new ClassDefinition
+        {
+            Id = entity.Id,
+            Name = entity.Name,
+            Source = entity.Source,
+            Slug = entity.Slug,
+            SpellcastingProgressionId = entity.SpellcastingProgressionId,
+            RawJson = entity.RawJson
+        };
+    }
+
+    private static SubclassDefinition ToModel(SubclassDefinitionEntity entity)
+    {
+        return new SubclassDefinition
+        {
+            Id = entity.Id,
+            ClassDefinitionId = entity.ClassDefinitionId,
+            Name = entity.Name,
+            Source = entity.Source,
+            Slug = entity.Slug,
+            RawJson = entity.RawJson
+        };
+    }
+
+    private static int? FindProgressionId(IEnumerable<SpellcastingProgressionEntity> progressions, string code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            code = "none";
+        }
+
+        return progressions.FirstOrDefault(progression => string.Equals(progression.Code, code, StringComparison.OrdinalIgnoreCase))?.Id;
+    }
+
+    private static string BuildSlug(string name, string source)
+    {
+        return $"{NormalizeSlugPart(name)}|{NormalizeSlugPart(source)}";
+    }
+
+    private static string BuildSubclassSlug(string classSlug, string name, string source)
+    {
+        return $"{classSlug}|{NormalizeSlugPart(name)}|{NormalizeSlugPart(source)}";
+    }
+
+    private static string BuildSubraceSlug(string raceName, string raceSource, string name, string source)
+    {
+        return $"{NormalizeSlugPart(raceName)}|{NormalizeSlugPart(raceSource)}|{NormalizeSlugPart(name)}|{NormalizeSlugPart(source)}";
+    }
+
+    private static string NormalizeSlugPart(string value)
+    {
+        return value.Trim().ToLowerInvariant().Replace(" ", "-");
+    }
+
+    private static void AddOptionEffects(CharacterOptionEffects effects, string? rawJson, string sourceLabel)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            return;
+        }
+
+        using var document = JsonDocument.Parse(rawJson);
+        if (document.RootElement.TryGetProperty("ability", out var ability))
+        {
+            AddAbilityBonuses(effects, ability, sourceLabel);
+        }
+
+        if (document.RootElement.TryGetProperty("skillProficiencies", out var skillProficiencies))
+        {
+            AddSkillProficiencies(effects, skillProficiencies, sourceLabel);
+        }
+
+        if (document.RootElement.TryGetProperty("toolProficiencies", out var toolProficiencies))
+        {
+            AddNamedOrChoiceProficiencies(effects, toolProficiencies, sourceLabel, "Tools");
+        }
+
+        if (document.RootElement.TryGetProperty("languageProficiencies", out var languageProficiencies))
+        {
+            AddNamedOrChoiceProficiencies(effects, languageProficiencies, sourceLabel, "Languages");
+        }
+
+        if (document.RootElement.TryGetProperty("skillToolLanguageProficiencies", out var skillToolLanguageProficiencies))
+        {
+            AddSkillToolLanguageChoices(effects, skillToolLanguageProficiencies, sourceLabel);
+        }
+    }
+
+    private static void AddAbilityBonuses(CharacterOptionEffects effects, JsonElement abilityElement, string sourceLabel)
+    {
+        if (abilityElement.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        foreach (var entry in abilityElement.EnumerateArray())
+        {
+            if (entry.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            foreach (var property in entry.EnumerateObject())
+            {
+                if (IsAbilityCode(property.Name) && property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetInt32(out var bonus))
+                {
+                    effects.AbilityBonuses[property.Name] = effects.AbilityBonuses.GetValueOrDefault(property.Name) + bonus;
+                    continue;
+                }
+
+                if (property.NameEquals("choose"))
+                {
+                    AddChoiceHint(effects, "Abilities", sourceLabel, ReadChoiceCount(property.Value), "Choose ability score bonuses.");
+                }
+            }
+        }
+    }
+
+    private static void AddSkillProficiencies(CharacterOptionEffects effects, JsonElement skillElement, string sourceLabel)
+    {
+        if (skillElement.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        foreach (var entry in skillElement.EnumerateArray())
+        {
+            if (entry.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            foreach (var property in entry.EnumerateObject())
+            {
+                if (property.NameEquals("choose"))
+                {
+                    AddChoiceHint(effects, "Skills", sourceLabel, ReadChoiceCount(property.Value), "Choose skill proficiencies.");
+                    continue;
+                }
+
+                if (property.Value.ValueKind == JsonValueKind.True)
+                {
+                    effects.SkillProficiencies.Add(property.Name);
+                }
+            }
+        }
+    }
+
+    private static void AddSkillToolLanguageChoices(CharacterOptionEffects effects, JsonElement proficiencyElement, string sourceLabel)
+    {
+        if (proficiencyElement.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        foreach (var entry in proficiencyElement.EnumerateArray())
+        {
+            if (entry.ValueKind != JsonValueKind.Object || !entry.TryGetProperty("choose", out var choose))
+            {
+                continue;
+            }
+
+            foreach (var choice in EnumerateChoiceEntries(choose))
+            {
+                var count = ReadChoiceCount(choice);
+                var fromValues = ReadChoiceFromValues(choice).ToList();
+                var hasSkill = fromValues.Any(value => value.Contains("Skill", StringComparison.OrdinalIgnoreCase));
+                var hasTool = fromValues.Any(value => value.Contains("Tool", StringComparison.OrdinalIgnoreCase));
+                var hasLanguage = fromValues.Any(value => value.Contains("Language", StringComparison.OrdinalIgnoreCase));
+                if (hasSkill && hasTool)
+                {
+                    AddChoiceHint(effects, "SkillTools", sourceLabel, count, count == 1
+                        ? "Choose 1 skill or tool proficiency."
+                        : $"Choose {count} skill or tool proficiencies.");
+                    continue;
+                }
+
+                if (hasSkill)
+                {
+                    AddChoiceHint(effects, "Skills", sourceLabel, count, count == 1
+                        ? "Choose 1 skill/tool proficiency."
+                        : $"Choose {count} skill/tool proficiencies.");
+                }
+
+                if (hasTool)
+                {
+                    AddChoiceHint(effects, "Tools", sourceLabel, count, count == 1
+                        ? "Choose 1 tool proficiency."
+                        : $"Choose {count} tool proficiencies.");
+                }
+
+                if (hasLanguage)
+                {
+                    AddChoiceHint(effects, "Languages", sourceLabel, count, count == 1
+                        ? "Choose 1 language."
+                        : $"Choose {count} languages.");
+                }
+            }
+        }
+    }
+
+    private static void AddNamedOrChoiceProficiencies(CharacterOptionEffects effects, JsonElement proficiencyElement, string sourceLabel, string category)
+    {
+        if (proficiencyElement.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        foreach (var entry in proficiencyElement.EnumerateArray())
+        {
+            if (entry.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            foreach (var property in entry.EnumerateObject())
+            {
+                if (property.NameEquals("choose"))
+                {
+                    AddChoiceHint(effects, category, sourceLabel, ReadChoiceCount(property.Value), category == "Tools" ? "Choose tool proficiencies." : "Choose languages.");
+                    continue;
+                }
+
+                if (property.Value.ValueKind == JsonValueKind.True)
+                {
+                    AddAutomaticProficiency(effects, category, property.Name);
+                    continue;
+                }
+
+                if (property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetInt32(out var count))
+                {
+                    AddChoiceHint(effects, category, sourceLabel, count, FormatGenericChoiceDescription(category, property.Name, count));
+                }
+            }
+        }
+    }
+
+    private static void AddAutomaticProficiency(CharacterOptionEffects effects, string category, string name)
+    {
+        if (category == "Tools")
+        {
+            effects.ToolProficiencies.Add(FormatProficiencyName(name));
+            return;
+        }
+
+        if (category == "Languages")
+        {
+            effects.LanguageProficiencies.Add(FormatProficiencyName(name));
+        }
+    }
+
+    private static string FormatGenericChoiceDescription(string category, string source, int count)
+    {
+        var formatted = FormatProficiencyName(source);
+        return category == "Tools"
+            ? $"Choose {count} {formatted} option{(count == 1 ? "" : "s")}."
+            : $"Choose {count} language{(count == 1 ? "" : "s")}.";
+    }
+
+    private static string FormatProficiencyName(string value)
+    {
+        return value switch
+        {
+            "anyGamingSet" => "Gaming Set",
+            "anyStandard" => "Standard Language",
+            "anyExotic" => "Exotic Language",
+            "anyTool" => "Tool",
+            "anyLanguage" => "Language",
+            _ => value
+        };
+    }
+
+    private static IEnumerable<JsonElement> EnumerateChoiceEntries(JsonElement choose)
+    {
+        if (choose.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var choice in choose.EnumerateArray())
+            {
+                yield return choice;
+            }
+
+            yield break;
+        }
+
+        if (choose.ValueKind == JsonValueKind.Object)
+        {
+            yield return choose;
+        }
+    }
+
+    private static IEnumerable<string> ReadChoiceFromValues(JsonElement choice)
+    {
+        if (!choice.TryGetProperty("from", out var from))
+        {
+            yield break;
+        }
+
+        if (from.ValueKind == JsonValueKind.String)
+        {
+            yield return from.GetString() ?? "";
+            yield break;
+        }
+
+        if (from.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var value in from.EnumerateArray())
+        {
+            if (value.ValueKind == JsonValueKind.String)
+            {
+                yield return value.GetString() ?? "";
+            }
+        }
+    }
+
+    private static int ReadChoiceCount(JsonElement choice)
+    {
+        if (choice.ValueKind == JsonValueKind.Object
+            && choice.TryGetProperty("count", out var count)
+            && count.ValueKind == JsonValueKind.Number
+            && count.TryGetInt32(out var parsed))
+        {
+            return parsed;
+        }
+
+        return 1;
+    }
+
+    private static void AddChoiceHint(CharacterOptionEffects effects, string category, string sourceLabel, int count, string description)
+    {
+        var source = string.IsNullOrWhiteSpace(sourceLabel) ? "Option" : sourceLabel;
+        effects.ChoiceHints.Add(new CharacterOptionChoice(category, source, Math.Max(1, count), description));
+        effects.DeferredChoices.Add($"{source}: {description}");
+    }
+
+    private static bool IsAbilityCode(string value)
+    {
+        return value is "str" or "dex" or "con" or "int" or "wis" or "cha";
+    }
+}

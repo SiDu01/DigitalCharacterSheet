@@ -11,7 +11,7 @@
     <ItemGroup>
         <Compile Include="..\..\Data\*.cs" LinkBase="Data" />
         <Compile Include="..\..\Models\*.cs" LinkBase="Models" />
-        <Compile Include="..\..\Services\AppDatabase.cs" Link="Services\AppDatabase.cs" />
+        <Compile Include="..\..\Services\AppDatabase*.cs" LinkBase="Services" />
         <Compile Include="..\..\Services\SpellImportService.cs" Link="Services\SpellImportService.cs" />
     </ItemGroup>
 
