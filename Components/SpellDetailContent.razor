@@ -21,9 +21,19 @@
                 <h1>@Spell.Name</h1>
                 <p>@Spell.LevelDisplay @Spell.School</p>
             </div>
-            <button class="primary-action @(IsActionActive ? "active" : "")" @onclick="TogglePrepared">
-                @ActionLabel
-            </button>
+            <div class="detail-actions">
+                @if (OnToggleBookmark.HasDelegate)
+                {
+                    <button class="icon-button bookmark-button @(IsBookmarked ? "active" : "")"
+                            title="Bookmark umschalten"
+                            @onclick="ToggleBookmark">
+                        @(IsBookmarked ? "★" : "☆")
+                    </button>
+                }
+                <button class="primary-action @(IsActionActive ? "active" : "")" @onclick="TogglePrepared">
+                    @ActionLabel
+                </button>
+            </div>
         </header>
 
         <dl class="detail-grid">
@@ -84,8 +94,10 @@
     [Parameter] public EventCallback OnBack { get; set; }
     [Parameter] public EventCallback<Spell> OnTogglePrepared { get; set; }
     [Parameter] public EventCallback<Spell> OnSelectVersion { get; set; }
+    [Parameter] public EventCallback<Spell> OnToggleBookmark { get; set; }
     [Parameter] public string? PreparedActionLabel { get; set; }
     [Parameter] public bool? IsPreparedActionActive { get; set; }
+    [Parameter] public bool IsBookmarked { get; set; }
 
     private IReadOnlyList<Spell> SourceVersions => Versions is { Count: > 0 } ? Versions : Spell is null ? [] : [Spell];
     private bool IsActionActive => Spell is not null && (IsPreparedActionActive ?? Spell.IsPrepared);
@@ -102,6 +114,14 @@
     private async Task SelectVersion(Spell version)
     {
         await OnSelectVersion.InvokeAsync(version);
+    }
+
+    private async Task ToggleBookmark()
+    {
+        if (Spell is not null)
+        {
+            await OnToggleBookmark.InvokeAsync(Spell);
+        }
     }
 
     private static string BuildSourceTitle(Spell spell)

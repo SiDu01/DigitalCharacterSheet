@@ -778,7 +778,8 @@ public sealed partial class AppDatabase
             IsArmor = entity.IsArmor,
             IsWondrous = entity.IsWondrous,
             IsConsumable = entity.IsConsumable,
-            Description = entity.Description
+            Description = entity.Description,
+            RawJson = entity.RawJson
         };
     }
 

@@ -3,6 +3,7 @@
 @inject AppDatabase Database
 @inject NavigationManager Navigation
 @inject IJSRuntime JsRuntime
+@inject RecentActivityService RecentActivity
 
 <PageTitle>Spells</PageTitle>
 
@@ -235,7 +236,9 @@
                     <SpellDetailContent Spell="selectedSpell"
                                         Versions="selectedSpellGroup?.Versions"
                                         OnTogglePrepared="TogglePrepared"
-                                        OnSelectVersion="SelectVersion" />
+                                        OnSelectVersion="SelectVersion"
+                                        OnToggleBookmark="ToggleBookmark"
+                                        IsBookmarked="@IsSelectedSpellBookmarked" />
                 }
             </aside>
         </section>
@@ -288,6 +291,7 @@
     private List<FilterChip> ActiveFilterChips => BuildActiveFilterChips();
     private int ActiveFilterCount => ActiveFilterChips.Count;
     private bool IsFilterPaneOpen => rightPaneMode == "Filters";
+    private bool IsSelectedSpellBookmarked => selectedSpell is not null && RecentActivity.IsBookmarked("Spell", selectedSpell.Id);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -443,9 +447,11 @@
             var detailGroup = await LoadDetailGroup(group);
             selectedSpellGroup = detailGroup;
             selectedSpell = detailGroup.ResolveVersion(spell);
+            TrackSpell(selectedSpell);
             return;
         }
 
+        TrackSpell(spell);
         Navigation.NavigateTo($"spells/{spell.Id}");
     }
 
@@ -464,6 +470,20 @@
     private void SelectVersion(Spell spell)
     {
         selectedSpell = spell;
+        TrackSpell(spell);
+    }
+
+    private void ToggleBookmark(Spell spell)
+    {
+        RecentActivity.ToggleBookmark("Spell", spell.Id, spell.Name, $"{spell.LevelDisplay} {spell.School} - {spell.Source}", $"spells/{spell.Id}");
+    }
+
+    private void TrackSpell(Spell? spell)
+    {
+        if (spell is not null)
+        {
+            RecentActivity.Track("Spell", spell.Id, spell.Name, $"{spell.LevelDisplay} {spell.School} - {spell.Source}", $"spells/{spell.Id}");
+        }
     }
 
     private async Task<SpellGroup> LoadDetailGroup(SpellGroup group)

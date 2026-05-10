@@ -2,6 +2,7 @@
 @inject AppDatabase Database
 @inject NavigationManager Navigation
 @inject IJSRuntime JsRuntime
+@inject RecentActivityService RecentActivity
 
 <PageTitle>@character?.Name</PageTitle>
 
@@ -39,6 +40,11 @@ else
             </div>
             <div class="detail-actions">
                 <div class="spell-count">@characterSpellIds.Count spells / @PreparedCount prepared</div>
+                <button class="icon-button bookmark-button @(IsCharacterBookmarked ? "active" : "")"
+                        title="Bookmark umschalten"
+                        @onclick="ToggleCharacterBookmark">
+                    @(IsCharacterBookmarked ? "★" : "☆")
+                </button>
                 @if (confirmDelete)
                 {
                     <button class="danger-action" @onclick="DeleteCharacter">Confirm Delete</button>
@@ -68,7 +74,7 @@ else
                         <h1>Add Items</h1>
                     </div>
                     <div class="header-actions">
-                        @if (!string.IsNullOrWhiteSpace(selectedInventoryCategory))
+                        @if (!string.IsNullOrWhiteSpace(selectedInventoryCategory) || !string.IsNullOrWhiteSpace(inventorySearchText))
                         {
                             <button type="button" class="text-button no-margin" @onclick="ShowInventoryCategories">Categories</button>
                         }
@@ -78,16 +84,82 @@ else
 
                 @if (string.IsNullOrWhiteSpace(selectedInventoryCategory))
                 {
-                    <section class="item-category-grid">
-                        @foreach (var category in InventoryCategoryTiles)
-                        {
-                            <button type="button" class="item-category-tile" @onclick="() => OpenInventoryCategory(category.Name)">
-                                <span class="item-category-count">@category.Count</span>
-                                <strong>@category.Name</strong>
-                                <small>@category.Description</small>
-                            </button>
-                        }
+                    <section class="spell-toolbar">
+                        <input class="search-input" placeholder="Alle Kategorien durchsuchen" @bind="inventorySearchText" @bind:event="oninput" @bind:after="ApplyInventoryFilter" />
                     </section>
+
+                    @if (string.IsNullOrWhiteSpace(inventorySearchText))
+                    {
+                        <section class="item-category-grid">
+                            @foreach (var category in InventoryCategoryTiles)
+                            {
+                                <button type="button" class="item-category-tile" @onclick="() => OpenInventoryCategory(category.Name)">
+                                    <span class="item-category-count">@category.Count</span>
+                                    <strong>@category.Name</strong>
+                                    <small>@category.Description</small>
+                                </button>
+                            }
+                        </section>
+                    }
+                    else
+                    {
+                        <section class="spell-master-detail character-item-add-master-detail">
+                            <section class="spell-list spell-list-pane">
+                                @foreach (var categoryGroup in availableItemGroups.GroupBy(group => group.Primary.Category))
+                                {
+                                    <div class="spell-level-separator">@categoryGroup.Key</div>
+                                    @foreach (var group in categoryGroup)
+                                    {
+                                        <article class="spell-row @(selectedInventoryDefinition is not null && group.Versions.Any(version => version.Id == selectedInventoryDefinition.Id) ? "selected" : "")"
+                                                 @onclick="() => SelectInventoryItem(group)">
+                                            <div class="spell-main">
+                                                <div class="spell-title">
+                                                    <h2>@group.Name</h2>
+                                                    <span class="rarity-badge">@FormatItemRarity(group.Rarity)</span>
+                                                </div>
+                                                <div class="spell-meta">
+                                                    <span>@DisplayItemValue(group.TypeCode)</span>
+                                                    <span>@group.Primary.Category</span>
+                                                    @if (group.RequiresAttunement)
+                                                    {
+                                                        <span>Attunement</span>
+                                                    }
+                                                    @foreach (var source in group.Versions.Select(version => version.Source).Distinct())
+                                                    {
+                                                        <span class="source-badge">@source</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </article>
+                                    }
+                                }
+                            </section>
+
+                            <aside class="spell-detail-pane">
+                                @if (selectedInventoryDefinition is null)
+                                {
+                                    <div class="empty-detail">
+                                        <p class="eyebrow">Details</p>
+                                        <h2>Select an item</h2>
+                                        <p class="muted">Die Suche läuft über alle Kategorien gleichzeitig.</p>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="inventory-add-detail-actions">
+                                        <ItemDetailContent Item="selectedInventoryDefinition"
+                                                           Versions="selectedInventoryGroup?.Versions"
+                                                           OnSelectVersion="SelectInventoryVersion" />
+                                        <button type="button"
+                                                class="primary-action inventory-add-primary"
+                                                @onclick="async () => await AddInventoryItem(selectedInventoryDefinition)">
+                                            Add to Inventory
+                                        </button>
+                                    </div>
+                                }
+                            </aside>
+                        </section>
+                    }
                 }
                 else
                 {
@@ -420,6 +492,15 @@ else
                             }
                             else
                             {
+                                @if (InventoryWarnings.Count > 0)
+                                {
+                                    <div class="inventory-warning-list">
+                                        @foreach (var warning in InventoryWarnings)
+                                        {
+                                            <span>@warning</span>
+                                        }
+                                    </div>
+                                }
                                 <section class="inventory-list">
                                     @if (inventoryItems.Count == 0)
                                     {
@@ -454,8 +535,9 @@ else
                                                     {
                                                         <button type="button"
                                                                 class="mode-button @(item.IsAttuned ? "active" : "")"
+                                                                disabled="@(!item.IsAttuned && AttunedItemCount >= 3)"
                                                                 title="Toggle attunement"
-                                                                @onclick="async () => await ToggleInventoryAttuned(item)">Attune</button>
+                                                                @onclick="async () => await ToggleInventoryAttuned(item)">@(item.IsAttuned ? "Attuned" : "Attune")</button>
                                                     }
                                                     <button type="button" class="mini-button" title="Remove item" @onclick="async () => await RemoveInventoryItem(item)">x</button>
                                                 </div>
@@ -529,23 +611,27 @@ else
                         </article>
                         <article class="combat-quick-stat">
                             <span>HP</span>
-                            <strong>--</strong>
-                            <small>not tracked</small>
+                            <div class="combat-hp-inputs">
+                                <input type="number" min="0" @bind="character.CurrentHitPoints" @bind:after="PersistCombatState" />
+                                <small>/</small>
+                                <input type="number" min="0" @bind="character.MaxHitPoints" @bind:after="PersistCombatState" />
+                            </div>
+                            <small>current / max</small>
                         </article>
                         <article class="combat-quick-stat">
                             <span>Temp</span>
-                            <strong>--</strong>
-                            <small>not tracked</small>
+                            <input class="combat-stat-input" type="number" min="0" @bind="character.TemporaryHitPoints" @bind:after="PersistCombatState" />
+                            <small>temporary</small>
                         </article>
                         <article class="combat-quick-stat">
                             <span>Init</span>
                             <strong>@FormatModifier(InitiativeModifier)</strong>
-                            <small>DEX</small>
+                            <small>@(HasInitiativeAdvantage ? "DEX + ADV" : "DEX")</small>
                         </article>
                         <article class="combat-quick-stat">
                             <span>Speed</span>
-                            <strong>--</strong>
-                            <small>later</small>
+                            <strong>@SpeedSummary</strong>
+                            <small>@SpeedDetail</small>
                         </article>
                         <article class="combat-quick-stat">
                             <span>Prof</span>
@@ -582,13 +668,44 @@ else
                         </div>
                     </section>
 
+                    @if (MappedCombatTraits.Count > 0)
+                    {
+                        <section class="combat-mini-section">
+                            <div class="combat-section-title">
+                                <span>Mapped Traits</span>
+                            </div>
+                            <div class="combat-effect-list">
+                                @foreach (var trait in MappedCombatTraits)
+                                {
+                                    <span class="combat-effect-chip mapped-confidence-@trait.Confidence.ToLowerInvariant()" title="@($"{trait.Source}; confidence: {trait.Confidence}")">
+                                        <small>@FormatMappedEffectType(trait.EffectType)</small>
+                                        <strong>@trait.Label</strong>
+                                        <small>@trait.Confidence</small>
+                                    </span>
+                                }
+                            </div>
+                        </section>
+                    }
+
                     <section class="combat-mini-section">
                         <div class="combat-section-title">
                             <span>Resistances / Immunities</span>
                         </div>
-                        <div class="combat-placeholder-list">
-                            <span>Resistances will be derived from features and items later.</span>
-                            <span>Immunities will be shown here.</span>
+                        <div class="combat-effect-list">
+                            @if (ActiveCombatDefenses.Count == 0)
+                            {
+                                <span class="combat-effect-empty">No active item defenses.</span>
+                            }
+                            else
+                            {
+                                @foreach (var defense in ActiveCombatDefenses)
+                                {
+                                    <span class="combat-effect-chip" title="@defense.SourceName">
+                                        <small>@defense.Label</small>
+                                        <strong>@defense.TargetLabel</strong>
+                                    </span>
+                                }
+                            }
                         </div>
                     </section>
 
@@ -599,7 +716,11 @@ else
                         <div class="combat-condition-grid">
                             @foreach (var condition in CombatConditionPlaceholders)
                             {
-                                <span>@condition</span>
+                                <button type="button"
+                                        class="@(activeConditions.Contains(condition) ? "active" : "")"
+                                        @onclick="async () => await ToggleCondition(condition)">
+                                    @condition
+                                </button>
                             }
                         </div>
                     </section>
@@ -654,7 +775,7 @@ else
                                         </button>
                                     }
                                 </summary>
-                                <p>@action.Description</p>
+                                <p><MarkupText Text="@action.Description" /></p>
                             </details>
                         }
                     </div>
@@ -936,11 +1057,16 @@ else
     private HashSet<int> characterSpellIds = [];
     private Dictionary<int, string> characterSpellModes = [];
     private List<SpellSlot> spellSlots = [];
+    private List<RaceDefinition> raceDefinitions = [];
+    private List<SubraceDefinition> subraceDefinitions = [];
+    private List<BackgroundDefinition> backgroundDefinitions = [];
+    private List<FeatDefinition> featDefinitions = [];
     private List<ClassDefinition> classDefinitions = [];
     private List<SubclassDefinition> subclassDefinitions = [];
     private List<SheetFeatureGroup> sheetFeatureGroups = [];
     private HashSet<string> hiddenFeatureKeys = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> hiddenCombatActionKeys = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> activeConditions = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<int> eligibleSpellIds = [];
     private Dictionary<int, SpellEligibility> spellEligibility = [];
     private string searchText = "";
@@ -965,21 +1091,54 @@ else
     private ArmorCalculation CurrentArmor => CalculateArmorClass();
     private int ArmorClass => CurrentArmor.Value;
     private string ArmorClassSource => CurrentArmor.Source;
-    private int InitiativeModifier => GetAbilityCheckModifier("dex");
+    private int InitiativeModifier => GetAbilityCheckModifier("dex") + GetFeatureInitiativeBonus();
+    private bool HasInitiativeAdvantage => FeatureRuleEffects.Any(effect => effect.EffectType == "InitiativeAdvantage");
     private int PassivePerception => 10 + GetSkillModifierByName("Perception");
+    private IReadOnlyList<MappedRuleEffect> FeatureRuleEffects => sheetFeatureGroups
+        .SelectMany(group => group.Levels)
+        .SelectMany(level => level.Features)
+        .SelectMany(feature => DescriptionRuleMapper.MapFeature(feature.Name, feature.Paragraphs).Effects)
+        .GroupBy(effect => $"{effect.EffectType}|{effect.TargetKey}|{effect.Label}", StringComparer.OrdinalIgnoreCase)
+        .Select(group => group.First())
+        .ToList();
+    private IReadOnlyList<MappedRuleEffect> MappedCombatTraits => FeatureRuleEffects
+        .Where(effect => effect.EffectType is "InitiativeAdvantage"
+            or "AdvantageOnSavingThrow"
+            or "AdvantageOnCheck"
+            or "AdvantageOnAttack"
+            or "DisadvantageOnRoll"
+            or "MovementMode"
+            or "Sense"
+            or "SenseBonus"
+            or "SpellAttackBonus"
+            or "SpellSaveDcBonus"
+            or "TemporaryHitPointsFormula")
+        .ToList();
+    private string SpeedSummary => FeatureRuleEffects.Any(effect => effect.EffectType is "SpeedBonus" or "MovementMode")
+        ? "Mapped"
+        : "--";
+    private string SpeedDetail => FeatureRuleEffects.Any(effect => effect.EffectType is "SpeedBonus" or "MovementMode")
+        ? string.Join(", ", FeatureRuleEffects.Where(effect => effect.EffectType is "SpeedBonus" or "MovementMode").Select(effect => effect.Label).Distinct())
+        : "base";
     private IReadOnlyList<CharacterInventoryItem> EquippedWeapons => inventoryItems
         .Where(item => item.IsEquipped && item.ItemDefinition?.WeaponStats is not null)
         .OrderBy(item => item.DisplayName)
         .ToList();
+    private int AttunedItemCount => inventoryItems.Count(item => item.IsAttuned);
+    private IReadOnlyList<string> InventoryWarnings => BuildInventoryWarnings().ToList();
     private IReadOnlyList<CombatFeatureAction> CombatFeatureActions => sheetFeatureGroups
         .SelectMany(group => group.Levels)
         .SelectMany(level => level.Features)
-        .Select(BuildCombatFeatureAction)
+        .Select(feature => BuildCombatFeatureAction(feature, "Feature", "Feature"))
+        .Concat(CharacterTraitActions)
         .Where(feature => feature is not null)
         .Select(feature => feature!)
-        .GroupBy(feature => $"{feature.ActionType}|{feature.Name}", StringComparer.OrdinalIgnoreCase)
+        .GroupBy(feature => $"{feature.ActionType}|{feature.SourceType}|{feature.Name}", StringComparer.OrdinalIgnoreCase)
         .Select(group => group.First())
         .OrderBy(feature => feature.Name)
+        .ToList();
+    private IReadOnlyList<CombatFeatureAction?> CharacterTraitActions => BuildCharacterTraitFeatures()
+        .Select(trait => BuildCombatFeatureAction(trait.Feature, trait.SourceType, trait.SourceLabel))
         .ToList();
     private IReadOnlyList<Spell> CombatPreparedSpells => knownSpells
         .Where(spell => spell.Level == 0 || GetSpellMode(spell.Id) == "Prepared")
@@ -988,6 +1147,17 @@ else
         .ToList();
     private IReadOnlyList<CombatActionOption> CurrentCombatActions => BuildCombatActions(activeCombatActionTab)
         .Where(action => combatEditMode || !hiddenCombatActionKeys.Contains(action.Key))
+        .ToList();
+    private IReadOnlyList<ItemRuleEffect> ActiveCombatDefenses => inventoryItems
+        .Where(IsItemBonusActive)
+        .Where(item => item.ItemDefinition is not null)
+        .SelectMany(BuildItemRuleEffects)
+        .Concat(BuildCharacterRuleEffects())
+        .Where(effect => effect.EffectType is "Resistance" or "Immunity" or "Condition Immunity" or "Vulnerability")
+        .GroupBy(effect => $"{effect.EffectType}|{effect.TargetKey}", StringComparer.OrdinalIgnoreCase)
+        .Select(group => group.First())
+        .OrderBy(effect => effect.SortOrder)
+        .ThenBy(effect => effect.TargetLabel)
         .ToList();
     private string SpellSlotSummary => spellSlots.Count == 0
         ? "No slots"
@@ -1008,6 +1178,7 @@ else
             ("WIS", character.Wisdom),
             ("CHA", character.Charisma)
         ];
+    private bool IsCharacterBookmarked => character is not null && RecentActivity.IsBookmarked("Character", character.Id);
     private IReadOnlyList<CombatAbilitySave> CombatAbilitySaves => character is null
         ? []
         : AbilityScores
@@ -1045,6 +1216,11 @@ else
     protected override async Task OnParametersSetAsync()
     {
         character = await Database.GetCharacterAsync(Id);
+        if (character is not null)
+        {
+            RecentActivity.Track("Character", character.Id, character.Name, character.Summary, $"characters/{character.Id}");
+        }
+        activeConditions = ReadConditionNames(character?.ConditionsJson).ToHashSet(StringComparer.OrdinalIgnoreCase);
         allSpells = (await Database.GetSpellSummariesAsync()).ToList();
         sourcePriorities = await Database.GetSourcePriorityMapAsync();
         spellEligibility = (await Database.GetSpellEligibilityAsync(Id)).ToDictionary();
@@ -1067,6 +1243,12 @@ else
 
     private async Task LoadCharacterFeatureDefinitions()
     {
+        raceDefinitions = (await Database.GetRaceDefinitionsAsync()).ToList();
+        subraceDefinitions = character?.RaceDefinitionId is null
+            ? []
+            : (await Database.GetSubraceDefinitionsAsync(character.RaceDefinitionId.Value)).ToList();
+        backgroundDefinitions = (await Database.GetBackgroundDefinitionsAsync()).ToList();
+        featDefinitions = (await Database.GetFeatDefinitionsAsync()).ToList();
         classDefinitions = (await Database.GetClassDefinitionsAsync()).ToList();
         subclassDefinitions = [];
 
@@ -1230,13 +1412,48 @@ else
 
     private async Task ToggleInventoryEquipped(CharacterInventoryItem item)
     {
-        item.IsEquipped = !item.IsEquipped;
+        var shouldEquip = !item.IsEquipped;
+        if (shouldEquip && item.ItemDefinition is not null)
+        {
+            if (item.ItemDefinition.ArmorStats is not null && !IsShield(item.ItemDefinition))
+            {
+                foreach (var equippedArmor in inventoryItems.Where(inventoryItem =>
+                    inventoryItem.Id != item.Id
+                    && inventoryItem.IsEquipped
+                    && inventoryItem.ItemDefinition?.ArmorStats is not null
+                    && !IsShield(inventoryItem.ItemDefinition)))
+                {
+                    equippedArmor.IsEquipped = false;
+                    await Database.UpdateCharacterInventoryItemAsync(equippedArmor);
+                }
+            }
+
+            if (IsShield(item.ItemDefinition))
+            {
+                foreach (var equippedShield in inventoryItems.Where(inventoryItem =>
+                    inventoryItem.Id != item.Id
+                    && inventoryItem.IsEquipped
+                    && inventoryItem.ItemDefinition is not null
+                    && IsShield(inventoryItem.ItemDefinition)))
+                {
+                    equippedShield.IsEquipped = false;
+                    await Database.UpdateCharacterInventoryItemAsync(equippedShield);
+                }
+            }
+        }
+
+        item.IsEquipped = shouldEquip;
         await Database.UpdateCharacterInventoryItemAsync(item);
         await LoadInventory();
     }
 
     private async Task ToggleInventoryAttuned(CharacterInventoryItem item)
     {
+        if (!item.IsAttuned && AttunedItemCount >= 3)
+        {
+            return;
+        }
+
         item.IsAttuned = !item.IsAttuned;
         await Database.UpdateCharacterInventoryItemAsync(item);
         await LoadInventory();
@@ -1255,6 +1472,30 @@ else
             .ThenBy(item => item.Category)
             .ThenBy(item => item.DisplayName)
             .ToList();
+    }
+
+    private IEnumerable<string> BuildInventoryWarnings()
+    {
+        if (AttunedItemCount >= 3)
+        {
+            yield return $"Attunement limit reached ({AttunedItemCount}/3).";
+        }
+
+        var equippedArmor = inventoryItems
+            .Where(item => item.IsEquipped && item.ItemDefinition?.ArmorStats is not null && !IsShield(item.ItemDefinition))
+            .ToList();
+        if (equippedArmor.Count > 1)
+        {
+            yield return "Multiple armors equipped. Only one armor should be active.";
+        }
+
+        var equippedShields = inventoryItems
+            .Where(item => item.IsEquipped && item.ItemDefinition is not null && IsShield(item.ItemDefinition))
+            .ToList();
+        if (equippedShields.Count > 1)
+        {
+            yield return "Multiple shields equipped. Only one shield should be active.";
+        }
     }
 
     private void SetActiveCombatActionTab(string tab)
@@ -1304,6 +1545,56 @@ else
         else
         {
             hiddenCombatActionKeys.Remove(actionKey);
+        }
+    }
+
+    private async Task ToggleCondition(string condition)
+    {
+        if (activeConditions.Contains(condition))
+        {
+            activeConditions.Remove(condition);
+        }
+        else
+        {
+            activeConditions.Add(condition);
+        }
+
+        await PersistCombatState();
+    }
+
+    private async Task PersistCombatState()
+    {
+        if (character is null)
+        {
+            return;
+        }
+
+        character.MaxHitPoints = Math.Max(0, character.MaxHitPoints);
+        character.CurrentHitPoints = Math.Clamp(character.CurrentHitPoints, 0, character.MaxHitPoints);
+        character.TemporaryHitPoints = Math.Max(0, character.TemporaryHitPoints);
+        character.ConditionsJson = System.Text.Json.JsonSerializer.Serialize(activeConditions.OrderBy(condition => condition).ToList());
+        await Database.UpdateCharacterCombatStateAsync(character.Id, character.MaxHitPoints, character.CurrentHitPoints, character.TemporaryHitPoints, character.ConditionsJson);
+    }
+
+    private static IEnumerable<string> ReadConditionNames(string? conditionsJson)
+    {
+        if (string.IsNullOrWhiteSpace(conditionsJson))
+        {
+            yield break;
+        }
+
+        using var document = System.Text.Json.JsonDocument.Parse(conditionsJson);
+        if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var condition in document.RootElement.EnumerateArray())
+        {
+            if (condition.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                yield return condition.GetString() ?? "";
+            }
         }
     }
 
@@ -1390,6 +1681,14 @@ else
     private void LevelUpCharacter()
     {
         Navigation.NavigateTo($"characters/{Id}/level-up");
+    }
+
+    private void ToggleCharacterBookmark()
+    {
+        if (character is not null)
+        {
+            RecentActivity.ToggleBookmark("Character", character.Id, character.Name, character.Summary, $"characters/{character.Id}");
+        }
     }
 
     private void RequestDelete()
@@ -1932,6 +2231,21 @@ else
         return GetAbilityModifier(abilityCode) + GetActiveItemBonus("AbilityCheck");
     }
 
+    private int GetFeatureInitiativeBonus()
+    {
+        var bonus = 0;
+        foreach (var feature in sheetFeatureGroups.SelectMany(group => group.Levels).SelectMany(level => level.Features))
+        {
+            var mapping = DescriptionRuleMapper.MapFeature(feature.Name, feature.Paragraphs);
+            foreach (var effect in mapping.Effects.Where(effect => effect.EffectType == "InitiativeAbilityBonus"))
+            {
+                bonus += GetAbilityModifier(effect.TargetKey);
+            }
+        }
+
+        return bonus;
+    }
+
     private int GetAbilityModifier(string abilityCode)
     {
         if (character is null)
@@ -1986,6 +2300,311 @@ else
         return item.RequiresAttunement ? item.IsAttuned : item.IsEquipped;
     }
 
+    private static IEnumerable<ItemRuleEffect> BuildItemRuleEffects(CharacterInventoryItem inventoryItem)
+    {
+        var item = inventoryItem.ItemDefinition;
+        if (item is null || string.IsNullOrWhiteSpace(item.RawJson))
+        {
+            yield break;
+        }
+
+        using var document = System.Text.Json.JsonDocument.Parse(item.RawJson);
+        foreach (var target in ReadRuleEffectTargets(document.RootElement, "resist"))
+        {
+            yield return new ItemRuleEffect("Resistance", NormalizeRuleTarget(target), FormatRuleTarget(target), item.Name);
+        }
+
+        foreach (var target in ReadRuleEffectTargets(document.RootElement, "immune"))
+        {
+            yield return new ItemRuleEffect("Immunity", NormalizeRuleTarget(target), FormatRuleTarget(target), item.Name);
+        }
+
+        foreach (var target in ReadRuleEffectTargets(document.RootElement, "conditionImmune"))
+        {
+            yield return new ItemRuleEffect("Condition Immunity", NormalizeRuleTarget(target), FormatRuleTarget(target), item.Name);
+        }
+
+        foreach (var target in ReadRuleEffectTargets(document.RootElement, "vulnerable"))
+        {
+            yield return new ItemRuleEffect("Vulnerability", NormalizeRuleTarget(target), FormatRuleTarget(target), item.Name);
+        }
+    }
+
+    private IEnumerable<ItemRuleEffect> BuildCharacterRuleEffects()
+    {
+        if (character is null)
+        {
+            yield break;
+        }
+
+        var race = character.RaceDefinitionId is null
+            ? raceDefinitions.FirstOrDefault(definition =>
+                string.Equals(definition.Name, character.RaceName, StringComparison.OrdinalIgnoreCase)
+                && (string.IsNullOrWhiteSpace(character.RaceSource) || string.Equals(definition.Source, character.RaceSource, StringComparison.OrdinalIgnoreCase)))
+            : raceDefinitions.FirstOrDefault(definition => definition.Id == character.RaceDefinitionId.Value);
+        foreach (var effect in BuildDefinitionRuleEffects(race?.RawJson, BuildSourceName("Race", race?.Name), $"Race:{race?.Id}", character.RaceChoicesJson))
+        {
+            yield return effect;
+        }
+
+        var subrace = character.SubraceDefinitionId is null
+            ? null
+            : subraceDefinitions.FirstOrDefault(definition => definition.Id == character.SubraceDefinitionId.Value);
+        foreach (var effect in BuildDefinitionRuleEffects(subrace?.RawJson, BuildSourceName("Race version", subrace?.Name ?? character.SubraceName), $"Subrace:{subrace?.Id}", character.RaceChoicesJson))
+        {
+            yield return effect;
+        }
+
+        var background = character.BackgroundDefinitionId is null
+            ? backgroundDefinitions.FirstOrDefault(definition =>
+                string.Equals(definition.Name, character.BackgroundName, StringComparison.OrdinalIgnoreCase)
+                && (string.IsNullOrWhiteSpace(character.BackgroundSource) || string.Equals(definition.Source, character.BackgroundSource, StringComparison.OrdinalIgnoreCase)))
+            : backgroundDefinitions.FirstOrDefault(definition => definition.Id == character.BackgroundDefinitionId.Value);
+        foreach (var effect in BuildDefinitionRuleEffects(background?.RawJson, BuildSourceName("Background", background?.Name), $"Background:{background?.Id}", character.BackgroundChoicesJson))
+        {
+            yield return effect;
+        }
+
+        foreach (var characterFeat in character.Feats)
+        {
+            var feat = featDefinitions.FirstOrDefault(definition => definition.Id == characterFeat.FeatDefinitionId)
+                ?? featDefinitions.FirstOrDefault(definition =>
+                    string.Equals(definition.Name, characterFeat.FeatName, StringComparison.OrdinalIgnoreCase)
+                    && (string.IsNullOrWhiteSpace(characterFeat.FeatSource) || string.Equals(definition.Source, characterFeat.FeatSource, StringComparison.OrdinalIgnoreCase)));
+            foreach (var effect in BuildDefinitionRuleEffects(feat?.RawJson, BuildSourceName("Feat", feat?.Name ?? characterFeat.FeatName), $"Feat:{feat?.Id}", character.FeatChoicesJson))
+            {
+                yield return effect;
+            }
+        }
+
+        foreach (var group in sheetFeatureGroups)
+        {
+            foreach (var feature in group.Levels.SelectMany(level => level.Features))
+            {
+                foreach (var effect in BuildTextRuleEffects(feature.Paragraphs, BuildSourceName(group.Kind, feature.Name)))
+                {
+                    yield return effect;
+                }
+            }
+        }
+    }
+
+    private static IEnumerable<ItemRuleEffect> BuildDefinitionRuleEffects(string? rawJson, string sourceName, string sourceKey, string choicesJson)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            yield break;
+        }
+
+        using var document = System.Text.Json.JsonDocument.Parse(rawJson);
+        foreach (var effect in BuildChoiceRuleEffects(rawJson, sourceKey, sourceName, choicesJson))
+        {
+            yield return effect;
+        }
+
+        foreach (var effect in BuildJsonRuleEffects(document.RootElement, sourceName))
+        {
+            yield return effect;
+        }
+
+        if (document.RootElement.TryGetProperty("entries", out var entries))
+        {
+            foreach (var effect in BuildTextRuleEffects(ExtractParagraphs(entries), sourceName))
+            {
+                yield return effect;
+            }
+        }
+    }
+
+    private static IEnumerable<ItemRuleEffect> BuildChoiceRuleEffects(string rawJson, string sourceKey, string sourceName, string choicesJson)
+    {
+        var selectedChoices = CharacterDefenseChoiceService.ReadSelectedChoices(choicesJson);
+        foreach (var requirement in CharacterDefenseChoiceService.BuildRequirements(rawJson, sourceKey, sourceName))
+        {
+            if (!selectedChoices.TryGetValue(requirement.Key, out var values))
+            {
+                continue;
+            }
+
+            foreach (var value in values.Take(requirement.Count))
+            {
+                yield return new ItemRuleEffect(requirement.EffectType, NormalizeRuleTarget(value), FormatRuleTarget(value), sourceName);
+            }
+        }
+    }
+
+    private static IEnumerable<ItemRuleEffect> BuildJsonRuleEffects(System.Text.Json.JsonElement root, string sourceName)
+    {
+        foreach (var target in ReadRuleEffectTargets(root, "resist"))
+        {
+            yield return new ItemRuleEffect("Resistance", NormalizeRuleTarget(target), FormatRuleTarget(target), sourceName);
+        }
+
+        foreach (var target in ReadRuleEffectTargets(root, "immune"))
+        {
+            yield return new ItemRuleEffect("Immunity", NormalizeRuleTarget(target), FormatRuleTarget(target), sourceName);
+        }
+
+        foreach (var target in ReadRuleEffectTargets(root, "conditionImmune"))
+        {
+            yield return new ItemRuleEffect("Condition Immunity", NormalizeRuleTarget(target), FormatRuleTarget(target), sourceName);
+        }
+
+        foreach (var target in ReadRuleEffectTargets(root, "vulnerable"))
+        {
+            yield return new ItemRuleEffect("Vulnerability", NormalizeRuleTarget(target), FormatRuleTarget(target), sourceName);
+        }
+    }
+
+    private static IEnumerable<ItemRuleEffect> BuildTextRuleEffects(IEnumerable<string> paragraphs, string sourceName)
+    {
+        foreach (var paragraph in paragraphs.Select(CleanMarkup))
+        {
+            foreach (var target in ExtractDamageTargets(paragraph, @"\byou (?:have|gain) resistance to ([^.]+?) damage\b"))
+            {
+                yield return new ItemRuleEffect("Resistance", NormalizeRuleTarget(target), FormatRuleTarget(target), sourceName);
+            }
+
+            foreach (var target in ExtractDamageTargets(paragraph, @"\byou (?:are|become) immune to ([^.]+?) damage\b"))
+            {
+                yield return new ItemRuleEffect("Immunity", NormalizeRuleTarget(target), FormatRuleTarget(target), sourceName);
+            }
+
+            foreach (var target in ExtractConditionTargets(paragraph, @"\byou (?:are|become) immune to (?:the )?([^.]+?) condition"))
+            {
+                yield return new ItemRuleEffect("Condition Immunity", NormalizeRuleTarget(target), FormatRuleTarget(target), sourceName);
+            }
+
+            foreach (var target in ExtractConditionTargets(paragraph, @"\byou can't be ([a-zA-Z ]+?)(?:\.|,| and| or|$)"))
+            {
+                yield return new ItemRuleEffect("Condition Immunity", NormalizeRuleTarget(target), FormatRuleTarget(target), sourceName);
+            }
+
+            foreach (var target in ExtractDamageTargets(paragraph, @"\byou (?:are|become) vulnerable to ([^.]+?) damage\b"))
+            {
+                yield return new ItemRuleEffect("Vulnerability", NormalizeRuleTarget(target), FormatRuleTarget(target), sourceName);
+            }
+        }
+    }
+
+    private static IEnumerable<string> ExtractDamageTargets(string text, string pattern)
+    {
+        foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(text, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+        {
+            foreach (var target in SplitRuleTargets(match.Groups[1].Value))
+            {
+                yield return target;
+            }
+        }
+    }
+
+    private static IEnumerable<string> ExtractConditionTargets(string text, string pattern)
+    {
+        var knownConditions = CombatConditionPlaceholders.Append("Exhaustion").Append("Disease").ToList();
+        foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(text, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+        {
+            var value = match.Groups[1].Value;
+            foreach (var condition in knownConditions.Where(condition => value.Contains(condition, StringComparison.OrdinalIgnoreCase)))
+            {
+                yield return condition;
+            }
+        }
+    }
+
+    private static IEnumerable<string> SplitRuleTargets(string value)
+    {
+        var normalized = value
+            .Replace(" and ", ",", StringComparison.OrdinalIgnoreCase)
+            .Replace(" or ", ",", StringComparison.OrdinalIgnoreCase);
+
+        foreach (var part in normalized.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var cleaned = part
+                .Replace("damage", "", StringComparison.OrdinalIgnoreCase)
+                .Replace("from nonmagical attacks", "", StringComparison.OrdinalIgnoreCase)
+                .Replace("from nonmagical weapons", "", StringComparison.OrdinalIgnoreCase)
+                .Trim();
+            if (!string.IsNullOrWhiteSpace(cleaned))
+            {
+                yield return cleaned;
+            }
+        }
+    }
+
+    private static string BuildSourceName(string sourceType, string? name)
+    {
+        return string.IsNullOrWhiteSpace(name) ? sourceType : $"{sourceType}: {name}";
+    }
+
+    private static IEnumerable<string> ReadRuleEffectTargets(System.Text.Json.JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var property))
+        {
+            yield break;
+        }
+
+        foreach (var target in ReadRuleEffectTargetElement(property))
+        {
+            if (!string.IsNullOrWhiteSpace(target))
+            {
+                yield return target;
+            }
+        }
+    }
+
+    private static IEnumerable<string> ReadRuleEffectTargetElement(System.Text.Json.JsonElement element)
+    {
+        switch (element.ValueKind)
+        {
+            case System.Text.Json.JsonValueKind.String:
+                yield return element.GetString() ?? "";
+                break;
+            case System.Text.Json.JsonValueKind.Array:
+                foreach (var child in element.EnumerateArray())
+                {
+                    foreach (var target in ReadRuleEffectTargetElement(child))
+                    {
+                        yield return target;
+                    }
+                }
+                break;
+            case System.Text.Json.JsonValueKind.Object:
+                if (element.TryGetProperty("choose", out _))
+                {
+                    yield break;
+                }
+
+                foreach (var property in element.EnumerateObject())
+                {
+                    if (property.Value.ValueKind == System.Text.Json.JsonValueKind.True)
+                    {
+                        yield return property.Name;
+                    }
+                    else
+                    {
+                        foreach (var target in ReadRuleEffectTargetElement(property.Value))
+                        {
+                            yield return target;
+                        }
+                    }
+                }
+                break;
+        }
+    }
+
+    private static string NormalizeRuleTarget(string target)
+    {
+        return CleanMarkup(target).Trim().ToLowerInvariant();
+    }
+
+    private static string FormatRuleTarget(string target)
+    {
+        var cleaned = CleanMarkup(target).Trim();
+        return string.IsNullOrWhiteSpace(cleaned)
+            ? "Unknown"
+            : System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(cleaned.ToLowerInvariant());
+    }
+
     private int ProficiencyBonus => character?.Level switch
     {
         null => 2,
@@ -2008,6 +2627,25 @@ else
             "BonusActions" => "Bonus Actions",
             "Reactions" => "Reactions",
             _ => "Actions"
+        };
+    }
+
+    private static string FormatMappedEffectType(string effectType)
+    {
+        return effectType switch
+        {
+            "AdvantageOnSavingThrow" => "Save Adv",
+            "AdvantageOnCheck" => "Check Adv",
+            "AdvantageOnAttack" => "Attack Adv",
+            "DisadvantageOnRoll" => "Disadv",
+            "InitiativeAdvantage" => "Init Adv",
+            "MovementMode" => "Move",
+            "Sense" => "Sense",
+            "SenseBonus" => "Sense",
+            "SpellAttackBonus" => "Spell Atk",
+            "SpellSaveDcBonus" => "Spell DC",
+            "TemporaryHitPointsFormula" => "Temp HP",
+            _ => effectType
         };
     }
 
@@ -2046,11 +2684,11 @@ else
         foreach (var feature in CombatFeatureActions.Where(feature => feature.ActionType == actionTab))
         {
             yield return new CombatActionOption(
-                BuildCombatActionKey(actionTab, "Feature", feature.Name),
+                BuildCombatActionKey(actionTab, feature.SourceType, feature.Name),
                 feature.Name,
                 feature.Summary,
-                feature.Summary,
-                ["Feature"]);
+                feature.Description,
+                [feature.SourceType, feature.Confidence]);
         }
 
         foreach (var spell in CombatPreparedSpells.Where(spell => SpellMatchesCombatActionTab(spell, actionTab)))
@@ -2134,7 +2772,7 @@ else
         return savingThrow.AbilityCode is "dex" or "con" or "wis";
     }
 
-    private static CombatFeatureAction? BuildCombatFeatureAction(SheetFeature feature)
+    private static CombatFeatureAction? BuildCombatFeatureAction(SheetFeature feature, string sourceType, string sourceLabel)
     {
         var text = string.Join(" ", feature.Paragraphs);
         var actionType = ClassifyFeatureAction(text);
@@ -2143,7 +2781,15 @@ else
             return null;
         }
 
-        return new CombatFeatureAction(feature.Name, actionType, BuildFeatureActionSummary(text));
+        var confidence = sourceType == "Feature" ? "High" : "Medium";
+        return new CombatFeatureAction(
+            feature.Name,
+            actionType,
+            BuildFeatureActionSummary(text),
+            CleanMarkup(text),
+            sourceType,
+            sourceLabel,
+            confidence);
     }
 
     private static string ClassifyFeatureAction(string text)
@@ -2216,6 +2862,75 @@ else
                     yield return new SheetFeatureGroup("Class", characterClass.DisplayName, classLevels);
                 }
             }
+        }
+    }
+
+    private IEnumerable<(SheetFeature Feature, string SourceType, string SourceLabel)> BuildCharacterTraitFeatures()
+    {
+        if (character is null)
+        {
+            yield break;
+        }
+
+        var race = character.RaceDefinitionId is null
+            ? raceDefinitions.FirstOrDefault(definition =>
+                string.Equals(definition.Name, character.RaceName, StringComparison.OrdinalIgnoreCase)
+                && (string.IsNullOrWhiteSpace(character.RaceSource) || string.Equals(definition.Source, character.RaceSource, StringComparison.OrdinalIgnoreCase)))
+            : raceDefinitions.FirstOrDefault(definition => definition.Id == character.RaceDefinitionId.Value);
+        foreach (var feature in BuildTraitFeatures(race?.RawJson, "Race"))
+        {
+            yield return (feature, "Race", BuildSourceName("Race", race?.Name));
+        }
+
+        var subrace = character.SubraceDefinitionId is null
+            ? null
+            : subraceDefinitions.FirstOrDefault(definition => definition.Id == character.SubraceDefinitionId.Value);
+        foreach (var feature in BuildTraitFeatures(subrace?.RawJson, "Race version"))
+        {
+            yield return (feature, "Race", BuildSourceName("Race version", subrace?.Name ?? character.SubraceName));
+        }
+
+        var background = character.BackgroundDefinitionId is null
+            ? backgroundDefinitions.FirstOrDefault(definition =>
+                string.Equals(definition.Name, character.BackgroundName, StringComparison.OrdinalIgnoreCase)
+                && (string.IsNullOrWhiteSpace(character.BackgroundSource) || string.Equals(definition.Source, character.BackgroundSource, StringComparison.OrdinalIgnoreCase)))
+            : backgroundDefinitions.FirstOrDefault(definition => definition.Id == character.BackgroundDefinitionId.Value);
+        foreach (var feature in BuildTraitFeatures(background?.RawJson, "Background"))
+        {
+            yield return (feature, "Background", BuildSourceName("Background", background?.Name));
+        }
+
+        foreach (var characterFeat in character.Feats)
+        {
+            var feat = featDefinitions.FirstOrDefault(definition => definition.Id == characterFeat.FeatDefinitionId)
+                ?? featDefinitions.FirstOrDefault(definition =>
+                    string.Equals(definition.Name, characterFeat.FeatName, StringComparison.OrdinalIgnoreCase)
+                    && (string.IsNullOrWhiteSpace(characterFeat.FeatSource) || string.Equals(definition.Source, characterFeat.FeatSource, StringComparison.OrdinalIgnoreCase)));
+            foreach (var feature in BuildTraitFeatures(feat?.RawJson, "Feat"))
+            {
+                yield return (feature, "Feat", BuildSourceName("Feat", feat?.Name ?? characterFeat.FeatName));
+            }
+        }
+    }
+
+    private static IEnumerable<SheetFeature> BuildTraitFeatures(string? rawJson, string sourceType)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            yield break;
+        }
+
+        using var document = System.Text.Json.JsonDocument.Parse(rawJson);
+        if (!document.RootElement.TryGetProperty("entries", out var entries))
+        {
+            yield break;
+        }
+
+        var index = 0;
+        foreach (var feature in ExtractTraitFeatures(entries, sourceType))
+        {
+            index++;
+            yield return feature with { Key = $"{sourceType}|{index}|{feature.Name}" };
         }
     }
 
@@ -2461,6 +3176,43 @@ else
         }
     }
 
+    private static IEnumerable<SheetFeature> ExtractTraitFeatures(System.Text.Json.JsonElement element, string sourceType)
+    {
+        if (element.ValueKind != System.Text.Json.JsonValueKind.Array)
+        {
+            var paragraphs = ExtractParagraphs(element).ToList();
+            if (paragraphs.Count > 0)
+            {
+                yield return new SheetFeature(sourceType, 0, sourceType, paragraphs);
+            }
+
+            yield break;
+        }
+
+        var unnamedIndex = 0;
+        foreach (var entry in element.EnumerateArray())
+        {
+            if (entry.ValueKind == System.Text.Json.JsonValueKind.Object && entry.TryGetProperty("name", out var nameElement))
+            {
+                var name = nameElement.GetString() ?? sourceType;
+                var paragraphs = ExtractParagraphs(entry).ToList();
+                if (paragraphs.Count > 0)
+                {
+                    yield return new SheetFeature(CleanMarkup(name), 0, $"{sourceType}|{name}", paragraphs);
+                }
+
+                continue;
+            }
+
+            var text = ExtractParagraphs(entry).ToList();
+            if (text.Count > 0)
+            {
+                unnamedIndex++;
+                yield return new SheetFeature($"{sourceType} Trait {unnamedIndex}", 0, $"{sourceType}|{unnamedIndex}", text);
+            }
+        }
+    }
+
     private static string ReadJsonString(System.Text.Json.JsonElement element, string propertyName)
     {
         return element.ValueKind == System.Text.Json.JsonValueKind.Object
@@ -2494,8 +3246,20 @@ else
     private sealed record SheetFeatureLevel(int Level, IReadOnlyList<SheetFeature> Features);
     private sealed record SheetFeature(string Name, int Level, string Key, IReadOnlyList<string> Paragraphs);
     private sealed record CombatAbilitySave(string Label, int AbilityModifier, int SaveModifier, bool IsSaveProficient);
-    private sealed record CombatFeatureAction(string Name, string ActionType, string Summary);
+    private sealed record CombatFeatureAction(string Name, string ActionType, string Summary, string Description, string SourceType, string SourceLabel, string Confidence);
     private sealed record CombatActionOption(string Key, string Name, string Summary, string Description, IReadOnlyList<string> Badges);
+    private sealed record ItemRuleEffect(string EffectType, string TargetKey, string TargetLabel, string SourceName)
+    {
+        public string Label => EffectType;
+        public int SortOrder => EffectType switch
+        {
+            "Resistance" => 0,
+            "Immunity" => 1,
+            "Condition Immunity" => 2,
+            "Vulnerability" => 3,
+            _ => 9
+        };
+    }
     private sealed record ArmorCalculation(int Value, string Source);
     private sealed record InventoryCategoryTile(string Name, int Count, string Description);
 }

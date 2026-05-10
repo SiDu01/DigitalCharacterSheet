@@ -1,10 +1,16 @@
 @using System.Text.RegularExpressions
+@implements IDisposable
+@inject TextBadgeSettingsService TextBadgeSettings
 
 @foreach (var segment in Segments)
 {
     if (segment.IsReference)
     {
         <span class="json-ref-badge @segment.CssClass">@segment.Label</span>
+    }
+    else if (segment.IsBadge)
+    {
+        <span class="text-term-badge">@segment.Label</span>
     }
     else
     {
@@ -17,9 +23,24 @@
 
     private static readonly Regex ReferenceRegex = new(@"\{@(?<type>[a-zA-Z0-9_]+)\s+(?<value>[^}]+)\}", RegexOptions.Compiled);
 
-    private IReadOnlyList<TextSegment> Segments => Parse(Text).ToList();
+    private IReadOnlyList<TextSegment> Segments => Parse(Text, TextBadgeSettings.GetEnabledPhrases()).ToList();
 
-    private static IEnumerable<TextSegment> Parse(string value)
+    protected override void OnInitialized()
+    {
+        TextBadgeSettings.Changed += RefreshBadges;
+    }
+
+    private async void RefreshBadges()
+    {
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        TextBadgeSettings.Changed -= RefreshBadges;
+    }
+
+    private static IEnumerable<TextSegment> Parse(string value, IReadOnlyList<string> badgePhrases)
     {
         if (string.IsNullOrEmpty(value))
         {
@@ -31,7 +52,10 @@
         {
             if (match.Index > currentIndex)
             {
-                yield return TextSegment.Text(value[currentIndex..match.Index]);
+                foreach (var segment in BuildTextSegments(value[currentIndex..match.Index], badgePhrases))
+                {
+                    yield return segment;
+                }
             }
 
             var referenceType = match.Groups["type"].Value;
@@ -42,8 +66,74 @@
 
         if (currentIndex < value.Length)
         {
-            yield return TextSegment.Text(value[currentIndex..]);
+            foreach (var segment in BuildTextSegments(value[currentIndex..], badgePhrases))
+            {
+                yield return segment;
+            }
         }
+    }
+
+    private static IEnumerable<TextSegment> BuildTextSegments(string value, IReadOnlyList<string> badgePhrases)
+    {
+        if (badgePhrases.Count == 0)
+        {
+            yield return TextSegment.Text(value);
+            yield break;
+        }
+
+        var currentIndex = 0;
+        while (currentIndex < value.Length)
+        {
+            var match = FindPhraseMatch(value, currentIndex, badgePhrases);
+            if (match is null)
+            {
+                yield return TextSegment.Text(value[currentIndex..]);
+                yield break;
+            }
+
+            if (match.Value.Index > currentIndex)
+            {
+                yield return TextSegment.Text(value[currentIndex..match.Value.Index]);
+            }
+
+            yield return TextSegment.Badge(value.Substring(match.Value.Index, match.Value.Length));
+            currentIndex = match.Value.Index + match.Value.Length;
+        }
+    }
+
+    private static PhraseMatch? FindPhraseMatch(string value, int startIndex, IReadOnlyList<string> badgePhrases)
+    {
+        var bestIndex = -1;
+        var bestLength = 0;
+        foreach (var phrase in badgePhrases)
+        {
+            var index = value.IndexOf(phrase, startIndex, StringComparison.OrdinalIgnoreCase);
+            while (index >= 0 && !HasWordBoundaries(value, index, phrase.Length))
+            {
+                index = value.IndexOf(phrase, index + 1, StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (index < 0)
+            {
+                continue;
+            }
+
+            if (bestIndex < 0 || index < bestIndex || index == bestIndex && phrase.Length > bestLength)
+            {
+                bestIndex = index;
+                bestLength = phrase.Length;
+            }
+        }
+
+        return bestIndex < 0 ? null : new PhraseMatch(bestIndex, bestLength);
+    }
+
+    private static bool HasWordBoundaries(string value, int index, int length)
+    {
+        var beforeIsWord = index > 0 && char.IsLetterOrDigit(value[index - 1]);
+        var afterIndex = index + length;
+        var afterIsWord = afterIndex < value.Length && char.IsLetterOrDigit(value[afterIndex]);
+        return !beforeIsWord && !afterIsWord;
     }
 
     private static string BuildReferenceLabel(string referenceType, string referenceValue)
@@ -61,9 +151,12 @@
         return $"json-ref-{referenceType.ToLowerInvariant()}";
     }
 
-    private sealed record TextSegment(string Label, bool IsReference, string CssClass)
+    private readonly record struct PhraseMatch(int Index, int Length);
+
+    private sealed record TextSegment(string Label, bool IsReference, bool IsBadge, string CssClass)
     {
-        public static TextSegment Text(string value) => new(value, false, "");
-        public static TextSegment Reference(string label, string cssClass) => new(label, true, cssClass);
+        public static TextSegment Text(string value) => new(value, false, false, "");
+        public static TextSegment Badge(string value) => new(value, false, true, "");
+        public static TextSegment Reference(string label, string cssClass) => new(label, true, false, cssClass);
     }
 }

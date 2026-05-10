@@ -73,6 +73,7 @@
                         </select>
                     </label>
                 }
+
             </section>
 
             <section class="creation-step">
@@ -103,6 +104,7 @@
                 {
                     <p class="muted compact-hint">This background has feat choices saved for a later rule step.</p>
                 }
+
             </section>
 
             <section class="creation-step">
@@ -174,6 +176,26 @@
                 }
             </section>
 
+            @if (AllDefenseChoiceRequirements.Count > 0 || AllAbilityChoiceRequirements.Count > 0 || optionChoiceHints.Count > 0)
+            {
+                <section class="creation-step pending-choice-panel">
+                    <p class="eyebrow">Pending Choices</p>
+                    @if (AllAbilityChoiceRequirements.Count > 0)
+                    {
+                        <AbilityChoiceList Requirements="AllAbilityChoiceRequirements"
+                                           SelectedChoices="selectedAbilityChoices"
+                                           OnChange="SetAbilityChoice" />
+                    }
+                    @if (AllDefenseChoiceRequirements.Count > 0)
+                    {
+                        <DefenseChoiceList Requirements="AllDefenseChoiceRequirements"
+                                           SelectedChoices="selectedDefenseChoices"
+                                           OnToggle="ToggleDefenseChoice" />
+                    }
+                    <ChoiceHintList Hints="optionChoiceHints" />
+                </section>
+            }
+
             <section class="creation-step">
                 <p class="eyebrow">Feats</p>
                 <ChoiceHintList Hints="@ChoiceHintsFor("Feats")" />
@@ -212,6 +234,7 @@
                         }
                     </section>
                 }
+
             </section>
 
             <section class="creation-step">
@@ -508,12 +531,15 @@
     private List<CharacterLanguageProficiency> languageProficiencies = CharacterLanguageProficiency.CreateDefaults();
     private List<string> optionEffectMessages = [];
     private List<CharacterOptionChoice> optionChoiceHints = [];
+    private HashSet<string> automaticSavingThrowProficiencies = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> automaticSkillProficiencies = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> selectedManualSkillChoices = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> automaticToolProficiencies = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> selectedManualToolChoices = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> automaticLanguageProficiencies = new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> selectedManualLanguageChoices = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, List<string>> selectedDefenseChoices = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, List<string>> selectedAbilityChoices = new(StringComparer.OrdinalIgnoreCase);
     private bool isCreating;
     private string newName = "";
     private int strength = 10;
@@ -555,6 +581,12 @@
     private ClassDefinition? SelectedClass => selectedClassDefinitionId is null ? null : classDefinitions.FirstOrDefault(definition => definition.Id == selectedClassDefinitionId.Value);
     private SubclassDefinition? SelectedSubclass => selectedSubclassDefinitionId is null ? null : subclassDefinitions.FirstOrDefault(definition => definition.Id == selectedSubclassDefinitionId.Value);
     private List<string> RaceSizeOptions => GetStringArray(SelectedRace?.SizeJson).ToList();
+    private IReadOnlyList<CharacterDefenseChoiceRequirement> RaceDefenseChoiceRequirements => BuildRaceDefenseChoiceRequirements().ToList();
+    private IReadOnlyList<CharacterDefenseChoiceRequirement> BackgroundDefenseChoiceRequirements => BuildBackgroundDefenseChoiceRequirements().ToList();
+    private IReadOnlyList<CharacterDefenseChoiceRequirement> FeatDefenseChoiceRequirements => BuildFeatDefenseChoiceRequirements().ToList();
+    private IReadOnlyList<CharacterAbilityChoiceRequirement> RaceAbilityChoiceRequirements => BuildRaceAbilityChoiceRequirements().ToList();
+    private IReadOnlyList<CharacterAbilityChoiceRequirement> BackgroundAbilityChoiceRequirements => BuildBackgroundAbilityChoiceRequirements().ToList();
+    private IReadOnlyList<CharacterAbilityChoiceRequirement> FeatAbilityChoiceRequirements => BuildFeatAbilityChoiceRequirements().ToList();
     private int SkillToolChoiceLimit => optionChoiceHints
         .Where(choice => string.Equals(choice.Category, "SkillTools", StringComparison.OrdinalIgnoreCase))
         .Sum(choice => choice.Count);
@@ -628,11 +660,15 @@
             selectedRaceSize = sizes[0];
         }
 
+        PruneDefenseChoices();
+        PruneAbilityChoices();
         detailKind = "Race";
     }
 
     private void SelectSubrace()
     {
+        PruneDefenseChoices();
+        PruneAbilityChoices();
         detailKind = "Race";
     }
 
@@ -645,6 +681,8 @@
     private void SelectBackgroundVersion(BackgroundDefinition? backgroundDefinition)
     {
         selectedBackgroundDefinitionId = backgroundDefinition?.Id;
+        PruneDefenseChoices();
+        PruneAbilityChoices();
         detailKind = "Background";
     }
 
@@ -780,11 +818,15 @@
         selectedFeatName = "";
         selectedFeatGroup = null;
         selectedFeatDefinitionId = null;
+        PruneDefenseChoices();
+        PruneAbilityChoices();
     }
 
     private void RemoveFeat(CharacterFeat feat)
     {
         newFeats.Remove(feat);
+        PruneDefenseChoices();
+        PruneAbilityChoices();
     }
 
     private async Task CreateCharacter()
@@ -853,9 +895,10 @@
             wisdom = 10 + effects.AbilityBonuses.GetValueOrDefault("wis");
             charisma = 10 + effects.AbilityBonuses.GetValueOrDefault("cha");
 
+            automaticSavingThrowProficiencies = effects.SavingThrowProficiencies.ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var savingThrow in savingThrows)
             {
-                savingThrow.IsProficient = effects.SavingThrowProficiencies.Contains(savingThrow.AbilityCode);
+                savingThrow.IsProficient = automaticSavingThrowProficiencies.Contains(savingThrow.AbilityCode);
             }
 
             optionEffectMessages = effects.DeferredChoices.Count == 0
@@ -1026,8 +1069,8 @@
             RaceChoicesJson = BuildRaceChoicesJson(),
             BackgroundDefinitionId = backgroundDefinition?.Id,
             BackgroundName = backgroundDefinition?.Name ?? "",
-            BackgroundChoicesJson = "{}",
-            FeatChoicesJson = "{}",
+            BackgroundChoicesJson = BuildBackgroundChoicesJson(),
+            FeatChoicesJson = BuildFeatChoicesJson(),
             ClassName = string.Join(" / ", newClasses.Select(characterClass => characterClass.ClassName).Distinct()),
             PrimaryClassDefinitionId = primaryClassDefinitionId,
             Level = newClasses.Count == 0 ? null : newClasses.Sum(characterClass => characterClass.Level),
@@ -1037,24 +1080,316 @@
             Intelligence = intelligence,
             Wisdom = wisdom,
             Charisma = charisma,
+            MaxHitPoints = 0,
+            CurrentHitPoints = 0,
+            TemporaryHitPoints = 0,
+            ConditionsJson = "[]",
             Classes = newClasses.ToList(),
             Feats = newFeats.ToList(),
-            SavingThrows = savingThrows.ToList(),
-            Skills = skills.ToList(),
-            ToolProficiencies = toolProficiencies.ToList(),
-            LanguageProficiencies = languageProficiencies.ToList()
+            SavingThrows = BuildStoredSavingThrows(),
+            Skills = BuildStoredSkills(),
+            ToolProficiencies = BuildStoredToolProficiencies(),
+            LanguageProficiencies = BuildStoredLanguageProficiencies()
         };
+    }
+
+    private List<CharacterSavingThrow> BuildStoredSavingThrows()
+    {
+        return savingThrows
+            .Select(savingThrow => new CharacterSavingThrow
+            {
+                Id = savingThrow.Id,
+                CharacterId = savingThrow.CharacterId,
+                AbilityCode = savingThrow.AbilityCode,
+                AbilityName = savingThrow.AbilityName,
+                IsProficient = savingThrow.IsProficient && !automaticSavingThrowProficiencies.Contains(savingThrow.AbilityCode),
+                RollMode = savingThrow.RollMode,
+                Notes = savingThrow.Notes
+            })
+            .ToList();
+    }
+
+    private List<CharacterSkill> BuildStoredSkills()
+    {
+        return skills
+            .Select(skill => new CharacterSkill
+            {
+                Id = skill.Id,
+                CharacterId = skill.CharacterId,
+                Name = skill.Name,
+                AbilityCode = skill.AbilityCode,
+                AbilityName = skill.AbilityName,
+                IsProficient = selectedManualSkillChoices.Contains(skill.Name),
+                ProficiencyLevel = selectedManualSkillChoices.Contains(skill.Name) ? "Proficient" : "None",
+                RollMode = skill.RollMode,
+                Notes = skill.Notes
+            })
+            .ToList();
+    }
+
+    private List<CharacterToolProficiency> BuildStoredToolProficiencies()
+    {
+        return toolProficiencies
+            .Select(tool => new CharacterToolProficiency
+            {
+                Id = tool.Id,
+                CharacterId = tool.CharacterId,
+                Name = tool.Name,
+                IsProficient = selectedManualToolChoices.Contains(tool.Name),
+                Notes = tool.Notes
+            })
+            .ToList();
+    }
+
+    private List<CharacterLanguageProficiency> BuildStoredLanguageProficiencies()
+    {
+        return languageProficiencies
+            .Select(language => new CharacterLanguageProficiency
+            {
+                Id = language.Id,
+                CharacterId = language.CharacterId,
+                Name = language.Name,
+                IsProficient = selectedManualLanguageChoices.Contains(language.Name),
+                Notes = language.Notes
+            })
+            .ToList();
     }
 
     private string BuildRaceChoicesJson()
     {
-        var choices = new Dictionary<string, string>();
+        var choices = new Dictionary<string, object>();
         if (!string.IsNullOrWhiteSpace(selectedRaceSize))
         {
             choices["size"] = selectedRaceSize;
         }
 
+        AddDefenseChoices(choices, RaceDefenseChoiceRequirements);
+        AddAbilityChoices(choices, RaceAbilityChoiceRequirements);
         return choices.Count == 0 ? "{}" : JsonSerializer.Serialize(choices);
+    }
+
+    private string BuildBackgroundChoicesJson()
+    {
+        var choices = new Dictionary<string, object>();
+        AddDefenseChoices(choices, BackgroundDefenseChoiceRequirements);
+        AddAbilityChoices(choices, BackgroundAbilityChoiceRequirements);
+        return choices.Count == 0 ? "{}" : JsonSerializer.Serialize(choices);
+    }
+
+    private string BuildFeatChoicesJson()
+    {
+        var choices = new Dictionary<string, object>();
+        AddDefenseChoices(choices, FeatDefenseChoiceRequirements);
+        AddAbilityChoices(choices, FeatAbilityChoiceRequirements);
+        return choices.Count == 0 ? "{}" : JsonSerializer.Serialize(choices);
+    }
+
+    private void AddDefenseChoices(Dictionary<string, object> choices, IReadOnlyList<CharacterDefenseChoiceRequirement> requirements)
+    {
+        var selected = requirements
+            .Where(requirement => selectedDefenseChoices.TryGetValue(requirement.Key, out var values) && values.Count > 0)
+            .ToDictionary(
+                requirement => requirement.Key,
+                requirement => selectedDefenseChoices[requirement.Key].Take(requirement.Count).ToList(),
+                StringComparer.OrdinalIgnoreCase);
+        if (selected.Count > 0)
+        {
+            choices["defenseChoices"] = selected;
+        }
+    }
+
+    private void AddAbilityChoices(Dictionary<string, object> choices, IReadOnlyList<CharacterAbilityChoiceRequirement> requirements)
+    {
+        var selected = requirements
+            .Where(requirement => selectedAbilityChoices.TryGetValue(requirement.Key, out var values) && values.Count > 0)
+            .ToDictionary(
+                requirement => requirement.Key,
+                requirement => selectedAbilityChoices[requirement.Key].Take(requirement.Count).ToList(),
+                StringComparer.OrdinalIgnoreCase);
+        if (selected.Count > 0)
+        {
+            choices["abilityChoices"] = selected;
+        }
+    }
+
+    private void SetAbilityChoice((string Key, int Index, string Value) choice)
+    {
+        var requirement = AllAbilityChoiceRequirements.FirstOrDefault(requirement => string.Equals(requirement.Key, choice.Key, StringComparison.OrdinalIgnoreCase));
+        if (requirement is null || choice.Index < 0 || choice.Index >= requirement.Count)
+        {
+            return;
+        }
+
+        if (!selectedAbilityChoices.TryGetValue(choice.Key, out var values))
+        {
+            values = [];
+            selectedAbilityChoices[choice.Key] = values;
+        }
+
+        while (values.Count <= choice.Index)
+        {
+            values.Add("");
+        }
+
+        values[choice.Index] = requirement.Options.Contains(choice.Value, StringComparer.OrdinalIgnoreCase) ? choice.Value : "";
+        values.RemoveAll(string.IsNullOrWhiteSpace);
+        if (values.Count == 0)
+        {
+            selectedAbilityChoices.Remove(choice.Key);
+        }
+    }
+
+    private void ToggleDefenseChoice((string Key, string Option, bool IsSelected) choice)
+    {
+        var requirement = AllDefenseChoiceRequirements.FirstOrDefault(requirement => string.Equals(requirement.Key, choice.Key, StringComparison.OrdinalIgnoreCase));
+        if (requirement is null)
+        {
+            return;
+        }
+
+        if (!selectedDefenseChoices.TryGetValue(choice.Key, out var values))
+        {
+            values = [];
+            selectedDefenseChoices[choice.Key] = values;
+        }
+
+        if (choice.IsSelected)
+        {
+            if (!values.Contains(choice.Option, StringComparer.OrdinalIgnoreCase) && values.Count < requirement.Count)
+            {
+                values.Add(choice.Option);
+            }
+
+            return;
+        }
+
+        values.RemoveAll(value => string.Equals(value, choice.Option, StringComparison.OrdinalIgnoreCase));
+        if (values.Count == 0)
+        {
+            selectedDefenseChoices.Remove(choice.Key);
+        }
+    }
+
+    private IReadOnlyList<CharacterDefenseChoiceRequirement> AllDefenseChoiceRequirements =>
+        RaceDefenseChoiceRequirements.Concat(BackgroundDefenseChoiceRequirements).Concat(FeatDefenseChoiceRequirements).ToList();
+
+    private IReadOnlyList<CharacterAbilityChoiceRequirement> AllAbilityChoiceRequirements =>
+        RaceAbilityChoiceRequirements.Concat(BackgroundAbilityChoiceRequirements).Concat(FeatAbilityChoiceRequirements).ToList();
+
+    private IEnumerable<CharacterDefenseChoiceRequirement> BuildRaceDefenseChoiceRequirements()
+    {
+        if (SelectedRace is not null)
+        {
+            foreach (var requirement in CharacterDefenseChoiceService.BuildRequirements(SelectedRace.RawJson, $"Race:{SelectedRace.Id}", $"Race: {SelectedRace.Name}"))
+            {
+                yield return requirement;
+            }
+        }
+
+        if (SelectedSubrace is not null)
+        {
+            foreach (var requirement in CharacterDefenseChoiceService.BuildRequirements(SelectedSubrace.RawJson, $"Subrace:{SelectedSubrace.Id}", $"Race version: {SelectedSubrace.Name}"))
+            {
+                yield return requirement;
+            }
+        }
+    }
+
+    private IEnumerable<CharacterDefenseChoiceRequirement> BuildBackgroundDefenseChoiceRequirements()
+    {
+        if (SelectedBackground is null)
+        {
+            yield break;
+        }
+
+        foreach (var requirement in CharacterDefenseChoiceService.BuildRequirements(SelectedBackground.RawJson, $"Background:{SelectedBackground.Id}", $"Background: {SelectedBackground.Name}"))
+        {
+            yield return requirement;
+        }
+    }
+
+    private IEnumerable<CharacterDefenseChoiceRequirement> BuildFeatDefenseChoiceRequirements()
+    {
+        foreach (var characterFeat in newFeats)
+        {
+            var feat = featDefinitions.FirstOrDefault(definition => definition.Id == characterFeat.FeatDefinitionId);
+            if (feat is null)
+            {
+                continue;
+            }
+
+            foreach (var requirement in CharacterDefenseChoiceService.BuildRequirements(feat.RawJson, $"Feat:{feat.Id}", $"Feat: {feat.Name}"))
+            {
+                yield return requirement;
+            }
+        }
+    }
+
+    private IEnumerable<CharacterAbilityChoiceRequirement> BuildRaceAbilityChoiceRequirements()
+    {
+        if (SelectedRace is not null)
+        {
+            foreach (var requirement in CharacterAbilityChoiceService.BuildRequirements(SelectedRace.RawJson, $"Race:{SelectedRace.Id}", $"Race: {SelectedRace.Name}"))
+            {
+                yield return requirement;
+            }
+        }
+
+        if (SelectedSubrace is not null)
+        {
+            foreach (var requirement in CharacterAbilityChoiceService.BuildRequirements(SelectedSubrace.RawJson, $"Subrace:{SelectedSubrace.Id}", $"Race version: {SelectedSubrace.Name}"))
+            {
+                yield return requirement;
+            }
+        }
+    }
+
+    private IEnumerable<CharacterAbilityChoiceRequirement> BuildBackgroundAbilityChoiceRequirements()
+    {
+        if (SelectedBackground is null)
+        {
+            yield break;
+        }
+
+        foreach (var requirement in CharacterAbilityChoiceService.BuildRequirements(SelectedBackground.RawJson, $"Background:{SelectedBackground.Id}", $"Background: {SelectedBackground.Name}"))
+        {
+            yield return requirement;
+        }
+    }
+
+    private IEnumerable<CharacterAbilityChoiceRequirement> BuildFeatAbilityChoiceRequirements()
+    {
+        foreach (var characterFeat in newFeats)
+        {
+            var feat = featDefinitions.FirstOrDefault(definition => definition.Id == characterFeat.FeatDefinitionId);
+            if (feat is null)
+            {
+                continue;
+            }
+
+            foreach (var requirement in CharacterAbilityChoiceService.BuildRequirements(feat.RawJson, $"Feat:{feat.Id}", $"Feat: {feat.Name}"))
+            {
+                yield return requirement;
+            }
+        }
+    }
+
+    private void PruneDefenseChoices()
+    {
+        var validKeys = AllDefenseChoiceRequirements.Select(requirement => requirement.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in selectedDefenseChoices.Keys.Where(key => !validKeys.Contains(key)).ToList())
+        {
+            selectedDefenseChoices.Remove(key);
+        }
+    }
+
+    private void PruneAbilityChoices()
+    {
+        var validKeys = AllAbilityChoiceRequirements.Select(requirement => requirement.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in selectedAbilityChoices.Keys.Where(key => !validKeys.Contains(key)).ToList())
+        {
+            selectedAbilityChoices.Remove(key);
+        }
     }
 
     private static OptionDetail BuildRaceDetail(RaceDefinition race, SubraceDefinition? subrace)

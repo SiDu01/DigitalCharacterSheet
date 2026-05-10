@@ -99,6 +99,7 @@ public sealed partial class AppDatabase
                 .Where(row => row.Id == character.RaceDefinitionId.Value)
                 .FirstOrDefaultAsync();
             AddOptionEffects(effects, race?.RawJson, "Race");
+            AddSelectedAbilityChoiceEffects(effects, race?.RawJson, $"Race:{race?.Id ?? 0}", race is null ? "Race" : $"Race: {race.Name}", character.RaceChoicesJson);
         }
 
         if (character.SubraceDefinitionId is not null)
@@ -107,6 +108,7 @@ public sealed partial class AppDatabase
                 .Where(row => row.Id == character.SubraceDefinitionId.Value)
                 .FirstOrDefaultAsync();
             AddOptionEffects(effects, subrace?.RawJson, "Race version");
+            AddSelectedAbilityChoiceEffects(effects, subrace?.RawJson, $"Subrace:{subrace?.Id ?? 0}", subrace is null ? "Race version" : $"Race version: {subrace.Name}", character.RaceChoicesJson);
         }
 
         if (character.BackgroundDefinitionId is not null)
@@ -115,6 +117,7 @@ public sealed partial class AppDatabase
                 .Where(row => row.Id == character.BackgroundDefinitionId.Value)
                 .FirstOrDefaultAsync();
             AddOptionEffects(effects, background?.RawJson, string.IsNullOrWhiteSpace(background?.Name) ? "Background" : $"Background {background.Name}");
+            AddSelectedAbilityChoiceEffects(effects, background?.RawJson, $"Background:{background?.Id ?? 0}", background is null ? "Background" : $"Background: {background.Name}", character.BackgroundChoicesJson);
             await AddGrantedFeatEffectsAsync(effects, background?.FeatsJson, background?.Name ?? "Background");
         }
 
@@ -124,11 +127,14 @@ public sealed partial class AppDatabase
                 .Where(row => row.Id == feat.FeatDefinitionId)
                 .FirstOrDefaultAsync();
             AddOptionEffects(effects, featDefinition?.RawJson, string.IsNullOrWhiteSpace(featDefinition?.Name) ? "Feat" : $"Feat {featDefinition.Name}");
+            AddSelectedAbilityChoiceEffects(effects, featDefinition?.RawJson, $"Feat:{featDefinition?.Id ?? 0}", featDefinition is null ? "Feat" : $"Feat: {featDefinition.Name}", character.FeatChoicesJson);
         }
 
+        var primaryClassDefinitionId = character.PrimaryClassDefinitionId
+            ?? character.Classes.FirstOrDefault(characterClass => characterClass.ClassDefinitionId > 0)?.ClassDefinitionId;
         foreach (var characterClass in character.Classes.Where(characterClass =>
                      characterClass.ClassDefinitionId > 0
-                     && characterClass.ClassDefinitionId == character.PrimaryClassDefinitionId))
+                     && characterClass.ClassDefinitionId == primaryClassDefinitionId))
         {
             await AddClassOptionEffectsAsync(effects, characterClass.ClassDefinitionId);
         }
@@ -764,12 +770,26 @@ public sealed partial class AppDatabase
                     continue;
                 }
 
-                if (property.NameEquals("choose"))
-                {
-                    AddChoiceHint(effects, "Abilities", sourceLabel, ReadChoiceCount(property.Value), "Choose ability score bonuses.");
-                }
+                // Ability choices are represented as explicit selectable requirements in the character UI.
             }
         }
+    }
+
+    private static void AddSelectedAbilityChoiceEffects(
+        CharacterOptionEffects effects,
+        string? rawJson,
+        string sourceKey,
+        string sourceName,
+        string choicesJson)
+    {
+        var requirements = CharacterAbilityChoiceService.BuildRequirements(rawJson, sourceKey, sourceName);
+        if (requirements.Count == 0)
+        {
+            return;
+        }
+
+        var selectedChoices = CharacterAbilityChoiceService.ReadSelectedChoices(choicesJson);
+        CharacterAbilityChoiceService.AddSelectedBonuses(effects.AbilityBonuses, requirements, selectedChoices);
     }
 
     private static void AddSkillProficiencies(CharacterOptionEffects effects, JsonElement skillElement, string sourceLabel)

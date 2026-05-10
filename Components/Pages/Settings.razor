@@ -1,6 +1,7 @@
 @page "/settings"
 @inject AppDatabase Database
 @inject IJSRuntime JsRuntime
+@inject TextBadgeSettingsService TextBadgeSettings
 
 <PageTitle>Settings</PageTitle>
 
@@ -15,6 +16,7 @@
     <nav class="tab-bar" aria-label="Settings sections">
         <button type="button" class="tab-button @(activeTab == "Appearance" ? "active" : "")" @onclick='() => SetActiveTab("Appearance")'>Appearance</button>
         <button type="button" class="tab-button @(activeTab == "Sources" ? "active" : "")" @onclick='() => SetActiveTab("Sources")'>Sources</button>
+        <button type="button" class="tab-button @(activeTab == "TextBadges" ? "active" : "")" @onclick='() => SetActiveTab("TextBadges")'>Text Badges</button>
         <button type="button" class="tab-button @(activeTab == "Data" ? "active" : "")" @onclick='() => SetActiveTab("Data")'>Data</button>
     </nav>
 
@@ -83,6 +85,52 @@
             }
         </section>
     }
+    else if (activeTab == "TextBadges")
+    {
+        <section class="settings-panel">
+            <header class="settings-panel-header">
+                <div>
+                    <p class="eyebrow">Reading Aid</p>
+                    <h2>Text Badges</h2>
+                </div>
+                <button type="button" class="text-button no-margin" @onclick="ResetTextBadges">Reset</button>
+            </header>
+
+            <form class="text-badge-add" @onsubmit="AddTextBadge" @onsubmit:preventDefault>
+                <input type="text" placeholder="New word or phrase" @bind="newTextBadgePhrase" />
+                <button type="submit" class="primary-action">Add</button>
+            </form>
+
+            @if (!string.IsNullOrWhiteSpace(textBadgeMessage))
+            {
+                <p class="muted">@textBadgeMessage</p>
+            }
+
+            <section class="text-badge-settings-list">
+                @foreach (var group in textBadgeRules.GroupBy(rule => rule.Category).OrderBy(group => group.Key))
+                {
+                    <article class="text-badge-group">
+                        <h3>@group.Key</h3>
+                        <div class="text-badge-rule-grid">
+                            @foreach (var rule in group.OrderBy(rule => rule.Phrase))
+                            {
+                                <div class="text-badge-rule-row @(rule.IsEnabled ? "" : "disabled")">
+                                    <label class="switch-toggle">
+                                        <input type="checkbox" checked="@rule.IsEnabled" @onchange="args => SetTextBadgeEnabled(rule, args.Value is bool value && value)" />
+                                        <span><MarkupText Text="@rule.Phrase" /></span>
+                                    </label>
+                                    @if (rule.Category == "Custom")
+                                    {
+                                        <button type="button" class="mini-button danger-action" @onclick="() => DeleteTextBadge(rule)">Delete</button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </article>
+                }
+            </section>
+        </section>
+    }
     else
     {
         <section class="settings-panel">
@@ -93,6 +141,9 @@
             <div class="settings-actions">
                 <button type="button" class="text-button no-margin" disabled="@isExporting" @onclick="ExportCharacters">
                     Export Characters
+                </button>
+                <button type="button" class="text-button no-margin" disabled="@isImporting" @onclick="ImportCharacters">
+                    Import Characters
                 </button>
             </div>
             @if (!string.IsNullOrWhiteSpace(dataMessage))
@@ -107,14 +158,19 @@
     private string activeTab = "Appearance";
     private string selectedTheme = "classic";
     private bool isExporting;
+    private bool isImporting;
     private bool isLoadingSources = true;
     private string dataMessage = "";
     private string sourceMessage = "";
+    private string textBadgeMessage = "";
+    private string newTextBadgePhrase = "";
     private List<SourceSetting> sourceSettings = [];
+    private List<TextBadgeRule> textBadgeRules = [];
 
     protected override async Task OnInitializedAsync()
     {
         await LoadSourceSettings();
+        LoadTextBadgeSettings();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -179,6 +235,60 @@
         sourceMessage = "Source-Einstellungen zurückgesetzt.";
     }
 
+    private void LoadTextBadgeSettings()
+    {
+        textBadgeRules = TextBadgeSettings.GetRules().Select(CloneTextBadgeRule).ToList();
+    }
+
+    private void SetTextBadgeEnabled(TextBadgeRule rule, bool isEnabled)
+    {
+        TextBadgeSettings.SetEnabled(rule.Id, isEnabled);
+        LoadTextBadgeSettings();
+        textBadgeMessage = isEnabled
+            ? $"{rule.Phrase} wird als Badge angezeigt."
+            : $"{rule.Phrase} wird nicht mehr als Badge angezeigt.";
+    }
+
+    private void AddTextBadge()
+    {
+        if (TextBadgeSettings.AddRule(newTextBadgePhrase))
+        {
+            textBadgeMessage = $"{newTextBadgePhrase.Trim()} wurde hinzugefuegt.";
+            newTextBadgePhrase = "";
+        }
+        else
+        {
+            textBadgeMessage = "Diese Wortgruppe existiert bereits oder ist leer.";
+        }
+
+        LoadTextBadgeSettings();
+    }
+
+    private void DeleteTextBadge(TextBadgeRule rule)
+    {
+        TextBadgeSettings.DeleteRule(rule.Id);
+        LoadTextBadgeSettings();
+        textBadgeMessage = $"{rule.Phrase} wurde geloescht.";
+    }
+
+    private void ResetTextBadges()
+    {
+        TextBadgeSettings.ResetDefaults();
+        LoadTextBadgeSettings();
+        textBadgeMessage = "Text-Badges wurden zurueckgesetzt.";
+    }
+
+    private static TextBadgeRule CloneTextBadgeRule(TextBadgeRule rule)
+    {
+        return new TextBadgeRule
+        {
+            Id = rule.Id,
+            Phrase = rule.Phrase,
+            IsEnabled = rule.IsEnabled,
+            Category = rule.Category
+        };
+    }
+
     private async Task ExportCharacters()
     {
         try
@@ -197,6 +307,50 @@
         finally
         {
             isExporting = false;
+        }
+    }
+
+    private async Task ImportCharacters()
+    {
+        try
+        {
+            isImporting = true;
+            dataMessage = "";
+            var result = await Microsoft.Maui.Storage.FilePicker.Default.PickAsync(new Microsoft.Maui.Storage.PickOptions
+            {
+                PickerTitle = "Select character export",
+                FileTypes = new Microsoft.Maui.Storage.FilePickerFileType(new Dictionary<Microsoft.Maui.Devices.DevicePlatform, IEnumerable<string>>
+                {
+                    { Microsoft.Maui.Devices.DevicePlatform.Android, new[] { "application/json", "text/plain" } },
+                    { Microsoft.Maui.Devices.DevicePlatform.WinUI, new[] { ".json" } }
+                })
+            });
+
+            if (result is null)
+            {
+                dataMessage = "Import cancelled.";
+                return;
+            }
+
+            var importPath = result.FullPath;
+            if (string.IsNullOrWhiteSpace(importPath) || !File.Exists(importPath))
+            {
+                importPath = Path.Combine(FileSystem.CacheDirectory, $"character-import-{DateTime.Now:yyyyMMdd-HHmmss}.json");
+                await using var source = await result.OpenReadAsync();
+                await using var target = File.Create(importPath);
+                await source.CopyToAsync(target);
+            }
+
+            var importedCount = await Database.ImportCharactersAsync(importPath);
+            dataMessage = $"Imported {importedCount} character(s).";
+        }
+        catch (Exception exception)
+        {
+            dataMessage = $"Import failed: {exception.Message}";
+        }
+        finally
+        {
+            isImporting = false;
         }
     }
 }

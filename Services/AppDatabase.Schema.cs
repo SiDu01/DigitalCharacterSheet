@@ -16,6 +16,10 @@ public sealed partial class AppDatabase
         await AddColumnIfMissingAsync("Characters", "Intelligence", "integer DEFAULT 10");
         await AddColumnIfMissingAsync("Characters", "Wisdom", "integer DEFAULT 10");
         await AddColumnIfMissingAsync("Characters", "Charisma", "integer DEFAULT 10");
+        await AddColumnIfMissingAsync("Characters", "MaxHitPoints", "integer DEFAULT 0");
+        await AddColumnIfMissingAsync("Characters", "CurrentHitPoints", "integer DEFAULT 0");
+        await AddColumnIfMissingAsync("Characters", "TemporaryHitPoints", "integer DEFAULT 0");
+        await AddColumnIfMissingAsync("Characters", "ConditionsJson", "text DEFAULT ''");
         await AddColumnIfMissingAsync("Characters", "RaceChoicesJson", "text DEFAULT ''");
         await AddColumnIfMissingAsync("Characters", "BackgroundChoicesJson", "text DEFAULT ''");
         await AddColumnIfMissingAsync("Characters", "FeatChoicesJson", "text DEFAULT ''");
@@ -34,6 +38,14 @@ public sealed partial class AppDatabase
 #else
         await Task.CompletedTask;
 #endif
+    }
+
+    private async Task ApplyCharacterCombatStateMigrationAsync()
+    {
+        await AddColumnIfMissingAsync("Characters", "MaxHitPoints", "integer DEFAULT 0");
+        await AddColumnIfMissingAsync("Characters", "CurrentHitPoints", "integer DEFAULT 0");
+        await AddColumnIfMissingAsync("Characters", "TemporaryHitPoints", "integer DEFAULT 0");
+        await AddColumnIfMissingAsync("Characters", "ConditionsJson", "text DEFAULT ''");
     }
 
     private async Task AddColumnIfMissingAsync(string tableName, string columnName, string columnDefinition)

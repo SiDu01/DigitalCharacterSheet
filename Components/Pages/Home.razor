@@ -1,19 +1,147 @@
 @page "/"
+@inject AppDatabase Database
 @inject NavigationManager Navigation
+@inject RecentActivityService RecentActivity
+
+<PageTitle>Home</PageTitle>
 
 <section class="home-shell">
-    <div>
-        <p class="eyebrow">Digital Character Sheet</p>
-        <h1>Spellbook</h1>
-        <p class="lede">Lokale 5e-Spell-Datenbank fuer Android, vorbereitet fuer Suche, Filter und spaetere Charakterfunktionen.</p>
-    </div>
+    <header class="page-header home-header">
+        <div>
+            <p class="eyebrow">Digital Character Sheet</p>
+            <h1>Dashboard</h1>
+        </div>
+    </header>
 
-    <button class="primary-action" @onclick="OpenSpells">Spells oeffnen</button>
+    <section class="home-tile-grid" aria-label="Main areas">
+        @foreach (var tile in DashboardTiles)
+        {
+            <button type="button" class="home-tile" @onclick="() => OpenRoute(tile.Route)">
+                <span>@tile.CountText</span>
+                <strong>@tile.Title</strong>
+                <small>@tile.Subtitle</small>
+            </button>
+        }
+    </section>
+
+    <section class="home-recent-grid">
+        <section class="home-panel">
+            <header class="settings-panel-header">
+                <div>
+                    <p class="eyebrow">Bookmarks</p>
+                    <h2>Gemerkte Eintraege</h2>
+                </div>
+            </header>
+
+            @if (isLoading)
+            {
+                <p class="muted">Dashboard wird geladen...</p>
+            }
+            else if (bookmarks.Count == 0)
+            {
+                <p class="muted">Noch keine Bookmarks gesetzt.</p>
+            }
+            else
+            {
+                <section class="home-recent-list">
+                    @foreach (var entry in bookmarks)
+                    {
+                        <article class="home-recent-row">
+                            <button type="button" class="home-recent-content" @onclick="() => OpenRoute(entry.Route)">
+                                <span class="source-code">@entry.EntryType</span>
+                                <strong>@entry.Title</strong>
+                                <small>@entry.Subtitle</small>
+                            </button>
+                            <button type="button" class="icon-button bookmark-button active" title="Bookmark entfernen" @onclick="() => ToggleBookmark(entry)">★</button>
+                        </article>
+                    }
+                </section>
+            }
+        </section>
+
+        <section class="home-panel">
+            <header class="settings-panel-header">
+                <div>
+                    <p class="eyebrow">Recently Viewed</p>
+                    <h2>Entries</h2>
+                </div>
+            </header>
+
+            @if (isLoading)
+            {
+                <p class="muted">Dashboard wird geladen...</p>
+            }
+            else if (recentEntries.Count == 0)
+            {
+                <p class="muted">Noch keine Spells oder Items angesehen.</p>
+            }
+            else
+            {
+                <section class="home-recent-list">
+                    @foreach (var entry in recentEntries)
+                    {
+                        <article class="home-recent-row">
+                            <button type="button" class="home-recent-content" @onclick="() => OpenRoute(entry.Route)">
+                                <span class="source-code">@entry.EntryType</span>
+                                <strong>@entry.Title</strong>
+                                <small>@entry.Subtitle</small>
+                            </button>
+                            <button type="button"
+                                    class="icon-button bookmark-button @(RecentActivity.IsBookmarked(entry.EntryType, entry.EntityId) ? "active" : "")"
+                                    title="Bookmark umschalten"
+                                    @onclick="() => ToggleBookmark(entry)">
+                                @(RecentActivity.IsBookmarked(entry.EntryType, entry.EntityId) ? "★" : "☆")
+                            </button>
+                        </article>
+                    }
+                </section>
+            }
+        </section>
+    </section>
 </section>
 
 @code {
-    private void OpenSpells()
+    private bool isLoading = true;
+    private int characterCount;
+    private int spellCount;
+    private int itemCount;
+    private List<RecentActivityEntry> bookmarks = [];
+    private List<RecentActivityEntry> recentEntries = [];
+
+    private IReadOnlyList<HomeTile> DashboardTiles =>
+    [
+        new("Characters", "Characters verwalten, erstellen und spielen", characterCount.ToString(), "characters"),
+        new("Spells", "Spellbook, Filter und Detailansicht", spellCount.ToString(), "spells"),
+        new("Items", "Ausrüstung, magische Items und Inventar", itemCount.ToString(), "items"),
+        new("Settings", "Theme, Sources, Import und Export", "", "settings")
+    ];
+
+    protected override async Task OnInitializedAsync()
     {
-        Navigation.NavigateTo("spells");
+        var characters = await Database.GetCharactersAsync();
+        characterCount = characters.Count;
+        spellCount = (await Database.GetSpellSummariesAsync()).Count;
+        itemCount = (await Database.GetItemDefinitionsAsync()).Count;
+        bookmarks = RecentActivity.GetBookmarks(null, 24).ToList();
+        recentEntries = RecentActivity.GetRecentEntries(null, 8)
+            .Where(entry => !string.Equals(entry.EntryType, "Character", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        isLoading = false;
     }
+
+    private void OpenRoute(string route)
+    {
+        if (!string.IsNullOrWhiteSpace(route))
+        {
+            Navigation.NavigateTo(route);
+        }
+    }
+
+    private void ToggleBookmark(RecentActivityEntry entry)
+    {
+        RecentActivity.ToggleBookmark(entry.EntryType, entry.EntityId, entry.Title, entry.Subtitle, entry.Route);
+        bookmarks = RecentActivity.GetBookmarks(null, 24).ToList();
+    }
+
+    private sealed record HomeTile(string Title, string Subtitle, string CountText, string Route);
 }

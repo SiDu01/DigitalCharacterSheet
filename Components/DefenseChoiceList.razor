@@ -1,0 +1,48 @@
+@if (Requirements.Count > 0)
+{
+    <section class="defense-choice-list">
+        @foreach (var requirement in Requirements)
+        {
+            var selected = SelectedChoices.TryGetValue(requirement.Key, out var values) ? values : [];
+            <div class="defense-choice-group">
+                <div class="choice-counter @(selected.Count > requirement.Count ? "invalid" : "")">
+                    <span>@requirement.SourceName - @requirement.EffectType</span>
+                    <strong>@selected.Count / @requirement.Count</strong>
+                </div>
+                <div class="defense-choice-options">
+                    @foreach (var option in requirement.Options)
+                    {
+                        var isChecked = selected.Contains(option, StringComparer.OrdinalIgnoreCase);
+                        var isDisabled = !isChecked && selected.Count >= requirement.Count;
+                        <label class="defense-choice-option @(isChecked ? "active" : "")">
+                            <input type="checkbox"
+                                   checked="@isChecked"
+                                   disabled="@isDisabled"
+                                   @onchange="eventArgs => Toggle(requirement.Key, option, eventArgs)" />
+                            <span>@FormatOption(option)</span>
+                        </label>
+                    }
+                </div>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<CharacterDefenseChoiceRequirement> Requirements { get; set; } = [];
+    [Parameter] public IReadOnlyDictionary<string, List<string>> SelectedChoices { get; set; } = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+    [Parameter] public EventCallback<(string Key, string Option, bool IsSelected)> OnToggle { get; set; }
+
+    private async Task Toggle(string key, string option, ChangeEventArgs eventArgs)
+    {
+        var isSelected = eventArgs.Value is bool value && value;
+        await OnToggle.InvokeAsync((key, option, isSelected));
+    }
+
+    private static string FormatOption(string option)
+    {
+        return string.IsNullOrWhiteSpace(option)
+            ? "Unknown"
+            : System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(option.ToLowerInvariant());
+    }
+}

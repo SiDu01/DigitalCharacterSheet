@@ -8,7 +8,7 @@ namespace DigitalCharacterSheet.Services;
 
 public sealed partial class AppDatabase
 {
-    private const int DatabaseVersion = 6;
+    private const int DatabaseVersion = 7;
     private const int SchemaVersion = 1;
     private const string ImportVersion = "spells-v1";
     private const string ClassImportVersion = "classes-v5";
@@ -269,9 +269,52 @@ public sealed partial class AppDatabase
 
     private sealed class CharacterExport
     {
+        public int FormatVersion { get; set; } = 2;
         public DateTime ExportedAtUtc { get; set; }
         public int DatabaseVersion { get; set; }
         public string SourceDataVersion { get; set; } = "";
         public List<Character> Characters { get; set; } = [];
+        public List<CharacterExportEntry> CharacterEntries { get; set; } = [];
+    }
+
+    private sealed class CharacterExportEntry
+    {
+        public Character Character { get; set; } = new();
+        public List<CharacterSpellExport> Spells { get; set; } = [];
+        public List<CharacterSpellSlotExport> SpellSlots { get; set; } = [];
+        public List<string> HiddenFeatureKeys { get; set; } = [];
+        public List<CharacterInventoryItemExport> Inventory { get; set; } = [];
+    }
+
+    private sealed class CharacterSpellExport
+    {
+        public int SpellId { get; set; }
+        public string Name { get; set; } = "";
+        public string Source { get; set; } = "";
+        public int? Page { get; set; }
+        public string Mode { get; set; } = "Known";
+    }
+
+    private sealed class CharacterSpellSlotExport
+    {
+        public int SpellLevel { get; set; }
+        public int UsedSlots { get; set; }
+    }
+
+    private sealed class CharacterInventoryItemExport
+    {
+        public int? ItemDefinitionId { get; set; }
+        public string ItemName { get; set; } = "";
+        public string ItemSource { get; set; } = "";
+        public string CustomName { get; set; } = "";
+        public string CustomDescription { get; set; } = "";
+        public int Quantity { get; set; } = 1;
+        public bool IsEquipped { get; set; }
+        public bool IsAttuned { get; set; }
+        public bool IsCarried { get; set; } = true;
+        public string ContainerName { get; set; } = "";
+        public string Notes { get; set; } = "";
+        public int? CurrentCharges { get; set; }
+        public int? MaxCharges { get; set; }
     }
 }

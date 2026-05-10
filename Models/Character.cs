@@ -25,6 +25,10 @@ public sealed class Character
     public int Intelligence { get; set; } = 10;
     public int Wisdom { get; set; } = 10;
     public int Charisma { get; set; } = 10;
+    public int MaxHitPoints { get; set; }
+    public int CurrentHitPoints { get; set; }
+    public int TemporaryHitPoints { get; set; }
+    public string ConditionsJson { get; set; } = "";
     public List<CharacterClass> Classes { get; set; } = [];
     public List<CharacterFeat> Feats { get; set; } = [];
     public List<CharacterSavingThrow> SavingThrows { get; set; } = CharacterSavingThrow.CreateDefaults();

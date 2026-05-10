@@ -98,7 +98,7 @@
         {
             <section class="detail-section">
                 <h2>Attunement</h2>
-                <p>@(string.IsNullOrWhiteSpace(Item.AttunementText) || Item.AttunementText == "true" ? "Requires attunement." : Item.AttunementText)</p>
+                <p><MarkupText Text="@FormatAttunementText(Item)" /></p>
                 @if (Item.AttunementRequirements.Count > 0)
                 {
                     <div class="tag-cloud inline-tag-cloud">
@@ -170,6 +170,13 @@
         var parts = new[] { item.Rarity, item.TypeCode, item.ItemKind }
             .Where(value => !string.IsNullOrWhiteSpace(value));
         return string.Join(" - ", parts);
+    }
+
+    private static string FormatAttunementText(ItemDefinition item)
+    {
+        return string.IsNullOrWhiteSpace(item.AttunementText) || item.AttunementText == "true"
+            ? "Requires attunement."
+            : item.AttunementText;
     }
 
     private static string DisplayValue(string value)

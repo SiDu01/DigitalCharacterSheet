@@ -21,6 +21,7 @@ public sealed class ItemDefinition
     public bool IsWondrous { get; set; }
     public bool IsConsumable { get; set; }
     public string Description { get; set; } = "";
+    public string RawJson { get; set; } = "";
     public ItemWeaponStats? WeaponStats { get; set; }
     public ItemArmorStats? ArmorStats { get; set; }
     public List<string> Properties { get; set; } = [];

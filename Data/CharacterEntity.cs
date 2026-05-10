@@ -37,6 +37,10 @@ public sealed class CharacterEntity
     public int Intelligence { get; set; } = 10;
     public int Wisdom { get; set; } = 10;
     public int Charisma { get; set; } = 10;
+    public int MaxHitPoints { get; set; }
+    public int CurrentHitPoints { get; set; }
+    public int TemporaryHitPoints { get; set; }
+    public string ConditionsJson { get; set; } = "";
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

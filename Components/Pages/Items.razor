@@ -2,6 +2,7 @@
 @implements IAsyncDisposable
 @inject AppDatabase Database
 @inject IJSRuntime JsRuntime
+@inject RecentActivityService RecentActivity
 
 <PageTitle>Items</PageTitle>
 
@@ -35,16 +36,84 @@
     {
         @if (string.IsNullOrWhiteSpace(selectedCategory))
         {
-            <section class="item-category-grid">
-                @foreach (var category in ItemCategoryTiles)
+            <section class="spell-toolbar item-category-toolbar">
+                <input class="search-input" placeholder="Alle Kategorien durchsuchen" @bind="searchText" @bind:event="oninput" @bind:after="ApplyFilter" />
+                @if (!string.IsNullOrWhiteSpace(searchText))
                 {
-                    <button type="button" class="item-category-tile" @onclick="() => OpenCategory(category.Name)">
-                        <span class="item-category-count">@category.Count</span>
-                        <strong>@category.Name</strong>
-                        <small>@category.Description</small>
-                    </button>
+                    <button type="button" class="text-button no-margin" @onclick="ResetCategorySearch">Reset</button>
                 }
             </section>
+
+            @if (string.IsNullOrWhiteSpace(searchText))
+            {
+                <section class="item-category-grid">
+                    @foreach (var category in ItemCategoryTiles)
+                    {
+                        <button type="button" class="item-category-tile" @onclick="() => OpenCategory(category.Name)">
+                            <span class="item-category-count">@category.Count</span>
+                            <strong>@category.Name</strong>
+                            <small>@category.Description</small>
+                        </button>
+                    }
+                </section>
+            }
+            else
+            {
+                <section class="spell-master-detail">
+                    <section class="spell-list spell-list-pane">
+                        @foreach (var categoryGroup in VisibleItemGroups.GroupBy(group => group.Primary.Category))
+                        {
+                            <div class="spell-level-separator">@categoryGroup.Key</div>
+                            @foreach (var group in categoryGroup)
+                            {
+                                <article class="spell-row @(selectedItemGroup?.Name == group.Name ? "selected" : "")" @onclick="() => OpenItem(group)">
+                                    <div class="spell-main">
+                                        <div class="spell-title">
+                                            <h2>@group.Name</h2>
+                                            <span class="@GetRarityClass(group.Rarity)">@FormatRarity(group.Rarity)</span>
+                                        </div>
+                                        <div class="spell-meta">
+                                            <span>@DisplayValue(group.TypeCode)</span>
+                                            <span>@group.Primary.Category</span>
+                                            @if (group.RequiresAttunement)
+                                            {
+                                                <span>Attunement</span>
+                                            }
+                                            @foreach (var source in group.Versions.Select(version => version.Source).Distinct())
+                                            {
+                                                <span class="source-badge">@source</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </article>
+                            }
+                        }
+                        @if (visibleItemGroupCount < filteredItemGroups.Count)
+                        {
+                            <div class="spell-list-sentinel" @ref="itemListSentinel">
+                                Weitere Items werden geladen...
+                            </div>
+                        }
+                    </section>
+
+                    <aside class="spell-detail-pane">
+                        @if (selectedItem is null)
+                        {
+                            <div class="empty-detail">
+                                <p class="eyebrow">Equipment</p>
+                                <h2>Suchergebnis auswählen</h2>
+                                <p class="muted">Die Suche läuft über alle Kategorien gleichzeitig.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <ItemDetailContent Item="selectedItem"
+                                               Versions="selectedItemGroup?.Versions"
+                                               OnSelectVersion="SelectVersion" />
+                        }
+                    </aside>
+                </section>
+            }
         }
         else
         {
@@ -263,7 +332,9 @@
     private const int VisibleItemGroupIncrement = 80;
     private IEnumerable<ItemGroup> VisibleItemGroups => filteredItemGroups.Take(visibleItemGroupCount);
     private string VisibleCountText => string.IsNullOrWhiteSpace(selectedCategory)
-        ? $"{itemGroups.Count} Items"
+        ? string.IsNullOrWhiteSpace(searchText)
+            ? $"{itemGroups.Count} Items"
+            : $"{Math.Min(visibleItemGroupCount, filteredItemGroups.Count)} von {filteredItemGroups.Count} gefunden"
         : $"{Math.Min(visibleItemGroupCount, filteredItemGroups.Count)} von {filteredItemGroups.Count} angezeigt";
     private List<FilterChip> ActiveFilterChips => BuildActiveFilterChips();
     private int ActiveFilterCount => ActiveFilterChips.Count;
@@ -297,7 +368,7 @@
     {
         if (isLoading
             || !string.IsNullOrWhiteSpace(loadError)
-            || string.IsNullOrWhiteSpace(selectedCategory)
+            || (string.IsNullOrWhiteSpace(selectedCategory) && string.IsNullOrWhiteSpace(searchText))
             || scrollObserverInitialized
             || visibleItemGroupCount >= filteredItemGroups.Count)
         {
@@ -339,6 +410,14 @@
         selectedItemGroup = null;
         rightPaneMode = "Details";
         ResetFilters();
+    }
+
+    private void ResetCategorySearch()
+    {
+        searchText = "";
+        selectedItem = null;
+        selectedItemGroup = null;
+        ApplyFilter();
     }
 
     private void OpenFilters()
@@ -401,12 +480,24 @@
     {
         selectedItemGroup = group;
         selectedItem = group.ResolveVersion(selectedItem);
+        if (selectedItem is not null)
+        {
+            RecentActivity.Track("Item", selectedItem.Id, selectedItem.ListName, BuildItemRecentSubtitle(selectedItem), "items");
+        }
         rightPaneMode = "Details";
     }
 
     private void SelectVersion(ItemDefinition item)
     {
         selectedItem = item;
+        RecentActivity.Track("Item", item.Id, item.ListName, BuildItemRecentSubtitle(item), "items");
+    }
+
+    private static string BuildItemRecentSubtitle(ItemDefinition item)
+    {
+        var parts = new[] { item.Category, item.Rarity, item.Source }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+        return string.Join(" - ", parts);
     }
 
     [JSInvokable]

@@ -146,16 +146,42 @@
                         </section>
                     }
 
-                    @if (RequiresFeatChoice || RequiresFightingStyleChoice || RequiresExpertiseChoice || GrantsHalfProficiency)
+                    @if (RequiresFeatChoice || RequiresFightingStyleChoice || RequiresExpertiseChoice || SkillProficiencyChoiceCount > 0 || ToolProficiencyChoiceCount > 0 || LanguageProficiencyChoiceCount > 0 || GrantsHalfProficiency)
                     {
                         <section class="level-up-choice">
                             <p class="eyebrow">Level-Up Choices</p>
+
+                            @if (MappedChoiceRows.Count > 0)
+                            {
+                                <div class="mapped-choice-editor">
+                                    @foreach (var row in MappedChoiceRows)
+                                    {
+                                        <div class="mapped-choice-row">
+                                            <div>
+                                                <strong>@row.Choice.Label</strong>
+                                                <small>@row.Choice.Source - @row.Choice.Confidence confidence</small>
+                                            </div>
+                                            <select value="@GetChoiceType(row.Key, row.Choice.ChoiceType)" @onchange="args => SetChoiceTypeOverride(row.Key, args.Value?.ToString())">
+                                                @foreach (var type in MappedChoiceTypes)
+                                                {
+                                                    <option value="@type">@FormatMappedChoiceType(type)</option>
+                                                }
+                                            </select>
+                                            <input type="number"
+                                                   min="0"
+                                                   max="6"
+                                                   value="@GetChoiceCount(row.Key, row.Choice.Count)"
+                                                   @onchange="args => SetChoiceCountOverride(row.Key, args.Value?.ToString())" />
+                                        </div>
+                                    }
+                                </div>
+                            }
 
                             @if (RequiresFeatChoice)
                             {
                                 <label class="stacked-field">
                                     <span>Feat</span>
-                                    <select @bind="selectedFeatDefinitionId">
+                                    <select @bind="selectedFeatDefinitionId" @bind:after="PruneLevelUpAbilityChoices">
                                         <option value="">Select feat</option>
                                         @foreach (var featDefinition in AvailableFeatDefinitions)
                                         {
@@ -163,6 +189,12 @@
                                         }
                                     </select>
                                 </label>
+                                @if (LevelUpAbilityChoiceRequirements.Count > 0)
+                                {
+                                    <AbilityChoiceList Requirements="LevelUpAbilityChoiceRequirements"
+                                                       SelectedChoices="selectedAbilityChoices"
+                                                       OnChange="SetLevelUpAbilityChoice" />
+                                }
                             }
 
                             @if (RequiresFightingStyleChoice)
@@ -191,6 +223,57 @@
                                                    disabled="@(!selectedExpertiseSkills.Contains(skill.Name) && selectedExpertiseSkills.Count >= ExpertiseChoiceCount)"
                                                    @onchange="args => ToggleExpertiseSkill(skill.Name, args)" />
                                             @skill.Name
+                                        </label>
+                                    }
+                                </div>
+                            }
+
+                            @if (SkillProficiencyChoiceCount > 0)
+                            {
+                                <p class="muted compact-hint">Select @SkillProficiencyChoiceCount skill proficiency/proficiencies.</p>
+                                <div class="level-up-choice-grid">
+                                    @foreach (var skill in EligibleSkillProficiencyChoices)
+                                    {
+                                        <label class="toggle">
+                                            <input type="checkbox"
+                                                   checked="@selectedSkillProficiencies.Contains(skill.Name)"
+                                                   disabled="@(!selectedSkillProficiencies.Contains(skill.Name) && selectedSkillProficiencies.Count >= SkillProficiencyChoiceCount)"
+                                                   @onchange="args => ToggleSkillProficiencyChoice(skill.Name, args)" />
+                                            @skill.Name
+                                        </label>
+                                    }
+                                </div>
+                            }
+
+                            @if (ToolProficiencyChoiceCount > 0)
+                            {
+                                <p class="muted compact-hint">Select @ToolProficiencyChoiceCount tool proficiency/proficiencies.</p>
+                                <div class="level-up-choice-grid">
+                                    @foreach (var tool in EligibleToolProficiencyChoices)
+                                    {
+                                        <label class="toggle">
+                                            <input type="checkbox"
+                                                   checked="@selectedToolProficiencies.Contains(tool.Name)"
+                                                   disabled="@(!selectedToolProficiencies.Contains(tool.Name) && selectedToolProficiencies.Count >= ToolProficiencyChoiceCount)"
+                                                   @onchange="args => ToggleToolProficiencyChoice(tool.Name, args)" />
+                                            @tool.Name
+                                        </label>
+                                    }
+                                </div>
+                            }
+
+                            @if (LanguageProficiencyChoiceCount > 0)
+                            {
+                                <p class="muted compact-hint">Select @LanguageProficiencyChoiceCount language(s).</p>
+                                <div class="level-up-choice-grid">
+                                    @foreach (var language in EligibleLanguageProficiencyChoices)
+                                    {
+                                        <label class="toggle">
+                                            <input type="checkbox"
+                                                   checked="@selectedLanguageProficiencies.Contains(language.Name)"
+                                                   disabled="@(!selectedLanguageProficiencies.Contains(language.Name) && selectedLanguageProficiencies.Count >= LanguageProficiencyChoiceCount)"
+                                                   @onchange="args => ToggleLanguageProficiencyChoice(language.Name, args)" />
+                                            @language.Name
                                         </label>
                                     }
                                 </div>
@@ -274,6 +357,12 @@
     private int? selectedFeatDefinitionId;
     private string selectedFightingStyle = "";
     private HashSet<string> selectedExpertiseSkills = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> selectedSkillProficiencies = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> selectedToolProficiencies = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> selectedLanguageProficiencies = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, List<string>> selectedAbilityChoices = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, string> mappedChoiceTypeOverrides = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, int> mappedChoiceCountOverrides = new(StringComparer.OrdinalIgnoreCase);
     private bool isAddingNewClass;
     private bool isLoading = true;
     private bool isSaving;
@@ -322,24 +411,74 @@
             && LevelUpChoicesAreComplete;
     private IReadOnlyList<LevelUpFeatureLevel> NewFeatureLevels => BuildNewFeatureLevels().ToList();
     private IReadOnlyList<LevelUpFeature> NewFeatures => NewFeatureLevels.SelectMany(level => level.Features).ToList();
+    private IReadOnlyList<DescriptionRuleMapping> NewFeatureRuleMappings => NewFeatures
+        .Select(feature => DescriptionRuleMapper.MapFeature(feature.Name, feature.Paragraphs))
+        .ToList();
+    private IReadOnlyList<MappedChoiceRow> MappedChoiceRows => NewFeatures
+        .SelectMany((feature, featureIndex) => DescriptionRuleMapper.MapFeature(feature.Name, feature.Paragraphs).Choices
+            .Select((choice, choiceIndex) => new MappedChoiceRow($"{featureIndex}:{choiceIndex}", feature.Name, choice)))
+        .ToList();
+    private IReadOnlyList<MappedRuleChoice> EffectiveMappedChoices => MappedChoiceRows
+        .Select(row => row.Choice with
+        {
+            ChoiceType = GetChoiceType(row.Key, row.Choice.ChoiceType),
+            Count = GetChoiceCount(row.Key, row.Choice.Count)
+        })
+        .Where(choice => choice.Count > 0)
+        .ToList();
     private bool RequiresFeatChoice => NewFeatures.Any(feature => IsFeatChoiceFeature(feature.Name));
     private bool RequiresFightingStyleChoice => NewFeatures.Any(feature => feature.Name.Contains("Fighting Style", StringComparison.OrdinalIgnoreCase));
-    private bool RequiresExpertiseChoice => NewFeatures.Any(feature => feature.Name.Contains("Expertise", StringComparison.OrdinalIgnoreCase));
-    private bool GrantsHalfProficiency => NewFeatures.Any(feature =>
-        feature.Name.Contains("Jack of All Trades", StringComparison.OrdinalIgnoreCase)
-        || feature.Paragraphs.Any(paragraph => paragraph.Contains("half your Proficiency Bonus", StringComparison.OrdinalIgnoreCase)));
-    private int ExpertiseChoiceCount => 2;
+    private bool RequiresExpertiseChoice => ExpertiseChoiceCount > 0;
+    private bool GrantsHalfProficiency => NewFeatureRuleMappings
+        .SelectMany(mapping => mapping.Effects)
+        .Any(effect => effect.EffectType == "SkillHalfProficiency");
+    private int ExpertiseChoiceCount => EffectiveMappedChoices
+        .Where(choice => choice.ChoiceType == "SkillExpertise")
+        .Sum(choice => choice.Count);
+    private int SkillProficiencyChoiceCount => EffectiveMappedChoices
+        .Where(choice => choice.ChoiceType == "SkillProficiency")
+        .Sum(choice => choice.Count);
+    private int ToolProficiencyChoiceCount => EffectiveMappedChoices
+        .Where(choice => choice.ChoiceType == "ToolProficiency")
+        .Sum(choice => choice.Count);
+    private int LanguageProficiencyChoiceCount => EffectiveMappedChoices
+        .Where(choice => choice.ChoiceType == "LanguageProficiency")
+        .Sum(choice => choice.Count);
     private bool LevelUpChoicesAreComplete => (!RequiresFeatChoice || selectedFeatDefinitionId is not null)
+        && AbilityChoicesAreComplete(LevelUpAbilityChoiceRequirements)
         && (!RequiresFightingStyleChoice || !string.IsNullOrWhiteSpace(selectedFightingStyle))
-        && (!RequiresExpertiseChoice || selectedExpertiseSkills.Count == ExpertiseChoiceCount);
+        && (!RequiresExpertiseChoice || selectedExpertiseSkills.Count == ExpertiseChoiceCount)
+        && (SkillProficiencyChoiceCount == 0 || selectedSkillProficiencies.Count == SkillProficiencyChoiceCount)
+        && (ToolProficiencyChoiceCount == 0 || selectedToolProficiencies.Count == ToolProficiencyChoiceCount)
+        && (LanguageProficiencyChoiceCount == 0 || selectedLanguageProficiencies.Count == LanguageProficiencyChoiceCount);
     private IReadOnlyList<FeatDefinition> AvailableFeatDefinitions => featDefinitions
-        .Where(definition => character?.Feats.All(feat => feat.FeatDefinitionId != definition.Id) ?? true)
+        .Where(definition => string.Equals(definition.Name, "Ability Score Improvement", StringComparison.OrdinalIgnoreCase)
+            || (character?.Feats.All(feat => feat.FeatDefinitionId != definition.Id) ?? true))
         .OrderBy(definition => definition.Name)
         .ThenBy(definition => definition.Source)
         .ToList();
+    private FeatDefinition? SelectedFeatDefinition => selectedFeatDefinitionId is null
+        ? null
+        : featDefinitions.FirstOrDefault(definition => definition.Id == selectedFeatDefinitionId.Value);
+    private IReadOnlyList<CharacterAbilityChoiceRequirement> LevelUpAbilityChoiceRequirements => SelectedFeatDefinition is null
+        ? []
+        : CharacterAbilityChoiceService.BuildRequirements(SelectedFeatDefinition.RawJson, $"Feat:{SelectedFeatDefinition.Id}", $"Feat: {SelectedFeatDefinition.Name}");
     private IReadOnlyList<CharacterSkill> EligibleExpertiseSkills => character?.Skills
         .Where(skill => SkillCanGainExpertise(skill))
+        .Where(skill => SkillMatchesAnyExpertiseScope(skill.Name))
         .OrderBy(skill => skill.Name)
+        .ToList() ?? [];
+    private IReadOnlyList<CharacterSkill> EligibleSkillProficiencyChoices => character?.Skills
+        .Where(skill => !skill.IsProficient && skill.ProficiencyLevel is not "Proficient" and not "Expertise")
+        .OrderBy(skill => skill.Name)
+        .ToList() ?? [];
+    private IReadOnlyList<CharacterToolProficiency> EligibleToolProficiencyChoices => character?.ToolProficiencies
+        .Where(tool => !tool.IsProficient)
+        .OrderBy(tool => tool.Name)
+        .ToList() ?? [];
+    private IReadOnlyList<CharacterLanguageProficiency> EligibleLanguageProficiencyChoices => character?.LanguageProficiencies
+        .Where(language => !language.IsProficient)
+        .OrderBy(language => language.Name)
         .ToList() ?? [];
     private static readonly string[] FightingStyleOptions =
     [
@@ -354,6 +493,14 @@
         "Thrown Weapon Fighting",
         "Two-Weapon Fighting",
         "Unarmed Fighting"
+    ];
+    private static readonly string[] MappedChoiceTypes =
+    [
+        "Ignore",
+        "SkillExpertise",
+        "SkillProficiency",
+        "ToolProficiency",
+        "LanguageProficiency"
     ];
 
     protected override async Task OnParametersSetAsync()
@@ -456,8 +603,10 @@
         }
 
         var grantsHalfProficiency = GrantsHalfProficiency;
+        var targetSourceDefinitionId = SelectedTargetClassDefinition?.Id ?? 0;
+        var targetSourceLevel = Math.Clamp(targetClass.Level + 1, 1, 20);
         isSaving = true;
-        targetClass.Level = Math.Clamp(targetClass.Level + 1, 1, 20);
+        targetClass.Level = targetSourceLevel;
 
         if (selectedSubclassDefinitionId is not null)
         {
@@ -470,7 +619,7 @@
             }
         }
 
-        var grantedEffects = ApplyLevelUpChoices(grantsHalfProficiency);
+        var grantedEffects = ApplyLevelUpChoices(grantsHalfProficiency, targetSourceDefinitionId, targetSourceLevel);
         character.Level = character.Classes.Sum(characterClass => characterClass.Level);
         await Database.UpdateCharacterAsync(character);
         await Database.AddCharacterGrantedEffectsAsync(character.Id, grantedEffects);
@@ -514,7 +663,7 @@
             Level = 1
         });
 
-        var grantedEffects = ApplyLevelUpChoices(GrantsHalfProficiency);
+        var grantedEffects = ApplyLevelUpChoices(GrantsHalfProficiency, selectedNewClassDefinition.Id, 1);
         character.PrimaryClassDefinitionId ??= selectedNewClassDefinition.Id;
         character.Level = character.Classes.Sum(characterClass => characterClass.Level);
         await Database.UpdateCharacterAsync(character);
@@ -522,7 +671,7 @@
         Navigation.NavigateTo($"characters/{Id}");
     }
 
-    private IReadOnlyList<CharacterGrantedEffect> ApplyLevelUpChoices(bool grantsHalfProficiency)
+    private IReadOnlyList<CharacterGrantedEffect> ApplyLevelUpChoices(bool grantsHalfProficiency, int sourceDefinitionId, int sourceLevel)
     {
         var grantedEffects = new List<CharacterGrantedEffect>();
         if (character is null)
@@ -546,6 +695,12 @@
             }
         }
 
+        if (selectedFeatDefinitionId is not null && LevelUpAbilityChoiceRequirements.Count > 0)
+        {
+            character.FeatChoicesJson = MergeAbilityChoices(character.FeatChoicesJson, LevelUpAbilityChoiceRequirements);
+            ApplyAbilityChoiceBonusesToCharacter(character, LevelUpAbilityChoiceRequirements);
+        }
+
         if (!string.IsNullOrWhiteSpace(selectedFightingStyle)
             && character.FightingStyles.All(style => !string.Equals(style.Name, selectedFightingStyle, StringComparison.OrdinalIgnoreCase)))
         {
@@ -553,12 +708,12 @@
             {
                 CharacterId = character.Id,
                 SourceType = "Class",
-                SourceDefinitionId = SelectedTargetClassDefinition?.Id ?? 0,
-                SourceLevel = NextClassLevel,
+                SourceDefinitionId = sourceDefinitionId,
+                SourceLevel = sourceLevel,
                 EffectType = "FightingStyle",
                 TargetKey = selectedFightingStyle,
                 Value = SelectedTargetClassDefinition?.Source ?? "",
-                Label = $"Chosen during level-up at level {NextClassLevel}."
+                Label = $"Chosen during level-up at level {sourceLevel}."
             });
         }
 
@@ -568,12 +723,57 @@
             {
                 CharacterId = character.Id,
                 SourceType = "Class",
-                SourceDefinitionId = SelectedTargetClassDefinition?.Id ?? 0,
-                SourceLevel = NextClassLevel,
+                SourceDefinitionId = sourceDefinitionId,
+                SourceLevel = sourceLevel,
                 EffectType = "SkillExpertise",
                 TargetKey = skillName,
                 Value = "Expertise",
-                Label = $"Chosen during level-up at level {NextClassLevel}."
+                Label = $"Chosen during level-up at level {sourceLevel}."
+            });
+        }
+
+        foreach (var skillName in selectedSkillProficiencies)
+        {
+            grantedEffects.Add(new CharacterGrantedEffect
+            {
+                CharacterId = character.Id,
+                SourceType = "Class",
+                SourceDefinitionId = sourceDefinitionId,
+                SourceLevel = sourceLevel,
+                EffectType = "SkillProficiency",
+                TargetKey = skillName,
+                Value = "Proficient",
+                Label = $"Chosen during level-up at level {sourceLevel}."
+            });
+        }
+
+        foreach (var toolName in selectedToolProficiencies)
+        {
+            grantedEffects.Add(new CharacterGrantedEffect
+            {
+                CharacterId = character.Id,
+                SourceType = "Class",
+                SourceDefinitionId = sourceDefinitionId,
+                SourceLevel = sourceLevel,
+                EffectType = "ToolProficiency",
+                TargetKey = toolName,
+                Value = "Proficient",
+                Label = $"Chosen during level-up at level {sourceLevel}."
+            });
+        }
+
+        foreach (var languageName in selectedLanguageProficiencies)
+        {
+            grantedEffects.Add(new CharacterGrantedEffect
+            {
+                CharacterId = character.Id,
+                SourceType = "Class",
+                SourceDefinitionId = sourceDefinitionId,
+                SourceLevel = sourceLevel,
+                EffectType = "LanguageProficiency",
+                TargetKey = languageName,
+                Value = "Proficient",
+                Label = $"Chosen during level-up at level {sourceLevel}."
             });
         }
 
@@ -583,8 +783,8 @@
             {
                 CharacterId = character.Id,
                 SourceType = "Class",
-                SourceDefinitionId = SelectedTargetClassDefinition?.Id ?? 0,
-                SourceLevel = NextClassLevel,
+                SourceDefinitionId = sourceDefinitionId,
+                SourceLevel = sourceLevel,
                 EffectType = "SkillHalfProficiency",
                 TargetKey = "AllSkills",
                 Value = "Half",
@@ -600,12 +800,106 @@
         selectedFeatDefinitionId = null;
         selectedFightingStyle = "";
         selectedExpertiseSkills.Clear();
+        selectedSkillProficiencies.Clear();
+        selectedToolProficiencies.Clear();
+        selectedLanguageProficiencies.Clear();
+        selectedAbilityChoices.Clear();
+        mappedChoiceTypeOverrides.Clear();
+        mappedChoiceCountOverrides.Clear();
+    }
+
+    private void SetLevelUpAbilityChoice((string Key, int Index, string Value) choice)
+    {
+        var requirement = LevelUpAbilityChoiceRequirements.FirstOrDefault(requirement => string.Equals(requirement.Key, choice.Key, StringComparison.OrdinalIgnoreCase));
+        if (requirement is null || choice.Index < 0 || choice.Index >= requirement.Count)
+        {
+            return;
+        }
+
+        if (!selectedAbilityChoices.TryGetValue(choice.Key, out var values))
+        {
+            values = [];
+            selectedAbilityChoices[choice.Key] = values;
+        }
+
+        while (values.Count <= choice.Index)
+        {
+            values.Add("");
+        }
+
+        values[choice.Index] = requirement.Options.Contains(choice.Value, StringComparer.OrdinalIgnoreCase) ? choice.Value : "";
+        values.RemoveAll(string.IsNullOrWhiteSpace);
+        if (values.Count == 0)
+        {
+            selectedAbilityChoices.Remove(choice.Key);
+        }
+    }
+
+    private void PruneLevelUpAbilityChoices()
+    {
+        var validKeys = LevelUpAbilityChoiceRequirements.Select(requirement => requirement.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in selectedAbilityChoices.Keys.Where(key => !validKeys.Contains(key)).ToList())
+        {
+            selectedAbilityChoices.Remove(key);
+        }
+    }
+
+    private bool AbilityChoicesAreComplete(IReadOnlyList<CharacterAbilityChoiceRequirement> requirements)
+    {
+        return requirements.All(requirement =>
+            selectedAbilityChoices.TryGetValue(requirement.Key, out var values)
+            && values.Where(value => requirement.Options.Contains(value, StringComparer.OrdinalIgnoreCase)).Take(requirement.Count).Count() == requirement.Count);
+    }
+
+    private string MergeAbilityChoices(string choicesJson, IReadOnlyList<CharacterAbilityChoiceRequirement> requirements)
+    {
+        var root = string.IsNullOrWhiteSpace(choicesJson)
+            ? new System.Text.Json.Nodes.JsonObject()
+            : System.Text.Json.Nodes.JsonNode.Parse(choicesJson)?.AsObject() ?? new System.Text.Json.Nodes.JsonObject();
+        var abilityChoices = root["abilityChoices"] as System.Text.Json.Nodes.JsonObject;
+        if (abilityChoices is null)
+        {
+            abilityChoices = new System.Text.Json.Nodes.JsonObject();
+            root["abilityChoices"] = abilityChoices;
+        }
+
+        foreach (var requirement in requirements)
+        {
+            if (!selectedAbilityChoices.TryGetValue(requirement.Key, out var values))
+            {
+                continue;
+            }
+
+            var array = new System.Text.Json.Nodes.JsonArray();
+            foreach (var value in values.Where(value => requirement.Options.Contains(value, StringComparer.OrdinalIgnoreCase)).Take(requirement.Count))
+            {
+                array.Add(value);
+            }
+
+            if (array.Count > 0)
+            {
+                abilityChoices[requirement.Key] = array;
+            }
+        }
+
+        return root.ToJsonString();
+    }
+
+    private void ApplyAbilityChoiceBonusesToCharacter(Character target, IReadOnlyList<CharacterAbilityChoiceRequirement> requirements)
+    {
+        var bonuses = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        CharacterAbilityChoiceService.AddSelectedBonuses(bonuses, requirements, selectedAbilityChoices);
+        foreach (var (abilityCode, bonus) in bonuses)
+        {
+            SetAbilityScore(target, abilityCode, GetAbilityScore(target, abilityCode) + bonus);
+        }
     }
 
     private void ToggleExpertiseSkill(string skillName, ChangeEventArgs args)
     {
         if (character?.Skills.FirstOrDefault(skill => string.Equals(skill.Name, skillName, StringComparison.OrdinalIgnoreCase)) is not { } skill
-            || !SkillCanGainExpertise(skill))
+            || !SkillCanGainExpertise(skill)
+            || !SkillMatchesAnyExpertiseScope(skill.Name))
         {
             selectedExpertiseSkills.Remove(skillName);
             return;
@@ -623,10 +917,120 @@
         selectedExpertiseSkills.Remove(skillName);
     }
 
+    private void ToggleSkillProficiencyChoice(string skillName, ChangeEventArgs args)
+    {
+        ToggleChoice(selectedSkillProficiencies, skillName, SkillProficiencyChoiceCount, args);
+    }
+
+    private void ToggleToolProficiencyChoice(string toolName, ChangeEventArgs args)
+    {
+        ToggleChoice(selectedToolProficiencies, toolName, ToolProficiencyChoiceCount, args);
+    }
+
+    private void ToggleLanguageProficiencyChoice(string languageName, ChangeEventArgs args)
+    {
+        ToggleChoice(selectedLanguageProficiencies, languageName, LanguageProficiencyChoiceCount, args);
+    }
+
+    private static void ToggleChoice(HashSet<string> selected, string value, int limit, ChangeEventArgs args)
+    {
+        if (args.Value is bool isChecked && isChecked)
+        {
+            if (selected.Count < limit)
+            {
+                selected.Add(value);
+            }
+            return;
+        }
+
+        selected.Remove(value);
+    }
+
+    private string GetChoiceType(string key, string fallback)
+    {
+        var value = mappedChoiceTypeOverrides.GetValueOrDefault(key, fallback);
+        return string.Equals(value, "Ignore", StringComparison.OrdinalIgnoreCase) ? "Ignore" : value;
+    }
+
+    private int GetChoiceCount(string key, int fallback)
+    {
+        return Math.Clamp(mappedChoiceCountOverrides.GetValueOrDefault(key, fallback), 0, 6);
+    }
+
+    private void SetChoiceTypeOverride(string key, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            mappedChoiceTypeOverrides.Remove(key);
+            return;
+        }
+
+        mappedChoiceTypeOverrides[key] = value;
+        TrimChoiceSelections();
+    }
+
+    private void SetChoiceCountOverride(string key, string? value)
+    {
+        if (!int.TryParse(value, out var parsed))
+        {
+            mappedChoiceCountOverrides.Remove(key);
+            return;
+        }
+
+        mappedChoiceCountOverrides[key] = Math.Clamp(parsed, 0, 6);
+        TrimChoiceSelections();
+    }
+
+    private void TrimChoiceSelections()
+    {
+        selectedExpertiseSkills = selectedExpertiseSkills.Take(ExpertiseChoiceCount).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        selectedSkillProficiencies = selectedSkillProficiencies.Take(SkillProficiencyChoiceCount).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        selectedToolProficiencies = selectedToolProficiencies.Take(ToolProficiencyChoiceCount).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        selectedLanguageProficiencies = selectedLanguageProficiencies.Take(LanguageProficiencyChoiceCount).ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string FormatMappedChoiceType(string choiceType)
+    {
+        return choiceType switch
+        {
+            "Ignore" => "Ignore",
+            "SkillExpertise" => "Skill Expertise",
+            "SkillProficiency" => "Skill Proficiency",
+            "ToolProficiency" => "Tool Proficiency",
+            "LanguageProficiency" => "Language",
+            _ => choiceType
+        };
+    }
+
     private static bool SkillCanGainExpertise(CharacterSkill skill)
     {
         return skill.ProficiencyLevel != "Expertise"
             && (skill.IsProficient || skill.ProficiencyLevel == "Proficient");
+    }
+
+    private bool SkillMatchesAnyExpertiseScope(string skillName)
+    {
+        var expertiseChoices = EffectiveMappedChoices
+            .Where(choice => choice.ChoiceType == "SkillExpertise")
+            .ToList();
+        if (expertiseChoices.Count == 0)
+        {
+            return true;
+        }
+
+        return expertiseChoices.Any(choice => SkillMatchesScope(skillName, choice.TargetScope));
+    }
+
+    private static bool SkillMatchesScope(string skillName, string targetScope)
+    {
+        if (!targetScope.StartsWith("SkillList:", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return targetScope["SkillList:".Length..]
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(allowedSkill => string.Equals(allowedSkill, skillName, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool IsFeatChoiceFeature(string featureName)
@@ -740,16 +1144,47 @@
             return 0;
         }
 
+        return GetAbilityScore(character, abilityCode);
+    }
+
+    private static int GetAbilityScore(Character target, string abilityCode)
+    {
         return abilityCode.ToLowerInvariant() switch
         {
-            "str" => character.Strength,
-            "dex" => character.Dexterity,
-            "con" => character.Constitution,
-            "int" => character.Intelligence,
-            "wis" => character.Wisdom,
-            "cha" => character.Charisma,
+            "str" => target.Strength,
+            "dex" => target.Dexterity,
+            "con" => target.Constitution,
+            "int" => target.Intelligence,
+            "wis" => target.Wisdom,
+            "cha" => target.Charisma,
             _ => 0
         };
+    }
+
+    private static void SetAbilityScore(Character target, string abilityCode, int value)
+    {
+        var clampedValue = Math.Clamp(value, 1, 30);
+        switch (abilityCode.ToLowerInvariant())
+        {
+            case "str":
+                target.Strength = clampedValue;
+                break;
+            case "dex":
+                target.Dexterity = clampedValue;
+                break;
+            case "con":
+                target.Constitution = clampedValue;
+                break;
+            case "int":
+                target.Intelligence = clampedValue;
+                break;
+            case "wis":
+                target.Wisdom = clampedValue;
+                break;
+            case "cha":
+                target.Charisma = clampedValue;
+                break;
+        }
     }
 
     private static bool TryReadAbilityRequirement(string abilityCode, JsonElement value, out AbilityRequirement requirement)
@@ -1087,4 +1522,5 @@
     private readonly record struct AbilityRequirement(string AbilityCode, int Minimum);
     private sealed record LevelUpFeatureLevel(int Level, IReadOnlyList<LevelUpFeature> Features);
     private sealed record LevelUpFeature(string Name, int Level, string Key, IReadOnlyList<string> Paragraphs);
+    private sealed record MappedChoiceRow(string Key, string FeatureName, MappedRuleChoice Choice);
 }

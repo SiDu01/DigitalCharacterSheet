@@ -20,6 +20,8 @@ public static class MauiProgram
         builder.Services.AddMauiBlazorWebView();
         builder.Services.AddSingleton<SpellImportService>();
         builder.Services.AddSingleton<AppDatabase>();
+        builder.Services.AddSingleton<TextBadgeSettingsService>();
+        builder.Services.AddSingleton<RecentActivityService>();
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();

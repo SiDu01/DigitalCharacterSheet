@@ -1,6 +1,7 @@
 @page "/spells/{Id:int}"
 @inject AppDatabase Database
 @inject NavigationManager Navigation
+@inject RecentActivityService RecentActivity
 
 <PageTitle>@spell?.Name</PageTitle>
 
@@ -16,7 +17,9 @@ else
                             ShowBackButton="true"
                             OnBack="OpenSpells"
                             OnTogglePrepared="TogglePrepared"
-                            OnSelectVersion="SelectVersion" />
+                            OnSelectVersion="SelectVersion"
+                            OnToggleBookmark="ToggleBookmark"
+                            IsBookmarked="@IsCurrentSpellBookmarked" />
     </section>
 }
 
@@ -25,6 +28,7 @@ else
 
     private Spell? spell;
     private List<Spell> versions = [];
+    private bool IsCurrentSpellBookmarked => spell is not null && RecentActivity.IsBookmarked("Spell", spell.Id);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -32,6 +36,7 @@ else
         if (spell is not null)
         {
             versions = (await Database.GetSpellVersionsAsync(spell.Name)).ToList();
+            RecentActivity.Track("Spell", spell.Id, spell.Name, $"{spell.LevelDisplay} {spell.School} - {spell.Source}", $"spells/{spell.Id}");
         }
     }
 
@@ -44,6 +49,12 @@ else
     private void SelectVersion(Spell selectedSpell)
     {
         spell = selectedSpell;
+        RecentActivity.Track("Spell", spell.Id, spell.Name, $"{spell.LevelDisplay} {spell.School} - {spell.Source}", $"spells/{spell.Id}");
+    }
+
+    private void ToggleBookmark(Spell selectedSpell)
+    {
+        RecentActivity.ToggleBookmark("Spell", selectedSpell.Id, selectedSpell.Name, $"{selectedSpell.LevelDisplay} {selectedSpell.School} - {selectedSpell.Source}", $"spells/{selectedSpell.Id}");
     }
 
     private void OpenSpells()

@@ -85,6 +85,9 @@ public sealed partial class AppDatabase
             case 6:
                 await ApplyItemBonusCompatibilityMigrationAsync();
                 return;
+            case 7:
+                await ApplyCharacterCombatStateMigrationAsync();
+                return;
             default:
                 throw new InvalidOperationException($"No migration is defined for database version {version}.");
         }

@@ -92,6 +92,10 @@ public sealed partial class AppDatabase
             Intelligence = ClampAbility(character.Intelligence),
             Wisdom = ClampAbility(character.Wisdom),
             Charisma = ClampAbility(character.Charisma),
+            MaxHitPoints = Math.Max(0, character.MaxHitPoints),
+            CurrentHitPoints = Math.Clamp(character.CurrentHitPoints, 0, Math.Max(0, character.MaxHitPoints)),
+            TemporaryHitPoints = Math.Max(0, character.TemporaryHitPoints),
+            ConditionsJson = character.ConditionsJson.Trim(),
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -125,6 +129,7 @@ public sealed partial class AppDatabase
         await InsertCharacterFightingStylesAsync(entity.Id, character.FightingStyles);
         await InsertCharacterToolProficienciesAsync(entity.Id, character.ToolProficiencies);
         await InsertCharacterLanguageProficienciesAsync(entity.Id, character.LanguageProficiencies);
+        await RebuildAutomaticOptionGrantedEffectsAsync(entity.Id, character);
 
         var classes = await GetCharacterClassesAsync(entity.Id);
         var feats = await GetCharacterFeatsAsync(entity.Id);
@@ -180,6 +185,10 @@ public sealed partial class AppDatabase
         entity.Intelligence = ClampAbility(character.Intelligence);
         entity.Wisdom = ClampAbility(character.Wisdom);
         entity.Charisma = ClampAbility(character.Charisma);
+        entity.MaxHitPoints = Math.Max(0, character.MaxHitPoints);
+        entity.CurrentHitPoints = Math.Clamp(character.CurrentHitPoints, 0, Math.Max(0, character.MaxHitPoints));
+        entity.TemporaryHitPoints = Math.Max(0, character.TemporaryHitPoints);
+        entity.ConditionsJson = character.ConditionsJson.Trim();
         entity.UpdatedAt = DateTime.UtcNow;
         await _database.UpdateAsync(entity);
 
@@ -266,6 +275,27 @@ public sealed partial class AppDatabase
         }
 
         await InsertCharacterLanguageProficienciesAsync(character.Id, character.LanguageProficiencies);
+        await RebuildAutomaticOptionGrantedEffectsAsync(character.Id, character);
+    }
+
+    public async Task UpdateCharacterCombatStateAsync(int characterId, int maxHitPoints, int currentHitPoints, int temporaryHitPoints, string conditionsJson)
+    {
+        await InitializeAsync();
+
+        var entity = await _database.Table<CharacterEntity>()
+            .Where(row => row.Id == characterId)
+            .FirstOrDefaultAsync();
+        if (entity is null)
+        {
+            throw new InvalidOperationException("Character was not found.");
+        }
+
+        entity.MaxHitPoints = Math.Max(0, maxHitPoints);
+        entity.CurrentHitPoints = Math.Clamp(currentHitPoints, 0, entity.MaxHitPoints);
+        entity.TemporaryHitPoints = Math.Max(0, temporaryHitPoints);
+        entity.ConditionsJson = conditionsJson.Trim();
+        entity.UpdatedAt = DateTime.UtcNow;
+        await _database.UpdateAsync(entity);
     }
 
     public async Task DeleteCharacterAsync(int characterId)
@@ -453,6 +483,24 @@ public sealed partial class AppDatabase
         if (entities.Count > 0)
         {
             await _database.InsertAllAsync(entities);
+        }
+    }
+
+    private async Task RebuildAutomaticOptionGrantedEffectsAsync(int characterId, Character character)
+    {
+        var existingOptionEffects = await _database.Table<CharacterGrantedEffectEntity>()
+            .Where(row => row.CharacterId == characterId && row.SourceType == "Option")
+            .ToListAsync();
+        foreach (var existingEffect in existingOptionEffects)
+        {
+            await _database.DeleteAsync(existingEffect);
+        }
+
+        var effects = await GetCharacterOptionEffectsAsync(character);
+        var grantedEffects = BuildAutomaticOptionGrantedEffects(characterId, effects).ToList();
+        if (grantedEffects.Count > 0)
+        {
+            await AddCharacterGrantedEffectsAsync(characterId, grantedEffects);
         }
     }
 
@@ -743,18 +791,436 @@ public sealed partial class AppDatabase
         }
 
         var characters = await GetCharactersAsync();
+        var entries = new List<CharacterExportEntry>();
+        foreach (var character in characters)
+        {
+            entries.Add(await BuildCharacterExportEntryAsync(character));
+        }
+
         var export = new CharacterExport
         {
+            FormatVersion = 2,
             ExportedAtUtc = DateTime.UtcNow,
             DatabaseVersion = DatabaseVersion,
             SourceDataVersion = BuildSourceDataVersion(),
-            Characters = characters.ToList()
+            Characters = characters.ToList(),
+            CharacterEntries = entries
         };
 
         var json = JsonSerializer.Serialize(export, new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(filePath, json);
         return filePath;
     }
+
+    public async Task<int> ImportCharactersAsync(string filePath)
+    {
+        await InitializeAsync();
+
+        var json = await File.ReadAllTextAsync(filePath);
+        var export = JsonSerializer.Deserialize<CharacterExport>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            ?? throw new InvalidOperationException("The selected file is not a valid character export.");
+
+        var entries = export.CharacterEntries.Count > 0
+            ? export.CharacterEntries
+            : export.Characters.Select(character => new CharacterExportEntry { Character = character }).ToList();
+
+        var importedCount = 0;
+        foreach (var entry in entries.Where(entry => !string.IsNullOrWhiteSpace(entry.Character.Name)))
+        {
+            await ImportCharacterEntryAsync(entry);
+            importedCount++;
+        }
+
+        return importedCount;
+    }
+
+    private async Task<CharacterExportEntry> BuildCharacterExportEntryAsync(Character character)
+    {
+        character.SavingThrows = (await GetCharacterSavingThrowsAsync(character.Id)).ToList();
+        character.Skills = (await GetCharacterSkillsAsync(character.Id)).ToList();
+        character.FightingStyles = (await GetCharacterFightingStylesAsync(character.Id)).ToList();
+        character.ToolProficiencies = (await GetCharacterToolProficienciesAsync(character.Id)).ToList();
+        character.LanguageProficiencies = (await GetCharacterLanguageProficienciesAsync(character.Id)).ToList();
+        character.GrantedEffects = (await GetCharacterGrantedEffectsAsync(character.Id)).ToList();
+
+        var spellLinks = await _database.Table<CharacterSpellEntity>()
+            .Where(link => link.CharacterId == character.Id)
+            .ToListAsync();
+        var spellIds = spellLinks.Select(link => link.SpellId).ToHashSet();
+        var spells = (await _database.Table<SpellEntity>().ToListAsync())
+            .Where(spell => spellIds.Contains(spell.Id))
+            .ToDictionary(spell => spell.Id);
+        var spellExports = spellLinks
+            .Select(link =>
+            {
+                spells.TryGetValue(link.SpellId, out var spell);
+                return new CharacterSpellExport
+                {
+                    SpellId = link.SpellId,
+                    Name = spell?.Name ?? "",
+                    Source = spell?.Source ?? "",
+                    Page = spell?.Page,
+                    Mode = string.IsNullOrWhiteSpace(link.Mode) ? "Known" : link.Mode
+                };
+            })
+            .ToList();
+
+        var slotExports = (await _database.Table<CharacterSpellSlotEntity>()
+            .Where(row => row.CharacterId == character.Id)
+            .ToListAsync())
+            .Select(row => new CharacterSpellSlotExport
+            {
+                SpellLevel = row.SpellLevel,
+                UsedSlots = row.UsedSlots
+            })
+            .ToList();
+
+        var hiddenFeatureKeys = (await _database.Table<CharacterHiddenFeatureEntity>()
+            .Where(row => row.CharacterId == character.Id)
+            .ToListAsync())
+            .Select(row => row.FeatureKey)
+            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var inventory = await GetCharacterInventoryAsync(character.Id);
+        var inventoryExports = inventory
+            .Select(item => new CharacterInventoryItemExport
+            {
+                ItemDefinitionId = item.ItemDefinitionId,
+                ItemName = item.ItemDefinition?.Name ?? item.CustomName,
+                ItemSource = item.ItemDefinition?.Source ?? "",
+                CustomName = item.CustomName,
+                CustomDescription = item.CustomDescription,
+                Quantity = item.Quantity,
+                IsEquipped = item.IsEquipped,
+                IsAttuned = item.IsAttuned,
+                IsCarried = item.IsCarried,
+                ContainerName = item.ContainerName,
+                Notes = item.Notes,
+                CurrentCharges = item.CurrentCharges,
+                MaxCharges = item.MaxCharges
+            })
+            .ToList();
+
+        return new CharacterExportEntry
+        {
+            Character = character,
+            Spells = spellExports,
+            SpellSlots = slotExports,
+            HiddenFeatureKeys = hiddenFeatureKeys,
+            Inventory = inventoryExports
+        };
+    }
+
+    private async Task ImportCharacterEntryAsync(CharacterExportEntry entry)
+    {
+        var character = entry.Character;
+        var originalClassLinks = character.Classes
+            .Select(characterClass => new ImportedClassLink(
+                characterClass.ClassDefinitionId,
+                characterClass.SubclassDefinitionId,
+                characterClass.ClassName,
+                characterClass.ClassSource,
+                characterClass.SubclassName,
+                characterClass.SubclassSource))
+            .ToList();
+
+        await RemapCharacterDefinitionIdsAsync(character);
+        var classIdMap = character.Classes
+            .Select(characterClass =>
+            {
+                var original = originalClassLinks.FirstOrDefault(oldClass =>
+                    string.Equals(oldClass.ClassName, characterClass.ClassName, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(oldClass.ClassSource, characterClass.ClassSource, StringComparison.OrdinalIgnoreCase));
+                return (OldId: original?.ClassDefinitionId ?? 0, NewId: characterClass.ClassDefinitionId);
+            })
+            .Where(pair => pair.OldId > 0 && pair.NewId > 0)
+            .GroupBy(pair => pair.OldId)
+            .ToDictionary(group => group.Key, group => group.First().NewId);
+        var subclassIdMap = character.Classes
+            .Where(characterClass => characterClass.SubclassDefinitionId is not null)
+            .Select(characterClass =>
+            {
+                var original = originalClassLinks.FirstOrDefault(oldClass =>
+                    string.Equals(oldClass.SubclassName, characterClass.SubclassName, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(oldClass.SubclassSource, characterClass.SubclassSource, StringComparison.OrdinalIgnoreCase));
+                return (OldId: original?.SubclassDefinitionId, NewId: characterClass.SubclassDefinitionId);
+            })
+            .Where(pair => pair.OldId is > 0 && pair.NewId is > 0)
+            .GroupBy(pair => pair.OldId!.Value)
+            .ToDictionary(group => group.Key, group => group.First().NewId!.Value);
+
+        foreach (var effect in character.GrantedEffects)
+        {
+            if (string.Equals(effect.SourceType, "Class", StringComparison.OrdinalIgnoreCase)
+                && classIdMap.TryGetValue(effect.SourceDefinitionId, out var newClassId))
+            {
+                effect.SourceDefinitionId = newClassId;
+            }
+            else if (string.Equals(effect.SourceType, "Subclass", StringComparison.OrdinalIgnoreCase)
+                && subclassIdMap.TryGetValue(effect.SourceDefinitionId, out var newSubclassId))
+            {
+                effect.SourceDefinitionId = newSubclassId;
+            }
+        }
+
+        character.Id = 0;
+        character.Name = await BuildImportedCharacterNameAsync(character.Name);
+        var imported = await AddCharacterAsync(character);
+        await AddCharacterGrantedEffectsAsync(imported.Id, character.GrantedEffects);
+        await ImportCharacterSpellsAsync(imported.Id, entry.Spells);
+        await ImportCharacterSpellSlotsAsync(imported.Id, entry.SpellSlots);
+        await ImportCharacterHiddenFeaturesAsync(imported.Id, entry.HiddenFeatureKeys);
+        await ImportCharacterInventoryAsync(imported.Id, entry.Inventory);
+    }
+
+    private async Task RemapCharacterDefinitionIdsAsync(Character character)
+    {
+        var raceDefinitions = await _database.Table<RaceDefinitionEntity>().ToListAsync();
+        var subraceDefinitions = await _database.Table<SubraceDefinitionEntity>().ToListAsync();
+        var backgroundDefinitions = await _database.Table<BackgroundDefinitionEntity>().ToListAsync();
+        var classDefinitions = await _database.Table<ClassDefinitionEntity>().ToListAsync();
+        var subclassDefinitions = await _database.Table<SubclassDefinitionEntity>().ToListAsync();
+        var featDefinitions = await _database.Table<FeatDefinitionEntity>().ToListAsync();
+
+        character.RaceDefinitionId = ResolveDefinitionId(
+            character.RaceDefinitionId,
+            character.RaceName,
+            character.RaceSource,
+            raceDefinitions,
+            definition => definition.Id,
+            definition => definition.Name,
+            definition => definition.Source);
+        character.SubraceDefinitionId = ResolveDefinitionId(
+            character.SubraceDefinitionId,
+            character.SubraceName,
+            character.SubraceSource,
+            subraceDefinitions,
+            definition => definition.Id,
+            definition => definition.Name,
+            definition => definition.Source);
+        character.BackgroundDefinitionId = ResolveDefinitionId(
+            character.BackgroundDefinitionId,
+            character.BackgroundName,
+            character.BackgroundSource,
+            backgroundDefinitions,
+            definition => definition.Id,
+            definition => definition.Name,
+            definition => definition.Source);
+        character.PrimaryClassDefinitionId = ResolveDefinitionId(
+            character.PrimaryClassDefinitionId,
+            character.Classes.FirstOrDefault(characterClass => characterClass.ClassDefinitionId == character.PrimaryClassDefinitionId)?.ClassName ?? "",
+            character.Classes.FirstOrDefault(characterClass => characterClass.ClassDefinitionId == character.PrimaryClassDefinitionId)?.ClassSource ?? "",
+            classDefinitions,
+            definition => definition.Id,
+            definition => definition.Name,
+            definition => definition.Source);
+
+        foreach (var characterClass in character.Classes)
+        {
+            characterClass.ClassDefinitionId = ResolveDefinitionId(
+                characterClass.ClassDefinitionId,
+                characterClass.ClassName,
+                characterClass.ClassSource,
+                classDefinitions,
+                definition => definition.Id,
+                definition => definition.Name,
+                definition => definition.Source) ?? 0;
+            characterClass.SubclassDefinitionId = ResolveDefinitionId(
+                characterClass.SubclassDefinitionId,
+                characterClass.SubclassName,
+                characterClass.SubclassSource,
+                subclassDefinitions,
+                definition => definition.Id,
+                definition => definition.Name,
+                definition => definition.Source);
+        }
+
+        foreach (var feat in character.Feats)
+        {
+            feat.FeatDefinitionId = ResolveDefinitionId(
+                feat.FeatDefinitionId,
+                feat.FeatName,
+                feat.FeatSource,
+                featDefinitions,
+                definition => definition.Id,
+                definition => definition.Name,
+                definition => definition.Source) ?? 0;
+        }
+    }
+
+    private async Task ImportCharacterSpellsAsync(int characterId, IEnumerable<CharacterSpellExport> spells)
+    {
+        var spellDefinitions = await _database.Table<SpellEntity>().ToListAsync();
+        var rows = spells
+            .Select(spell => ResolveSpellId(spell, spellDefinitions) is { } spellId
+                ? new CharacterSpellEntity
+                {
+                    CharacterId = characterId,
+                    SpellId = spellId,
+                    Mode = spell.Mode is "Prepared" ? "Prepared" : "Known",
+                    AddedAt = DateTime.UtcNow
+                }
+                : null)
+            .Where(row => row is not null)
+            .Select(row => row!)
+            .GroupBy(row => row.SpellId)
+            .Select(group => group.First())
+            .ToList();
+
+        if (rows.Count > 0)
+        {
+            await _database.InsertAllAsync(rows);
+        }
+    }
+
+    private async Task ImportCharacterSpellSlotsAsync(int characterId, IEnumerable<CharacterSpellSlotExport> spellSlots)
+    {
+        var rows = spellSlots
+            .Where(slot => slot.SpellLevel is >= 1 and <= 9 && slot.UsedSlots > 0)
+            .GroupBy(slot => slot.SpellLevel)
+            .Select(group => new CharacterSpellSlotEntity
+            {
+                CharacterId = characterId,
+                SpellLevel = group.Key,
+                UsedSlots = Math.Max(0, group.First().UsedSlots)
+            })
+            .ToList();
+
+        if (rows.Count > 0)
+        {
+            await _database.InsertAllAsync(rows);
+        }
+    }
+
+    private async Task ImportCharacterHiddenFeaturesAsync(int characterId, IEnumerable<string> hiddenFeatureKeys)
+    {
+        var rows = hiddenFeatureKeys
+            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .Select(key => key.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(key => new CharacterHiddenFeatureEntity
+            {
+                CharacterId = characterId,
+                FeatureKey = key
+            })
+            .ToList();
+
+        if (rows.Count > 0)
+        {
+            await _database.InsertAllAsync(rows);
+        }
+    }
+
+    private async Task ImportCharacterInventoryAsync(int characterId, IEnumerable<CharacterInventoryItemExport> inventory)
+    {
+        var itemDefinitions = await _database.Table<ItemDefinitionEntity>().ToListAsync();
+        var now = DateTime.UtcNow;
+        var rows = inventory
+            .Select(item => new CharacterInventoryItemEntity
+            {
+                CharacterId = characterId,
+                ItemDefinitionId = ResolveItemDefinitionId(item, itemDefinitions),
+                CustomName = item.CustomName.Trim(),
+                CustomDescription = item.CustomDescription.Trim(),
+                Quantity = Math.Max(1, item.Quantity),
+                IsEquipped = item.IsEquipped,
+                IsAttuned = item.IsAttuned,
+                IsCarried = item.IsCarried,
+                ContainerName = item.ContainerName.Trim(),
+                Notes = item.Notes.Trim(),
+                CurrentCharges = item.CurrentCharges,
+                MaxCharges = item.MaxCharges,
+                CreatedAt = now,
+                UpdatedAt = now
+            })
+            .ToList();
+
+        if (rows.Count > 0)
+        {
+            await _database.InsertAllAsync(rows);
+        }
+    }
+
+    private static int? ResolveSpellId(CharacterSpellExport spell, IReadOnlyList<SpellEntity> spellDefinitions)
+    {
+        var byNameAndSource = spellDefinitions.FirstOrDefault(definition =>
+            string.Equals(definition.Name, spell.Name, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(definition.Source, spell.Source, StringComparison.OrdinalIgnoreCase));
+        if (byNameAndSource is not null)
+        {
+            return byNameAndSource.Id;
+        }
+
+        return spellDefinitions.Any(definition => definition.Id == spell.SpellId)
+            ? spell.SpellId
+            : null;
+    }
+
+    private static int? ResolveItemDefinitionId(CharacterInventoryItemExport item, IReadOnlyList<ItemDefinitionEntity> itemDefinitions)
+    {
+        var byNameAndSource = itemDefinitions.FirstOrDefault(definition =>
+            string.Equals(definition.Name, item.ItemName, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(definition.Source, item.ItemSource, StringComparison.OrdinalIgnoreCase));
+        if (byNameAndSource is not null)
+        {
+            return byNameAndSource.Id;
+        }
+
+        return item.ItemDefinitionId is not null && itemDefinitions.Any(definition => definition.Id == item.ItemDefinitionId.Value)
+            ? item.ItemDefinitionId
+            : null;
+    }
+
+    private static int? ResolveDefinitionId<T>(
+        int? existingId,
+        string name,
+        string source,
+        IReadOnlyList<T> definitions,
+        Func<T, int> idSelector,
+        Func<T, string> nameSelector,
+        Func<T, string> sourceSelector)
+    {
+        var byNameAndSource = definitions.FirstOrDefault(definition =>
+            string.Equals(nameSelector(definition), name, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(sourceSelector(definition), source, StringComparison.OrdinalIgnoreCase));
+        if (byNameAndSource is not null)
+        {
+            return idSelector(byNameAndSource);
+        }
+
+        return existingId is not null && definitions.Any(definition => idSelector(definition) == existingId.Value)
+            ? existingId
+            : null;
+    }
+
+    private async Task<string> BuildImportedCharacterNameAsync(string name)
+    {
+        var existingNames = (await _database.Table<CharacterEntity>().ToListAsync())
+            .Select(character => character.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!existingNames.Contains(name))
+        {
+            return name;
+        }
+
+        var index = 2;
+        while (existingNames.Contains($"{name} (Import {index})"))
+        {
+            index++;
+        }
+
+        return $"{name} (Import {index})";
+    }
+
+    private sealed record ImportedClassLink(
+        int ClassDefinitionId,
+        int? SubclassDefinitionId,
+        string ClassName,
+        string ClassSource,
+        string SubclassName,
+        string SubclassSource);
 
     private async Task<int> CalculateNormalCasterLevelAsync(int characterId)
     {
@@ -878,6 +1344,7 @@ public sealed partial class AppDatabase
             BackgroundChoicesJson = entity.BackgroundChoicesJson,
             FeatChoicesJson = entity.FeatChoicesJson,
             ClassName = entity.ClassName,
+            PrimaryClassDefinitionId = classes.FirstOrDefault(characterClass => characterClass.ClassDefinitionId > 0)?.ClassDefinitionId,
             Level = entity.Level,
             Strength = entity.Strength,
             Dexterity = entity.Dexterity,
@@ -885,6 +1352,10 @@ public sealed partial class AppDatabase
             Intelligence = entity.Intelligence,
             Wisdom = entity.Wisdom,
             Charisma = entity.Charisma,
+            MaxHitPoints = entity.MaxHitPoints,
+            CurrentHitPoints = entity.CurrentHitPoints,
+            TemporaryHitPoints = entity.TemporaryHitPoints,
+            ConditionsJson = entity.ConditionsJson,
             Classes = classes.ToList(),
             Feats = feats.ToList(),
             SavingThrows = MergeSavingThrows(savingThrows),
@@ -1299,6 +1770,18 @@ public sealed partial class AppDatabase
         {
             switch (effect.EffectType)
             {
+                case "SavingThrowProficiency":
+                    ApplySavingThrowProficiency(character, effect.TargetKey);
+                    break;
+                case "SkillProficiency":
+                    ApplySkillProficiency(character, effect.TargetKey);
+                    break;
+                case "ToolProficiency":
+                    ApplyToolProficiency(character, effect.TargetKey);
+                    break;
+                case "LanguageProficiency":
+                    ApplyLanguageProficiency(character, effect.TargetKey);
+                    break;
                 case "SkillHalfProficiency" when string.Equals(effect.TargetKey, "AllSkills", StringComparison.OrdinalIgnoreCase):
                     foreach (var skill in character.Skills.Where(skill => !skill.IsProficient && skill.ProficiencyLevel is not "Proficient" and not "Expertise"))
                     {
@@ -1328,6 +1811,79 @@ public sealed partial class AppDatabase
             .Select(group => group.First())
             .OrderBy(style => style.Name)
             .ToList();
+    }
+
+    private static IEnumerable<CharacterGrantedEffect> BuildAutomaticOptionGrantedEffects(int characterId, CharacterOptionEffects effects)
+    {
+        foreach (var abilityCode in effects.SavingThrowProficiencies.Where(value => !string.IsNullOrWhiteSpace(value)))
+        {
+            yield return BuildAutomaticOptionGrantedEffect(characterId, "SavingThrowProficiency", abilityCode, "Proficient");
+        }
+
+        foreach (var skillName in effects.SkillProficiencies.Where(value => !string.IsNullOrWhiteSpace(value)))
+        {
+            yield return BuildAutomaticOptionGrantedEffect(characterId, "SkillProficiency", skillName, "Proficient");
+        }
+
+        foreach (var toolName in effects.ToolProficiencies.Where(value => !string.IsNullOrWhiteSpace(value)))
+        {
+            yield return BuildAutomaticOptionGrantedEffect(characterId, "ToolProficiency", toolName, "Proficient");
+        }
+
+        foreach (var languageName in effects.LanguageProficiencies.Where(value => !string.IsNullOrWhiteSpace(value)))
+        {
+            yield return BuildAutomaticOptionGrantedEffect(characterId, "LanguageProficiency", languageName, "Proficient");
+        }
+    }
+
+    private static CharacterGrantedEffect BuildAutomaticOptionGrantedEffect(int characterId, string effectType, string targetKey, string value)
+    {
+        return new CharacterGrantedEffect
+        {
+            CharacterId = characterId,
+            SourceType = "Option",
+            EffectType = effectType,
+            TargetKey = targetKey,
+            Value = value,
+            Label = "Granted by selected character options."
+        };
+    }
+
+    private static void ApplySavingThrowProficiency(Character character, string abilityCode)
+    {
+        var savingThrow = character.SavingThrows.FirstOrDefault(save => string.Equals(save.AbilityCode, abilityCode, StringComparison.OrdinalIgnoreCase));
+        if (savingThrow is not null)
+        {
+            savingThrow.IsProficient = true;
+        }
+    }
+
+    private static void ApplySkillProficiency(Character character, string skillName)
+    {
+        var skill = character.Skills.FirstOrDefault(skill => string.Equals(skill.Name, skillName, StringComparison.OrdinalIgnoreCase));
+        if (skill is not null && skill.ProficiencyLevel is not "Expertise")
+        {
+            skill.IsProficient = true;
+            skill.ProficiencyLevel = "Proficient";
+        }
+    }
+
+    private static void ApplyToolProficiency(Character character, string toolName)
+    {
+        var tool = character.ToolProficiencies.FirstOrDefault(tool => string.Equals(tool.Name, toolName, StringComparison.OrdinalIgnoreCase));
+        if (tool is not null)
+        {
+            tool.IsProficient = true;
+        }
+    }
+
+    private static void ApplyLanguageProficiency(Character character, string languageName)
+    {
+        var language = character.LanguageProficiencies.FirstOrDefault(language => string.Equals(language.Name, languageName, StringComparison.OrdinalIgnoreCase));
+        if (language is not null)
+        {
+            language.IsProficient = true;
+        }
     }
 
     private static void ApplySkillExpertise(Character character, string skillName)
@@ -1369,7 +1925,16 @@ public sealed partial class AppDatabase
             return false;
         }
 
-        return effect.SourceLevel is null || matchingClass.Level >= effect.SourceLevel.Value;
+        return effect.SourceLevel is null
+            || matchingClass.Level >= effect.SourceLevel.Value
+            || IsLevelUpOffByOneEffect(effect, matchingClass.Level);
+    }
+
+    private static bool IsLevelUpOffByOneEffect(CharacterGrantedEffect effect, int classLevel)
+    {
+        return effect.SourceLevel == classLevel + 1
+            && effect.Label.StartsWith("Chosen during level-up", StringComparison.OrdinalIgnoreCase)
+            && effect.EffectType is "SkillExpertise" or "SkillProficiency" or "ToolProficiency" or "LanguageProficiency" or "FightingStyle" or "SkillHalfProficiency";
     }
 
     private static string BuildGrantedEffectKey(CharacterGrantedEffect effect)
