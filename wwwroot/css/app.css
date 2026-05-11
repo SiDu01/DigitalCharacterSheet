@@ -684,6 +684,77 @@ main {
     max-width: 1480px;
 }
 
+.creator-workspace {
+    display: grid;
+    grid-template-columns: minmax(19rem, 26rem) minmax(0, 1fr);
+    gap: 1rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    align-items: start;
+    overflow: hidden;
+}
+
+.creator-step-panel,
+.creator-detail-panel {
+    min-width: 0;
+    min-height: 0;
+    max-height: 100%;
+    overflow: auto;
+    padding: .9rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.creator-step-panel {
+    align-self: start;
+}
+
+.creator-detail-panel {
+    align-self: stretch;
+    height: 100%;
+}
+
+.creator-step-screen {
+    display: grid;
+    align-content: start;
+    grid-auto-rows: max-content;
+    gap: .55rem;
+    min-width: 0;
+}
+
+.creator-step-screen.hidden {
+    display: none;
+}
+
+.creator-step-screen + .creator-step-screen:not(.hidden) {
+    margin-top: .75rem;
+}
+
+.creator-step-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    min-width: 0;
+    padding-bottom: .25rem;
+    border-bottom: 1px solid var(--app-border);
+}
+
+.creator-step-heading .eyebrow {
+    margin: 0;
+    color: var(--app-text);
+    font-size: .9rem;
+}
+
+.creator-step-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: .35rem;
+    flex: 0 0 auto;
+}
+
 .creation-split {
     display: grid;
     gap: 1rem;
@@ -692,8 +763,92 @@ main {
 
 .creation-flow {
     display: grid;
+    align-content: start;
+    align-items: start;
+    grid-auto-rows: max-content;
     gap: .75rem;
     min-width: 0;
+}
+
+.creation-header {
+    align-items: center;
+    margin-bottom: .65rem;
+}
+
+.creation-title-area {
+    min-width: 0;
+}
+
+.creation-title-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .6rem;
+    min-width: 0;
+}
+
+.creation-step-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem;
+    min-width: 0;
+}
+
+.creation-step-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .28rem;
+    min-height: 1.55rem;
+    padding: .15rem .4rem .15rem .22rem;
+    border: 1px solid #d1d5db;
+    border-radius: 999px;
+    color: #4b5563;
+    background: #f8fafc;
+    font-size: .72rem;
+    font-weight: 800;
+}
+
+.creation-step-badge span {
+    display: inline-grid;
+    place-items: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    border-radius: 999px;
+    color: #fff;
+    background: #64748b;
+    font-size: .65rem;
+}
+
+.creation-step-badge strong {
+    font-size: .72rem;
+    line-height: 1;
+}
+
+.creation-step-badge.active {
+    border-color: var(--app-primary);
+    color: var(--app-primary-text);
+    background: var(--app-panel-soft);
+}
+
+.creation-step-badge.active span {
+    background: var(--app-primary);
+}
+
+.creation-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: .45rem;
+}
+
+.creation-header-actions span {
+    min-width: 7.5rem;
+    color: var(--app-muted);
+    font-size: .78rem;
+    font-weight: 900;
+    text-align: center;
+    text-transform: uppercase;
 }
 
 .creation-step-nav {
@@ -747,6 +902,9 @@ main {
 
 .creation-step {
     display: grid;
+    align-content: start;
+    align-self: start;
+    grid-auto-rows: max-content;
     gap: .55rem;
     min-width: 0;
     padding: .75rem;
@@ -805,7 +963,9 @@ main {
 }
 
 .creation-step input,
-.creation-step select {
+.creation-step select,
+.creator-step-screen input,
+.creator-step-screen select {
     width: 100%;
     min-height: 2.35rem;
     border: 1px solid #cbd5e1;
@@ -993,6 +1153,70 @@ main {
     border-radius: 6px;
     padding: .3rem .45rem;
     background: #fff;
+}
+
+.ability-mode-switcher {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+}
+
+.ability-assignment-grid,
+.point-buy-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+    gap: .5rem;
+}
+
+.ability-assignment-grid label,
+.point-buy-grid article {
+    display: grid;
+    gap: .3rem;
+    min-width: 0;
+    padding: .55rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #f8fafc;
+}
+
+.ability-assignment-grid span,
+.point-buy-grid span {
+    color: #6b7280;
+    font-size: .75rem;
+    font-weight: 800;
+}
+
+.point-buy-controls {
+    display: grid;
+    grid-template-columns: 1.7rem 1fr 1.7rem;
+    align-items: center;
+    gap: .35rem;
+}
+
+.point-buy-controls strong {
+    min-height: 1.9rem;
+    display: grid;
+    place-items: center;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    color: #111827;
+    background: #fff;
+}
+
+.point-buy-grid small {
+    color: var(--app-muted);
+    font-size: .72rem;
+    font-weight: 700;
+}
+
+.ability-roll-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+    color: var(--app-muted);
+    font-size: .8rem;
+    font-weight: 700;
 }
 
 .ability-score {
@@ -2662,6 +2886,41 @@ button.source-badge {
     white-space: nowrap;
 }
 
+.home-recent-list,
+.selected-class-list,
+.slot-list,
+.proficiency-list,
+.readonly-proficiency-list,
+.choice-hint-list,
+.defense-choice-list,
+.ability-choice-list,
+.level-up-new-class-list,
+.level-up-feature-list,
+.sheet-check-list,
+.inventory-add-list,
+.inventory-list,
+.inventory-category-grid,
+.inventory-source-list,
+.sheet-feature-list,
+.combat-placeholder-list,
+.combat-action-list,
+.compact-slot-list,
+.spell-list,
+.character-list,
+.feature-level-list,
+.source-settings-list,
+.text-badge-settings-list {
+    align-content: start;
+    grid-auto-rows: max-content;
+}
+
+.sheet-chip-list,
+.inventory-warning-list,
+.combat-effect-list {
+    align-content: flex-start;
+    align-items: flex-start;
+}
+
 .spell-list,
 .character-list {
     display: grid;
@@ -3382,25 +3641,29 @@ button.source-badge {
         flex: 1 1 auto;
         min-height: 0;
         margin-bottom: 1rem;
-        align-items: stretch;
+        align-items: start;
         overflow: hidden;
     }
 
     .creation-flow {
+        align-self: start;
         min-height: 0;
-        height: 100%;
+        height: auto;
+        max-height: 100%;
         overflow: auto;
-        padding: .9rem .25rem .9rem .9rem;
+        padding: .9rem;
         border: 1px solid #e5e7eb;
         border-radius: 8px;
         background: #fff;
     }
 
-    .creation-step-nav {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+    .creator-workspace {
+        grid-template-columns: clamp(20rem, 30vw, 27rem) minmax(0, 1fr);
+        margin-bottom: 1rem;
     }
 
     .creation-detail-pane {
+        align-self: stretch;
         display: block;
         min-height: 0;
         height: 100%;
@@ -3423,6 +3686,23 @@ button.source-badge {
     .page-header,
     .detail-header {
         flex-direction: column;
+    }
+
+    .creation-header {
+        align-items: stretch;
+    }
+
+    .creation-title-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .creation-header-actions {
+        justify-content: flex-start;
+    }
+
+    .creation-header-actions span {
+        min-width: 0;
     }
 
     .character-compact-header {
@@ -3464,9 +3744,14 @@ button.source-badge {
     }
 
     .level-up-layout,
+    .creator-workspace,
     .level-up-class-card,
     .level-up-summary {
         grid-template-columns: 1fr;
+    }
+
+    .creator-detail-panel {
+        display: none;
     }
 
     .level-up-summary {
@@ -3706,6 +3991,8 @@ button.source-badge {
 [data-theme="leather"] .form-panel select,
 [data-theme="leather"] .creation-step input,
 [data-theme="leather"] .creation-step select,
+[data-theme="leather"] .creator-step-screen input,
+[data-theme="leather"] .creator-step-screen select,
 [data-theme="leather"] .level-up-choice select,
 [data-theme="leather"] .proficiency-row input,
 [data-theme="leather"] .proficiency-row select,
@@ -3735,6 +4022,8 @@ button.source-badge {
 [data-theme="leather"] .class-builder,
 [data-theme="leather"] .creation-flow,
 [data-theme="leather"] .creation-step,
+[data-theme="leather"] .creator-step-panel,
+[data-theme="leather"] .creator-detail-panel,
 [data-theme="leather"] .sheet-panel,
 [data-theme="leather"] .combat-stat-card,
 [data-theme="leather"] .combat-quick-stat,
@@ -3759,13 +4048,15 @@ button.source-badge {
 }
 
 [data-theme="leather"] .creation-step-tab,
+[data-theme="leather"] .creation-step-badge,
 [data-theme="leather"] .creation-review-grid article {
     border-color: var(--app-border);
     color: var(--app-text);
     background: var(--app-panel-soft);
 }
 
-[data-theme="leather"] .creation-step-tab.active {
+[data-theme="leather"] .creation-step-tab.active,
+[data-theme="leather"] .creation-step-badge.active {
     border-color: var(--app-primary);
     color: var(--app-primary-text);
 }
@@ -3965,6 +4256,8 @@ button.source-badge {
 [data-theme="leather"] .slot-row,
 [data-theme="leather"] .compact-slot,
 [data-theme="leather"] .ability-grid label,
+[data-theme="leather"] .ability-assignment-grid label,
+[data-theme="leather"] .point-buy-grid article,
 [data-theme="leather"] .ability-score,
 [data-theme="leather"] .sheet-ability,
 [data-theme="leather"] .sheet-chip,
@@ -3973,6 +4266,18 @@ button.source-badge {
     border-color: var(--app-border);
     color: var(--app-text);
     background: var(--app-panel-soft);
+}
+
+[data-theme="leather"] .point-buy-controls strong {
+    border-color: var(--app-primary);
+    color: var(--app-text);
+    background: #15110f;
+}
+
+[data-theme="leather"] .ability-assignment-grid span,
+[data-theme="leather"] .point-buy-grid span,
+[data-theme="leather"] .ability-roll-toolbar {
+    color: var(--app-primary-text);
 }
 
 [data-theme="leather"] .level-up-class-card strong,

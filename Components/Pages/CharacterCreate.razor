@@ -8,35 +8,51 @@
 <section class="character-page character-create-page">
     <button class="back-button" title="Back" aria-label="Back" @onclick="OpenCharacters">‹</button>
 
-    <header class="page-header">
-        <div>
+    <header class="page-header creation-header">
+        <div class="creation-title-area">
             <p class="eyebrow">Character Creation</p>
-            <h1>New Character</h1>
+            <div class="creation-title-row">
+                <h1>New Character</h1>
+                <nav class="creation-step-badges" aria-label="Character creation steps">
+                    @foreach (var step in CreationSteps)
+                    {
+                        <button type="button"
+                                class="creation-step-badge @(currentStep == step.Key ? "active" : "")"
+                                title="@step.Label"
+                                @onclick="() => SetStep(step.Key)">
+                            <span>@step.Number</span>
+                            <strong>@step.Label</strong>
+                        </button>
+                    }
+                </nav>
+            </div>
         </div>
-        <button type="button" class="primary-action" disabled="@isCreating" @onclick="CreateCharacter">Create</button>
+        <div class="creation-header-actions">
+            <button type="button" class="primary-action" disabled="@isCreating" @onclick="CreateCharacter">Create</button>
+        </div>
     </header>
 
-    <section class="creation-split">
-        <section class="creation-flow">
-            <nav class="creation-step-nav" aria-label="Character creation steps">
-                @foreach (var step in CreationSteps)
-                {
-                    <button type="button"
-                            class="creation-step-tab @(currentStep == step.Key ? "active" : "")"
-                            @onclick="() => SetStep(step.Key)">
-                        <span>@step.Number</span>
-                        <strong>@step.Label</strong>
-                    </button>
-                }
-            </nav>
-
-            <section class="creation-step @(IsStep("Identity") ? "" : "hidden")">
-                <p class="eyebrow">Identity</p>
+    <section class="creator-workspace">
+        <section class="creator-step-panel">
+            <section class="creator-step-screen @(IsStep("Identity") ? "" : "hidden")">
+                <div class="creator-step-heading">
+                    <p class="eyebrow">Identity</p>
+                    <div class="creator-step-controls">
+                        <button type="button" class="text-button no-margin" disabled="@IsFirstStep" @onclick="PreviousStep">Previous</button>
+                        <button type="button" class="text-button no-margin" disabled="@IsLastStep" @onclick="NextStep">Next</button>
+                    </div>
+                </div>
                 <input placeholder="Name" @bind="newName" @bind:event="oninput" />
             </section>
 
-            <section class="creation-step @(IsStep("Ancestry") ? "" : "hidden")">
-                <p class="eyebrow">Ancestry</p>
+            <section class="creator-step-screen @(IsStep("Ancestry") ? "" : "hidden")">
+                <div class="creator-step-heading">
+                    <p class="eyebrow">Ancestry</p>
+                    <div class="creator-step-controls">
+                        <button type="button" class="text-button no-margin" disabled="@IsFirstStep" @onclick="PreviousStep">Previous</button>
+                        <button type="button" class="text-button no-margin" disabled="@IsLastStep" @onclick="NextStep">Next</button>
+                    </div>
+                </div>
                 <select @bind="selectedRaceName" @bind:after="SelectRaceGroup">
                     <option value="">Select race</option>
                     @foreach (var raceGroup in raceGroups)
@@ -88,8 +104,14 @@
 
             </section>
 
-            <section class="creation-step @(IsStep("Background") ? "" : "hidden")">
-                <p class="eyebrow">Background</p>
+            <section class="creator-step-screen @(IsStep("Background") ? "" : "hidden")">
+                <div class="creator-step-heading">
+                    <p class="eyebrow">Background</p>
+                    <div class="creator-step-controls">
+                        <button type="button" class="text-button no-margin" disabled="@IsFirstStep" @onclick="PreviousStep">Previous</button>
+                        <button type="button" class="text-button no-margin" disabled="@IsLastStep" @onclick="NextStep">Next</button>
+                    </div>
+                </div>
                 <select @bind="selectedBackgroundName" @bind:after="SelectBackgroundGroup">
                     <option value="">Select background</option>
                     @foreach (var backgroundGroup in backgroundGroups)
@@ -119,8 +141,14 @@
 
             </section>
 
-            <section class="creation-step @(IsStep("Classes") ? "" : "hidden")">
-                <p class="eyebrow">Classes</p>
+            <section class="creator-step-screen @(IsStep("Classes") ? "" : "hidden")">
+                <div class="creator-step-heading">
+                    <p class="eyebrow">Classes</p>
+                    <div class="creator-step-controls">
+                        <button type="button" class="text-button no-margin" disabled="@IsFirstStep" @onclick="PreviousStep">Previous</button>
+                        <button type="button" class="text-button no-margin" disabled="@IsLastStep" @onclick="NextStep">Next</button>
+                    </div>
+                </div>
                 <div class="class-picker">
                     <select @bind="selectedClassName" @bind:after="SelectClassGroup">
                         <option value="0">Select class</option>
@@ -129,7 +157,7 @@
                             <option value="@classGroup.Name">@classGroup.Name</option>
                         }
                     </select>
-                    <input placeholder="Level" type="number" min="1" max="20" @bind="selectedClassLevel" />
+                    <input placeholder="Level" type="number" min="1" max="20" @bind="selectedClassLevel" @bind:after="RecomputeOptionEffectsAsync" />
                     <button type="button" class="text-button" @onclick="AddClass">Add Class</button>
                 </div>
 
@@ -161,7 +189,7 @@
                 {
                     <label class="stacked-field">
                         <span>First class</span>
-                        <select @bind="primaryClassDefinitionId">
+                        <select @bind="primaryClassDefinitionId" @bind:after="RecomputeOptionEffectsAsync">
                             <option value="">Select first class</option>
                             @foreach (var characterClass in newClasses)
                             {
@@ -181,7 +209,6 @@
                     </section>
                 }
 
-                <button type="button" class="text-button no-margin" @onclick="ApplyOptionEffects">Apply option bonuses</button>
                 @if (optionEffectMessages.Count > 0)
                 {
                     <p class="muted compact-hint">@string.Join("; ", optionEffectMessages)</p>
@@ -190,7 +217,7 @@
 
             @if (AllDefenseChoiceRequirements.Count > 0 || AllAbilityChoiceRequirements.Count > 0 || optionChoiceHints.Count > 0)
             {
-                <section class="creation-step pending-choice-panel @(IsStep("Review") ? "" : "hidden")">
+                <section class="creator-step-screen pending-choice-panel @(IsStep("Review") ? "" : "hidden")">
                     <p class="eyebrow">Pending Choices</p>
                     @if (AllAbilityChoiceRequirements.Count > 0)
                     {
@@ -208,8 +235,14 @@
                 </section>
             }
 
-            <section class="creation-step @(IsStep("Feats") ? "" : "hidden")">
-                <p class="eyebrow">Feats</p>
+            <section class="creator-step-screen @(IsStep("Feats") ? "" : "hidden")">
+                <div class="creator-step-heading">
+                    <p class="eyebrow">Feats</p>
+                    <div class="creator-step-controls">
+                        <button type="button" class="text-button no-margin" disabled="@IsFirstStep" @onclick="PreviousStep">Previous</button>
+                        <button type="button" class="text-button no-margin" disabled="@IsLastStep" @onclick="NextStep">Next</button>
+                    </div>
+                </div>
                 <ChoiceHintList Hints="@ChoiceHintsFor("Feats")" />
                 <select @bind="selectedFeatName" @bind:after="SelectFeatGroup">
                     <option value="">Select feat</option>
@@ -249,20 +282,111 @@
 
             </section>
 
-            <section class="creation-step @(IsStep("Abilities") ? "" : "hidden")">
-                <p class="eyebrow">Abilities</p>
-                <ChoiceHintList Hints="@ChoiceHintsFor("Abilities")" />
-                <div class="ability-grid">
-                    <label><span>STR</span><input type="number" min="1" max="30" @bind="strength" /></label>
-                    <label><span>DEX</span><input type="number" min="1" max="30" @bind="dexterity" /></label>
-                    <label><span>CON</span><input type="number" min="1" max="30" @bind="constitution" /></label>
-                    <label><span>INT</span><input type="number" min="1" max="30" @bind="intelligence" /></label>
-                    <label><span>WIS</span><input type="number" min="1" max="30" @bind="wisdom" /></label>
-                    <label><span>CHA</span><input type="number" min="1" max="30" @bind="charisma" /></label>
+            <section class="creator-step-screen @(IsStep("Abilities") ? "" : "hidden")">
+                <div class="creator-step-heading">
+                    <p class="eyebrow">Abilities</p>
+                    <div class="creator-step-controls">
+                        <button type="button" class="text-button no-margin" disabled="@IsFirstStep" @onclick="PreviousStep">Previous</button>
+                        <button type="button" class="text-button no-margin" disabled="@IsLastStep" @onclick="NextStep">Next</button>
+                    </div>
                 </div>
+                <ChoiceHintList Hints="@ChoiceHintsFor("Abilities")" />
+                <div class="ability-mode-switcher" aria-label="Ability score mode">
+                    @foreach (var mode in AbilityScoreModes)
+                    {
+                        <button type="button"
+                                class="source-version @(abilityScoreMode == mode ? "active" : "")"
+                                @onclick="() => SetAbilityScoreMode(mode)">
+                            @mode
+                        </button>
+                    }
+                </div>
+
+                @if (abilityScoreMode == "Manual")
+                {
+                    <div class="ability-grid">
+                        @foreach (var ability in AbilityCodes)
+                        {
+                            <label>
+                                <span>@ability.Label</span>
+                                <input type="number" min="1" max="30" value="@GetAbilityValue(ability.Code)" @onchange="args => SetAbilityValue(ability.Code, args.Value?.ToString())" />
+                            </label>
+                        }
+                    </div>
+                }
+                else if (abilityScoreMode == "Standard Array")
+                {
+                    <p class="muted compact-hint">Assign 15, 14, 13, 12, 10, and 8 once each.</p>
+                    <div class="ability-assignment-grid">
+                        @foreach (var ability in AbilityCodes)
+                        {
+                            <label>
+                                <span>@ability.Label</span>
+                                <select value="@GetAbilityValue(ability.Code)" @onchange="args => AssignAbilityScore(ability.Code, args.Value?.ToString(), StandardArrayScores)">
+                                    <option value="">Select score</option>
+                                    @foreach (var score in StandardArrayScores)
+                                    {
+                                        <option value="@score" disabled="@IsAssignedScoreUnavailable(ability.Code, score, StandardArrayScores)">@score</option>
+                                    }
+                                </select>
+                            </label>
+                        }
+                    </div>
+                }
+                else if (abilityScoreMode == "Point Buy")
+                {
+                    <div class="choice-counter @(PointBuyRemaining < 0 ? "invalid" : "")">
+                        <span>Point buy remaining</span>
+                        <strong>@PointBuyRemaining / 27</strong>
+                    </div>
+                    <div class="point-buy-grid">
+                        @foreach (var ability in AbilityCodes)
+                        {
+                            var value = GetAbilityValue(ability.Code);
+                            <article>
+                                <span>@ability.Label</span>
+                                <div class="point-buy-controls">
+                                    <button type="button" class="mini-button" disabled="@(value <= 8)" @onclick="() => ChangePointBuyScore(ability.Code, -1)">-</button>
+                                    <strong>@value</strong>
+                                    <button type="button" class="mini-button" disabled="@(value >= 15 || !CanIncreasePointBuyScore(ability.Code))" @onclick="() => ChangePointBuyScore(ability.Code, 1)">+</button>
+                                </div>
+                                <small>Cost @PointBuyCost(value)</small>
+                            </article>
+                        }
+                    </div>
+                }
+                else if (abilityScoreMode == "Roll")
+                {
+                    <div class="ability-roll-toolbar">
+                        <button type="button" class="text-button no-margin" @onclick="RollAbilityScores">Roll 4d6 drop lowest</button>
+                        <span>@(rolledScores.Count == 0 ? "No rolls yet" : $"Rolled: {string.Join(", ", rolledScores)}")</span>
+                    </div>
+                    <div class="ability-assignment-grid">
+                        @foreach (var ability in AbilityCodes)
+                        {
+                            <label>
+                                <span>@ability.Label</span>
+                                <select value="@GetAbilityValue(ability.Code)" disabled="@(rolledScores.Count == 0)" @onchange="args => AssignAbilityScore(ability.Code, args.Value?.ToString(), rolledScores)">
+                                    <option value="">Select roll</option>
+                                    @foreach (var score in rolledScores)
+                                    {
+                                        <option value="@score" disabled="@IsAssignedScoreUnavailable(ability.Code, score, rolledScores)">@score</option>
+                                    }
+                                </select>
+                            </label>
+                        }
+                    </div>
+                }
             </section>
 
-            <section class="creation-step @(IsStep("Proficiencies") ? "" : "hidden")">
+            <section class="creator-step-screen @(IsStep("Proficiencies") ? "" : "hidden")">
+                    <div class="creator-step-heading">
+                        <p class="eyebrow">Proficiencies</p>
+                        <div class="creator-step-controls">
+                            <button type="button" class="text-button no-margin" disabled="@IsFirstStep" @onclick="PreviousStep">Previous</button>
+                            <button type="button" class="text-button no-margin" disabled="@IsLastStep" @onclick="NextStep">Next</button>
+                        </div>
+                    </div>
                     <button type="button" class="section-toggle" @onclick="ToggleSavingThrows">
                         <span>Saving Throws</span>
                         <span>@(showSavingThrows ? "Hide" : "Show")</span>
@@ -291,7 +415,7 @@
                 }
             </section>
 
-            <section class="creation-step @(IsStep("Proficiencies") ? "" : "hidden")">
+            <section class="creator-step-screen @(IsStep("Proficiencies") ? "" : "hidden")">
                     <button type="button" class="section-toggle" @onclick="ToggleSkills">
                         <span>Skills</span>
                         <span>@(showSkills ? "Hide" : "Show")</span>
@@ -333,7 +457,7 @@
                 }
             </section>
 
-            <section class="creation-step @(IsStep("Proficiencies") ? "" : "hidden")">
+            <section class="creator-step-screen @(IsStep("Proficiencies") ? "" : "hidden")">
                 <button type="button" class="section-toggle" @onclick="ToggleTools">
                     <span>Tools</span>
                     <span>@(showTools ? "Hide" : "Show")</span>
@@ -369,7 +493,7 @@
                 }
             </section>
 
-            <section class="creation-step @(IsStep("Proficiencies") ? "" : "hidden")">
+            <section class="creator-step-screen @(IsStep("Proficiencies") ? "" : "hidden")">
                 <button type="button" class="section-toggle" @onclick="ToggleLanguages">
                     <span>Languages</span>
                     <span>@(showLanguages ? "Hide" : "Show")</span>
@@ -405,8 +529,14 @@
                 }
             </section>
 
-            <section class="creation-step review-step @(IsStep("Review") ? "" : "hidden")">
-                <p class="eyebrow">Review</p>
+            <section class="creator-step-screen review-step @(IsStep("Review") ? "" : "hidden")">
+                <div class="creator-step-heading">
+                    <p class="eyebrow">Review</p>
+                    <div class="creator-step-controls">
+                        <button type="button" class="text-button no-margin" disabled="@IsFirstStep" @onclick="PreviousStep">Previous</button>
+                        <button type="button" class="text-button no-margin" disabled="@IsLastStep" @onclick="NextStep">Next</button>
+                    </div>
+                </div>
                 <div class="creation-review-grid">
                     <article>
                         <span>Name</span>
@@ -436,19 +566,13 @@
                 <p class="muted compact-hint">Use Create when the summary and pending choices look right.</p>
             </section>
 
-            <footer class="creation-step-actions">
-                <button type="button" class="text-button no-margin" disabled="@IsFirstStep" @onclick="PreviousStep">Previous</button>
-                <span>@CurrentStepLabel</span>
-                <button type="button" class="text-button no-margin" disabled="@IsLastStep" @onclick="NextStep">Next</button>
-            </footer>
-
             @if (!string.IsNullOrWhiteSpace(errorMessage))
             {
                 <p class="validation-message">@errorMessage</p>
             }
         </section>
 
-        <aside class="creation-detail-pane">
+        <aside class="creator-detail-panel">
             @if (SelectedDetail is null)
             {
                 <div class="empty-detail">
@@ -589,6 +713,7 @@
     private HashSet<string> selectedManualLanguageChoices = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, List<string>> selectedDefenseChoices = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, List<string>> selectedAbilityChoices = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, int> appliedAbilityBonuses = new(StringComparer.OrdinalIgnoreCase);
     private bool isCreating;
     private string newName = "";
     private int strength = 10;
@@ -597,6 +722,8 @@
     private int intelligence = 10;
     private int wisdom = 10;
     private int charisma = 10;
+    private string abilityScoreMode = "Manual";
+    private List<int> rolledScores = [];
     private string selectedRaceName = "";
     private int? selectedRaceDefinitionId;
     private int? selectedSubraceDefinitionId;
@@ -619,6 +746,17 @@
     private bool showTools;
     private bool showLanguages;
     private static readonly string[] RollModes = ["Normal", "Advantage", "Disadvantage"];
+    private static readonly string[] AbilityScoreModes = ["Manual", "Standard Array", "Point Buy", "Roll"];
+    private static readonly int[] StandardArrayScores = [15, 14, 13, 12, 10, 8];
+    private static readonly AbilityCode[] AbilityCodes =
+    [
+        new("str", "STR"),
+        new("dex", "DEX"),
+        new("con", "CON"),
+        new("int", "INT"),
+        new("wis", "WIS"),
+        new("cha", "CHA")
+    ];
 
     private RaceGroup? selectedRaceGroup;
     private BackgroundGroup? selectedBackgroundGroup;
@@ -663,6 +801,8 @@
     private int ManualSkillChoiceCount => selectedManualSkillChoices.Count + selectedManualToolChoices.Count;
     private int ManualToolChoiceCount => selectedManualToolChoices.Count + selectedManualSkillChoices.Count;
     private int ManualLanguageChoiceCount => selectedManualLanguageChoices.Count;
+    private int PointBuySpent => AbilityCodes.Sum(ability => PointBuyCost(GetAbilityValue(ability.Code)));
+    private int PointBuyRemaining => 27 - PointBuySpent;
     private int CurrentStepIndex => Math.Max(0, CreationSteps.ToList().FindIndex(step => step.Key == currentStep));
     private bool IsFirstStep => CurrentStepIndex == 0;
     private bool IsLastStep => CurrentStepIndex >= CreationSteps.Count - 1;
@@ -734,6 +874,173 @@
         }
     }
 
+    private void SetAbilityScoreMode(string mode)
+    {
+        if (!AbilityScoreModes.Contains(mode))
+        {
+            return;
+        }
+
+        abilityScoreMode = mode;
+        if (mode == "Point Buy")
+        {
+            foreach (var ability in AbilityCodes)
+            {
+                SetAbilityValue(ability.Code, Math.Clamp(GetAbilityValue(ability.Code), 8, 15));
+            }
+        }
+        else if (mode == "Standard Array")
+        {
+            ApplyScoresInOrder(StandardArrayScores);
+        }
+        else if (mode == "Roll" && rolledScores.Count > 0)
+        {
+            ApplyScoresInOrder(rolledScores);
+        }
+    }
+
+    private int GetAbilityValue(string abilityCode)
+    {
+        return abilityCode switch
+        {
+            "str" => strength,
+            "dex" => dexterity,
+            "con" => constitution,
+            "int" => intelligence,
+            "wis" => wisdom,
+            "cha" => charisma,
+            _ => 10
+        };
+    }
+
+    private void SetAbilityValue(string abilityCode, string? value)
+    {
+        if (!int.TryParse(value, out var parsed))
+        {
+            return;
+        }
+
+        SetAbilityValue(abilityCode, Math.Clamp(parsed, 1, 30));
+    }
+
+    private void SetAbilityValue(string abilityCode, int value)
+    {
+        switch (abilityCode)
+        {
+            case "str":
+                strength = value;
+                break;
+            case "dex":
+                dexterity = value;
+                break;
+            case "con":
+                constitution = value;
+                break;
+            case "int":
+                intelligence = value;
+                break;
+            case "wis":
+                wisdom = value;
+                break;
+            case "cha":
+                charisma = value;
+                break;
+        }
+    }
+
+    private void AssignAbilityScore(string abilityCode, string? value, IReadOnlyList<int> availableScores)
+    {
+        if (!int.TryParse(value, out var score) || !availableScores.Contains(score))
+        {
+            return;
+        }
+
+        SetAbilityValue(abilityCode, score);
+    }
+
+    private bool IsAssignedScoreUnavailable(string abilityCode, int score, IReadOnlyList<int> availableScores)
+    {
+        var selectedIndex = availableScores
+            .Select((value, index) => new { value, index })
+            .Where(entry => entry.value == score)
+            .Select(entry => entry.index)
+            .ToList();
+        if (selectedIndex.Count > 1)
+        {
+            var usedCount = AbilityCodes
+                .Where(ability => ability.Code != abilityCode)
+                .Count(ability => GetAbilityValue(ability.Code) == score);
+            return usedCount >= selectedIndex.Count;
+        }
+
+        return AbilityCodes.Any(ability => ability.Code != abilityCode && GetAbilityValue(ability.Code) == score);
+    }
+
+    private void ChangePointBuyScore(string abilityCode, int delta)
+    {
+        var current = GetAbilityValue(abilityCode);
+        var next = Math.Clamp(current + delta, 8, 15);
+        if (next > current && !CanIncreasePointBuyScore(abilityCode))
+        {
+            return;
+        }
+
+        SetAbilityValue(abilityCode, next);
+    }
+
+    private bool CanIncreasePointBuyScore(string abilityCode)
+    {
+        var current = GetAbilityValue(abilityCode);
+        if (current >= 15)
+        {
+            return false;
+        }
+
+        var additionalCost = PointBuyCost(current + 1) - PointBuyCost(current);
+        return PointBuyRemaining >= additionalCost;
+    }
+
+    private static int PointBuyCost(int score)
+    {
+        return score switch
+        {
+            <= 8 => 0,
+            9 => 1,
+            10 => 2,
+            11 => 3,
+            12 => 4,
+            13 => 5,
+            14 => 7,
+            _ => 9
+        };
+    }
+
+    private void RollAbilityScores()
+    {
+        rolledScores = Enumerable.Range(0, 6)
+            .Select(_ => RollSingleAbilityScore())
+            .OrderByDescending(score => score)
+            .ToList();
+        ApplyScoresInOrder(rolledScores);
+    }
+
+    private static int RollSingleAbilityScore()
+    {
+        var rolls = Enumerable.Range(0, 4)
+            .Select(_ => Random.Shared.Next(1, 7))
+            .OrderByDescending(value => value)
+            .Take(3);
+        return rolls.Sum();
+    }
+
+    private void ApplyScoresInOrder(IReadOnlyList<int> scores)
+    {
+        for (var index = 0; index < AbilityCodes.Length && index < scores.Count; index++)
+        {
+            SetAbilityValue(AbilityCodes[index].Code, scores[index]);
+        }
+    }
+
     private async Task SelectRaceGroup()
     {
         selectedRaceGroup = raceGroups.FirstOrDefault(group => group.Name == selectedRaceName);
@@ -757,39 +1064,43 @@
         PruneDefenseChoices();
         PruneAbilityChoices();
         detailKind = "Race";
+        await RecomputeOptionEffectsAsync();
     }
 
-    private void SelectSubrace()
+    private async Task SelectSubrace()
     {
         PruneDefenseChoices();
         PruneAbilityChoices();
         detailKind = "Race";
+        await RecomputeOptionEffectsAsync();
     }
 
-    private void SelectBackgroundGroup()
+    private async Task SelectBackgroundGroup()
     {
         selectedBackgroundGroup = backgroundGroups.FirstOrDefault(group => group.Name == selectedBackgroundName);
-        SelectBackgroundVersion(selectedBackgroundGroup?.Primary);
+        await SelectBackgroundVersion(selectedBackgroundGroup?.Primary);
     }
 
-    private void SelectBackgroundVersion(BackgroundDefinition? backgroundDefinition)
+    private async Task SelectBackgroundVersion(BackgroundDefinition? backgroundDefinition)
     {
         selectedBackgroundDefinitionId = backgroundDefinition?.Id;
         PruneDefenseChoices();
         PruneAbilityChoices();
         detailKind = "Background";
+        await RecomputeOptionEffectsAsync();
     }
 
-    private void SelectFeatGroup()
+    private async Task SelectFeatGroup()
     {
         selectedFeatGroup = featGroups.FirstOrDefault(group => group.Name == selectedFeatName);
-        SelectFeatVersion(selectedFeatGroup?.Primary);
+        await SelectFeatVersion(selectedFeatGroup?.Primary);
     }
 
-    private void SelectFeatVersion(FeatDefinition? featDefinition)
+    private Task SelectFeatVersion(FeatDefinition? featDefinition)
     {
         selectedFeatDefinitionId = featDefinition?.Id;
         detailKind = "Feat";
+        return Task.CompletedTask;
     }
 
     private async Task SelectClassGroup()
@@ -825,7 +1136,7 @@
         }
     }
 
-    private void AddClass()
+    private async Task AddClass()
     {
         errorMessage = "";
 
@@ -874,18 +1185,24 @@
         selectedSubclassDefinitionId = null;
         subclassDefinitions = [];
         selectedClassLevel = 1;
+        PruneDefenseChoices();
+        PruneAbilityChoices();
+        await RecomputeOptionEffectsAsync();
     }
 
-    private void RemoveClass(CharacterClass characterClass)
+    private async Task RemoveClass(CharacterClass characterClass)
     {
         newClasses.Remove(characterClass);
         if (primaryClassDefinitionId == characterClass.ClassDefinitionId)
         {
             primaryClassDefinitionId = newClasses.FirstOrDefault()?.ClassDefinitionId;
         }
+        PruneDefenseChoices();
+        PruneAbilityChoices();
+        await RecomputeOptionEffectsAsync();
     }
 
-    private void AddFeat()
+    private async Task AddFeat()
     {
         errorMessage = "";
 
@@ -914,13 +1231,15 @@
         selectedFeatDefinitionId = null;
         PruneDefenseChoices();
         PruneAbilityChoices();
+        await RecomputeOptionEffectsAsync();
     }
 
-    private void RemoveFeat(CharacterFeat feat)
+    private async Task RemoveFeat(CharacterFeat feat)
     {
         newFeats.Remove(feat);
         PruneDefenseChoices();
         PruneAbilityChoices();
+        await RecomputeOptionEffectsAsync();
     }
 
     private async Task CreateCharacter()
@@ -936,6 +1255,7 @@
         try
         {
             isCreating = true;
+            await RecomputeOptionEffectsAsync();
             var character = await Database.AddCharacterAsync(BuildDraftCharacter());
 
             Navigation.NavigateTo($"characters/{character.Id}");
@@ -975,19 +1295,14 @@
         showLanguages = !showLanguages;
     }
 
-    private async Task ApplyOptionEffects()
+    private async Task RecomputeOptionEffectsAsync()
     {
         errorMessage = "";
 
         try
         {
             var effects = await Database.GetCharacterOptionEffectsAsync(BuildDraftCharacter());
-            strength = 10 + effects.AbilityBonuses.GetValueOrDefault("str");
-            dexterity = 10 + effects.AbilityBonuses.GetValueOrDefault("dex");
-            constitution = 10 + effects.AbilityBonuses.GetValueOrDefault("con");
-            intelligence = 10 + effects.AbilityBonuses.GetValueOrDefault("int");
-            wisdom = 10 + effects.AbilityBonuses.GetValueOrDefault("wis");
-            charisma = 10 + effects.AbilityBonuses.GetValueOrDefault("cha");
+            ApplyAbilityBonusDelta(effects.AbilityBonuses);
 
             automaticSavingThrowProficiencies = effects.SavingThrowProficiencies.ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var savingThrow in savingThrows)
@@ -1035,8 +1350,24 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Could not apply option bonuses: {ex.Message}";
+            errorMessage = $"Could not update option bonuses: {ex.Message}";
         }
+    }
+
+    private void ApplyAbilityBonusDelta(IReadOnlyDictionary<string, int> nextBonuses)
+    {
+        foreach (var ability in AbilityCodes)
+        {
+            var previousBonus = appliedAbilityBonuses.GetValueOrDefault(ability.Code);
+            var nextBonus = nextBonuses.GetValueOrDefault(ability.Code);
+            var delta = nextBonus - previousBonus;
+            if (delta != 0)
+            {
+                SetAbilityValue(ability.Code, Math.Clamp(GetAbilityValue(ability.Code) + delta, 1, 30));
+            }
+        }
+
+        appliedAbilityBonuses = nextBonuses.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
     }
 
     private IReadOnlyList<CharacterOptionChoice> ChoiceHintsFor(string category)
@@ -2083,4 +2414,5 @@
     private sealed record OptionDetailProgressionTable(string Title, IReadOnlyList<string> Columns, IReadOnlyList<OptionDetailProgressionRow> Rows);
     private sealed record OptionDetailProgressionRow(IReadOnlyList<string> Values);
     private sealed record CreationStep(string Key, string Label, string Number);
+    private sealed record AbilityCode(string Code, string Label);
 }
