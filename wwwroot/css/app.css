@@ -190,6 +190,7 @@ main {
 
 .home-shell {
     display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
     gap: 1rem;
     height: calc(100vh - 2rem);
     min-height: 0;
@@ -246,11 +247,12 @@ main {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: .75rem;
     min-height: 0;
+    align-items: stretch;
 }
 
 .home-panel {
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
     align-content: start;
     gap: .75rem;
     min-height: 0;
@@ -266,6 +268,13 @@ main {
     font-size: 1.05rem;
 }
 
+.home-panel-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    min-width: 0;
+}
+
 .home-recent-list {
     display: grid;
     align-content: start;
@@ -273,6 +282,32 @@ main {
     min-height: 0;
     overflow-y: auto;
     padding-right: .25rem;
+}
+
+.home-empty-state {
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: .35rem;
+    min-height: 0;
+    height: 100%;
+    padding: 1rem;
+    border: 1px dashed var(--app-border);
+    border-radius: 8px;
+    color: var(--app-muted);
+    background: var(--app-panel-soft);
+    text-align: center;
+}
+
+.home-empty-state h3 {
+    margin: 0;
+    color: var(--app-text);
+    font-size: .95rem;
+}
+
+.home-empty-state p {
+    max-width: 22rem;
+    margin: 0;
 }
 
 .home-recent-row {
@@ -661,6 +696,55 @@ main {
     min-width: 0;
 }
 
+.creation-step-nav {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .4rem;
+}
+
+.creation-step-tab {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    min-width: 0;
+    padding: .45rem .55rem;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    color: #4b5563;
+    background: #f8fafc;
+    text-align: left;
+}
+
+.creation-step-tab span {
+    display: inline-grid;
+    place-items: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 999px;
+    color: #fff;
+    background: #64748b;
+    font-size: .72rem;
+    font-weight: 900;
+}
+
+.creation-step-tab strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .78rem;
+}
+
+.creation-step-tab.active {
+    border-color: var(--app-primary);
+    color: var(--app-primary-text);
+    background: var(--app-panel-soft);
+}
+
+.creation-step-tab.active span {
+    background: var(--app-primary);
+}
+
 .creation-step {
     display: grid;
     gap: .55rem;
@@ -669,6 +753,55 @@ main {
     border: 1px solid #e5e7eb;
     border-radius: 8px;
     background: #fff;
+}
+
+.creation-step.hidden {
+    display: none;
+}
+
+.creation-step-actions {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .65rem;
+    padding: .35rem 0;
+}
+
+.creation-step-actions span {
+    color: var(--app-muted);
+    font-size: .8rem;
+    font-weight: 800;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.creation-review-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .45rem;
+}
+
+.creation-review-grid article {
+    display: grid;
+    gap: .15rem;
+    padding: .55rem;
+    border: 1px solid var(--app-border);
+    border-radius: 7px;
+    background: var(--app-panel-soft);
+}
+
+.creation-review-grid span {
+    color: var(--app-muted);
+    font-size: .7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.creation-review-grid strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--app-text);
+    font-size: .88rem;
 }
 
 .creation-step input,
@@ -1444,6 +1577,33 @@ main {
     display: grid;
     gap: .45rem;
     min-height: 0;
+}
+
+.inventory-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .4rem;
+}
+
+.inventory-summary-grid div {
+    display: grid;
+    gap: .1rem;
+    padding: .45rem .55rem;
+    border: 1px solid var(--app-border);
+    border-radius: 7px;
+    background: var(--app-panel-soft);
+}
+
+.inventory-summary-grid span {
+    color: var(--app-muted);
+    font-size: .68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.inventory-summary-grid strong {
+    color: var(--app-primary-text);
+    font-size: .9rem;
 }
 
 .inventory-list {
@@ -3022,6 +3182,10 @@ button.source-badge {
         grid-template-columns: 1fr;
     }
 
+    .inventory-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .filter-bar,
     .detail-grid,
     .form-panel,
@@ -3230,6 +3394,10 @@ button.source-badge {
         border: 1px solid #e5e7eb;
         border-radius: 8px;
         background: #fff;
+    }
+
+    .creation-step-nav {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .creation-detail-pane {
@@ -3588,6 +3756,18 @@ button.source-badge {
     border-color: var(--app-border);
     color: var(--app-text);
     background: var(--app-panel);
+}
+
+[data-theme="leather"] .creation-step-tab,
+[data-theme="leather"] .creation-review-grid article {
+    border-color: var(--app-border);
+    color: var(--app-text);
+    background: var(--app-panel-soft);
+}
+
+[data-theme="leather"] .creation-step-tab.active {
+    border-color: var(--app-primary);
+    color: var(--app-primary-text);
 }
 
 [data-theme="leather"] .spell-slot-summary p:last-child {

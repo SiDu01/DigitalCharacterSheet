@@ -8,7 +8,7 @@
 
 @if (character is null)
 {
-    <p class="muted">Character wird geladen...</p>
+    <p class="muted">Loading character...</p>
 }
 else
 {
@@ -41,7 +41,7 @@ else
             <div class="detail-actions">
                 <div class="spell-count">@characterSpellIds.Count spells / @PreparedCount prepared</div>
                 <button class="icon-button bookmark-button @(IsCharacterBookmarked ? "active" : "")"
-                        title="Bookmark umschalten"
+                        title="Toggle bookmark"
                         @onclick="ToggleCharacterBookmark">
                     @(IsCharacterBookmarked ? "★" : "☆")
                 </button>
@@ -85,7 +85,7 @@ else
                 @if (string.IsNullOrWhiteSpace(selectedInventoryCategory))
                 {
                     <section class="spell-toolbar">
-                        <input class="search-input" placeholder="Alle Kategorien durchsuchen" @bind="inventorySearchText" @bind:event="oninput" @bind:after="ApplyInventoryFilter" />
+                        <input class="search-input" placeholder="Search all categories" @bind="inventorySearchText" @bind:event="oninput" @bind:after="ApplyInventoryFilter" />
                     </section>
 
                     @if (string.IsNullOrWhiteSpace(inventorySearchText))
@@ -141,7 +141,7 @@ else
                                     <div class="empty-detail">
                                         <p class="eyebrow">Details</p>
                                         <h2>Select an item</h2>
-                                        <p class="muted">Die Suche läuft über alle Kategorien gleichzeitig.</p>
+                                        <p class="muted">Search runs across all categories at once.</p>
                                     </div>
                                 }
                                 else
@@ -149,7 +149,9 @@ else
                                     <div class="inventory-add-detail-actions">
                                         <ItemDetailContent Item="selectedInventoryDefinition"
                                                            Versions="selectedInventoryGroup?.Versions"
-                                                           OnSelectVersion="SelectInventoryVersion" />
+                                                           OnSelectVersion="SelectInventoryVersion"
+                                                           OnToggleBookmark="ToggleInventoryBookmark"
+                                                           IsBookmarked="@IsSelectedInventoryDefinitionBookmarked" />
                                         <button type="button"
                                                 class="primary-action inventory-add-primary"
                                                 @onclick="async () => await AddInventoryItem(selectedInventoryDefinition)">
@@ -164,7 +166,7 @@ else
                 else
                 {
                     <section class="spell-toolbar">
-                        <input class="search-input" placeholder="Item suchen" @bind="inventorySearchText" @bind:event="oninput" @bind:after="ApplyInventoryFilter" />
+                        <input class="search-input" placeholder="Search item" @bind="inventorySearchText" @bind:event="oninput" @bind:after="ApplyInventoryFilter" />
                     </section>
 
                     <section class="spell-master-detail character-item-add-master-detail">
@@ -213,7 +215,9 @@ else
                                 <div class="inventory-add-detail-actions">
                                     <ItemDetailContent Item="selectedInventoryDefinition"
                                                        Versions="selectedInventoryGroup?.Versions"
-                                                       OnSelectVersion="SelectInventoryVersion" />
+                                                       OnSelectVersion="SelectInventoryVersion"
+                                                       OnToggleBookmark="ToggleInventoryBookmark"
+                                                       IsBookmarked="@IsSelectedInventoryDefinitionBookmarked" />
                                     <button type="button"
                                             class="primary-action inventory-add-primary"
                                             @onclick="async () => await AddInventoryItem(selectedInventoryDefinition)">
@@ -420,7 +424,7 @@ else
                             {
                                 <section class="inventory-toolbar inventory-add-toolbar">
                                     <input class="search-input compact-search"
-                                           placeholder="Item suchen"
+                                           placeholder="Search item"
                                            @bind="inventorySearchText"
                                            @bind:event="oninput"
                                            @bind:after="ApplyInventoryFilter" />
@@ -492,6 +496,24 @@ else
                             }
                             else
                             {
+                                <section class="inventory-summary-grid">
+                                    <div>
+                                        <span>Items</span>
+                                        <strong>@inventoryItems.Sum(item => item.Quantity)</strong>
+                                    </div>
+                                    <div>
+                                        <span>Equipped</span>
+                                        <strong>@inventoryItems.Count(item => item.IsEquipped)</strong>
+                                    </div>
+                                    <div>
+                                        <span>Attuned</span>
+                                        <strong>@AttunedItemCount / 3</strong>
+                                    </div>
+                                    <div>
+                                        <span>Weight</span>
+                                        <strong>@FormatInventoryWeight(TotalInventoryWeight)</strong>
+                                    </div>
+                                </section>
                                 @if (InventoryWarnings.Count > 0)
                                 {
                                     <div class="inventory-warning-list">
@@ -528,14 +550,19 @@ else
                                                     <span class="inventory-quantity">@item.Quantity</span>
                                                     <button type="button" class="mini-button" title="Increase quantity" @onclick="async () => await ChangeInventoryQuantity(item, 1)">+</button>
                                                     <button type="button"
+                                                            class="mode-button @(item.IsCarried ? "active" : "")"
+                                                            title="Toggle carried"
+                                                            @onclick="async () => await ToggleInventoryCarried(item)">Carry</button>
+                                                    <button type="button"
                                                             class="mode-button @(item.IsEquipped ? "active" : "")"
+                                                            disabled="@(!item.IsCarried)"
                                                             title="Toggle equipped"
                                                             @onclick="async () => await ToggleInventoryEquipped(item)">Equip</button>
                                                     @if (item.RequiresAttunement)
                                                     {
                                                         <button type="button"
                                                                 class="mode-button @(item.IsAttuned ? "active" : "")"
-                                                                disabled="@(!item.IsAttuned && AttunedItemCount >= 3)"
+                                                                disabled="@(!item.IsCarried || (!item.IsAttuned && AttunedItemCount >= 3))"
                                                                 title="Toggle attunement"
                                                                 @onclick="async () => await ToggleInventoryAttuned(item)">@(item.IsAttuned ? "Attuned" : "Attune")</button>
                                                     }
@@ -626,7 +653,7 @@ else
                         <article class="combat-quick-stat">
                             <span>Init</span>
                             <strong>@FormatModifier(InitiativeModifier)</strong>
-                            <small>@(HasInitiativeAdvantage ? "DEX + ADV" : "DEX")</small>
+                            <small>@InitiativeSource</small>
                         </article>
                         <article class="combat-quick-stat">
                             <span>Speed</span>
@@ -681,6 +708,25 @@ else
                                         <small>@FormatMappedEffectType(trait.EffectType)</small>
                                         <strong>@trait.Label</strong>
                                         <small>@trait.Confidence</small>
+                                    </span>
+                                }
+                            </div>
+                        </section>
+                    }
+
+                    @if (ActiveItemEffects.Count > 0)
+                    {
+                        <section class="combat-mini-section">
+                            <div class="combat-section-title">
+                                <span>Item Effects</span>
+                                <small>active inventory only</small>
+                            </div>
+                            <div class="combat-effect-list">
+                                @foreach (var effect in ActiveItemEffects.Where(effect => effect.IsBonus).Take(10))
+                                {
+                                    <span class="combat-effect-chip" title="@effect.SourceName">
+                                        <small>@effect.Label</small>
+                                        <strong>@FormatModifier(effect.Value)</strong>
                                     </span>
                                 }
                             </div>
@@ -915,7 +961,7 @@ else
                     </header>
                     @if (knownSpellGroups.Count == 0)
                     {
-                        <p class="muted">Noch keine Spells hinzugefuegt.</p>
+                        <p class="muted">No spells added yet.</p>
                     }
                     else
                     {
@@ -969,9 +1015,9 @@ else
                         </label>
                     </header>
                     <section class="filter-bar character-spell-filter">
-                        <input class="search-input" placeholder="Spell suchen" @bind="searchText" @bind:event="oninput" @bind:after="ApplySpellFilter" />
+                        <input class="search-input" placeholder="Search spell" @bind="searchText" @bind:event="oninput" @bind:after="ApplySpellFilter" />
                         <select @bind="selectedLevel" @bind:after="ApplySpellFilter">
-                            <option value="">Alle Level</option>
+                            <option value="">All levels</option>
                             @for (var level = 0; level <= 9; level++)
                             {
                                 <option value="@level">@(level == 0 ? "Cantrip" : $"Level {level}")</option>
@@ -1091,7 +1137,8 @@ else
     private ArmorCalculation CurrentArmor => CalculateArmorClass();
     private int ArmorClass => CurrentArmor.Value;
     private string ArmorClassSource => CurrentArmor.Source;
-    private int InitiativeModifier => GetAbilityCheckModifier("dex") + GetFeatureInitiativeBonus();
+    private int InitiativeModifier => GetAbilityCheckModifier("dex") + GetFeatureInitiativeBonus() + GetActiveItemBonus("Initiative");
+    private string InitiativeSource => BuildInitiativeSource();
     private bool HasInitiativeAdvantage => FeatureRuleEffects.Any(effect => effect.EffectType == "InitiativeAdvantage");
     private int PassivePerception => 10 + GetSkillModifierByName("Perception");
     private IReadOnlyList<MappedRuleEffect> FeatureRuleEffects => sheetFeatureGroups
@@ -1124,8 +1171,13 @@ else
         .Where(item => item.IsEquipped && item.ItemDefinition?.WeaponStats is not null)
         .OrderBy(item => item.DisplayName)
         .ToList();
+    private IReadOnlyList<ItemEffect> ActiveItemEffects => ItemEffectService.BuildActiveEffects(inventoryItems);
     private int AttunedItemCount => inventoryItems.Count(item => item.IsAttuned);
     private IReadOnlyList<string> InventoryWarnings => BuildInventoryWarnings().ToList();
+    private bool IsSelectedInventoryDefinitionBookmarked => selectedInventoryDefinition is not null && RecentActivity.IsBookmarked("Item", selectedInventoryDefinition.Id);
+    private double TotalInventoryWeight => inventoryItems
+        .Where(item => item.IsCarried)
+        .Sum(item => (item.ItemDefinition?.Weight ?? 0) * Math.Max(1, item.Quantity));
     private IReadOnlyList<CombatFeatureAction> CombatFeatureActions => sheetFeatureGroups
         .SelectMany(group => group.Levels)
         .SelectMany(level => level.Features)
@@ -1148,10 +1200,9 @@ else
     private IReadOnlyList<CombatActionOption> CurrentCombatActions => BuildCombatActions(activeCombatActionTab)
         .Where(action => combatEditMode || !hiddenCombatActionKeys.Contains(action.Key))
         .ToList();
-    private IReadOnlyList<ItemRuleEffect> ActiveCombatDefenses => inventoryItems
-        .Where(IsItemBonusActive)
-        .Where(item => item.ItemDefinition is not null)
-        .SelectMany(BuildItemRuleEffects)
+    private IReadOnlyList<ItemRuleEffect> ActiveCombatDefenses => ActiveItemEffects
+            .Where(effect => effect.EffectType is "Resistance" or "Immunity" or "Condition Immunity" or "Vulnerability")
+            .Select(effect => new ItemRuleEffect(effect.EffectType, effect.TargetKey, effect.TargetLabel, effect.SourceName))
         .Concat(BuildCharacterRuleEffects())
         .Where(effect => effect.EffectType is "Resistance" or "Immunity" or "Condition Immunity" or "Vulnerability")
         .GroupBy(effect => $"{effect.EffectType}|{effect.TargetKey}", StringComparer.OrdinalIgnoreCase)
@@ -1391,6 +1442,18 @@ else
         selectedInventoryDefinition = item;
     }
 
+    private void ToggleInventoryBookmark(ItemDefinition item)
+    {
+        RecentActivity.ToggleBookmark("Item", item.Id, item.ListName, BuildItemRecentSubtitle(item), $"items/{item.Id}");
+    }
+
+    private static string BuildItemRecentSubtitle(ItemDefinition item)
+    {
+        var parts = new[] { item.Category, item.Rarity, item.Source }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+        return string.Join(" - ", parts);
+    }
+
     private async Task AddInventoryItem(ItemDefinition item)
     {
         await Database.AddCharacterInventoryItemAsync(Id, item.Id);
@@ -1412,6 +1475,11 @@ else
 
     private async Task ToggleInventoryEquipped(CharacterInventoryItem item)
     {
+        if (!item.IsCarried)
+        {
+            return;
+        }
+
         var shouldEquip = !item.IsEquipped;
         if (shouldEquip && item.ItemDefinition is not null)
         {
@@ -1447,8 +1515,26 @@ else
         await LoadInventory();
     }
 
+    private async Task ToggleInventoryCarried(CharacterInventoryItem item)
+    {
+        item.IsCarried = !item.IsCarried;
+        if (!item.IsCarried)
+        {
+            item.IsEquipped = false;
+            item.IsAttuned = false;
+        }
+
+        await Database.UpdateCharacterInventoryItemAsync(item);
+        await LoadInventory();
+    }
+
     private async Task ToggleInventoryAttuned(CharacterInventoryItem item)
     {
+        if (!item.IsCarried)
+        {
+            return;
+        }
+
         if (!item.IsAttuned && AttunedItemCount >= 3)
         {
             return;
@@ -1810,7 +1896,17 @@ else
             parts.Add("Attuned");
         }
 
+        if (!item.IsCarried)
+        {
+            parts.Add("Stored");
+        }
+
         return parts.Count == 0 ? "Custom item" : string.Join(" / ", parts);
+    }
+
+    private static string FormatInventoryWeight(double weight)
+    {
+        return weight <= 0 ? "-" : $"{weight:0.#} lb";
     }
 
     private static string BuildInventoryVersionLabel(ItemDefinition item)
@@ -2097,13 +2193,13 @@ else
             _ => dexterityModifier
         };
 
-        return armorClass + ParseSignedBonus(item.Bonuses.FirstOrDefault(bonus => bonus.BonusType == "ArmorClass")?.Value);
+        return armorClass + GetItemBonus(item, "ArmorClass");
     }
 
     private static int GetShieldArmorBonus(ItemDefinition item)
     {
         var baseBonus = item.ArmorStats?.ArmorClass ?? 2;
-        return baseBonus + ParseSignedBonus(item.Bonuses.FirstOrDefault(bonus => bonus.BonusType == "ArmorClass")?.Value);
+        return baseBonus + GetItemBonus(item, "ArmorClass");
     }
 
     private static bool IsShield(ItemDefinition item)
@@ -2120,7 +2216,7 @@ else
             return "";
         }
 
-        var bonus = ParseSignedBonus(item.Bonuses.FirstOrDefault(bonus => bonus.BonusType == "ArmorClass")?.Value);
+        var bonus = GetItemBonus(item, "ArmorClass");
         var bonusText = bonus == 0 ? "" : $" {FormatModifier(bonus)}";
         return $"{item.ArmorStats.ArmorClass}{bonusText}".Trim();
     }
@@ -2246,6 +2342,22 @@ else
         return bonus;
     }
 
+    private string BuildInitiativeSource()
+    {
+        var parts = new List<string> { HasInitiativeAdvantage ? "DEX + ADV" : "DEX" };
+        if (GetFeatureInitiativeBonus() != 0)
+        {
+            parts.Add("features");
+        }
+
+        if (GetActiveItemBonus("Initiative") != 0 || GetActiveItemBonus("AbilityCheck") != 0)
+        {
+            parts.Add("items");
+        }
+
+        return string.Join(" + ", parts);
+    }
+
     private int GetAbilityModifier(string abilityCode)
     {
         if (character is null)
@@ -2274,60 +2386,44 @@ else
 
     private int GetActiveItemBonus(string bonusType, Func<CharacterInventoryItem, bool> itemFilter)
     {
-        return inventoryItems
-            .Where(IsItemBonusActive)
+        var inventoryItemIds = inventoryItems
             .Where(itemFilter)
-            .Select(item => item.ItemDefinition)
-            .Where(item => item is not null)
-            .Sum(item => GetItemBonus(item!, bonusType));
+            .Select(item => item.Id)
+            .ToHashSet();
+
+        return ActiveItemEffects
+            .Where(effect => inventoryItemIds.Contains(effect.InventoryItemId))
+            .Where(effect => ItemEffectMatchesBonus(effect, bonusType))
+            .Sum(effect => effect.Value);
     }
 
     private static int GetItemBonus(ItemDefinition item, params string[] bonusTypes)
     {
-        return bonusTypes
-            .Select(bonusType => item.Bonuses.FirstOrDefault(bonus => string.Equals(bonus.BonusType, bonusType, StringComparison.OrdinalIgnoreCase))?.Value)
-            .Select(ParseSignedBonus)
-            .FirstOrDefault(value => value != 0);
+        return ItemEffectService.GetDefinitionBonus(item, bonusTypes);
     }
 
     private static bool IsItemBonusActive(CharacterInventoryItem item)
     {
-        if (!item.IsCarried || item.ItemDefinition is null)
-        {
-            return false;
-        }
-
-        return item.RequiresAttunement ? item.IsAttuned : item.IsEquipped;
+        return ItemEffectService.IsActive(item);
     }
 
-    private static IEnumerable<ItemRuleEffect> BuildItemRuleEffects(CharacterInventoryItem inventoryItem)
+    private static bool ItemEffectMatchesBonus(ItemEffect effect, string bonusType)
     {
-        var item = inventoryItem.ItemDefinition;
-        if (item is null || string.IsNullOrWhiteSpace(item.RawJson))
+        return bonusType switch
         {
-            yield break;
-        }
-
-        using var document = System.Text.Json.JsonDocument.Parse(item.RawJson);
-        foreach (var target in ReadRuleEffectTargets(document.RootElement, "resist"))
-        {
-            yield return new ItemRuleEffect("Resistance", NormalizeRuleTarget(target), FormatRuleTarget(target), item.Name);
-        }
-
-        foreach (var target in ReadRuleEffectTargets(document.RootElement, "immune"))
-        {
-            yield return new ItemRuleEffect("Immunity", NormalizeRuleTarget(target), FormatRuleTarget(target), item.Name);
-        }
-
-        foreach (var target in ReadRuleEffectTargets(document.RootElement, "conditionImmune"))
-        {
-            yield return new ItemRuleEffect("Condition Immunity", NormalizeRuleTarget(target), FormatRuleTarget(target), item.Name);
-        }
-
-        foreach (var target in ReadRuleEffectTargets(document.RootElement, "vulnerable"))
-        {
-            yield return new ItemRuleEffect("Vulnerability", NormalizeRuleTarget(target), FormatRuleTarget(target), item.Name);
-        }
+            "ArmorClass" => effect.EffectType == "ArmorClassBonus",
+            "SavingThrow" => effect.EffectType == "SavingThrowBonus",
+            "ConcentrationSavingThrow" => effect.EffectType == "ConcentrationSavingThrowBonus",
+            "AbilityCheck" => effect.EffectType == "AbilityCheckBonus",
+            "Weapon" or "WeaponAttack" => effect.EffectType == "WeaponAttackBonus",
+            "WeaponDamage" => effect.EffectType == "WeaponDamageBonus",
+            "SpellAttack" => effect.EffectType == "SpellAttackBonus",
+            "SpellSaveDc" => effect.EffectType == "SpellSaveDcBonus",
+            "SpellDamage" => effect.EffectType == "SpellDamageBonus",
+            "ProficiencyBonus" => effect.EffectType == "ProficiencyBonus",
+            "Initiative" => effect.EffectType == "InitiativeBonus",
+            _ => string.Equals(effect.EffectType, $"{bonusType}Bonus", StringComparison.OrdinalIgnoreCase)
+        };
     }
 
     private IEnumerable<ItemRuleEffect> BuildCharacterRuleEffects()

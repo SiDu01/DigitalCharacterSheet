@@ -56,7 +56,7 @@
 
             @if (isLoadingSources)
             {
-                <p class="muted">Sources werden geladen...</p>
+                <p class="muted">Loading sources...</p>
             }
             else
             {
@@ -204,7 +204,7 @@
         }
         catch (Exception exception)
         {
-            sourceMessage = $"Sources konnten nicht geladen werden: {exception.Message}";
+            sourceMessage = $"Sources could not be loaded: {exception.Message}";
         }
         finally
         {
@@ -232,7 +232,7 @@
     {
         await Database.ResetSourceSettingsAsync();
         await LoadSourceSettings();
-        sourceMessage = "Source-Einstellungen zurückgesetzt.";
+        sourceMessage = "Source settings have been reset.";
     }
 
     private void LoadTextBadgeSettings()
@@ -245,20 +245,20 @@
         TextBadgeSettings.SetEnabled(rule.Id, isEnabled);
         LoadTextBadgeSettings();
         textBadgeMessage = isEnabled
-            ? $"{rule.Phrase} wird als Badge angezeigt."
-            : $"{rule.Phrase} wird nicht mehr als Badge angezeigt.";
+            ? $"{rule.Phrase} is shown as a badge."
+            : $"{rule.Phrase} is no longer shown as a badge.";
     }
 
     private void AddTextBadge()
     {
         if (TextBadgeSettings.AddRule(newTextBadgePhrase))
         {
-            textBadgeMessage = $"{newTextBadgePhrase.Trim()} wurde hinzugefuegt.";
+            textBadgeMessage = $"{newTextBadgePhrase.Trim()} has been added.";
             newTextBadgePhrase = "";
         }
         else
         {
-            textBadgeMessage = "Diese Wortgruppe existiert bereits oder ist leer.";
+            textBadgeMessage = "This phrase already exists or is empty.";
         }
 
         LoadTextBadgeSettings();
@@ -275,7 +275,7 @@
     {
         TextBadgeSettings.ResetDefaults();
         LoadTextBadgeSettings();
-        textBadgeMessage = "Text-Badges wurden zurueckgesetzt.";
+        textBadgeMessage = "Text badges have been reset.";
     }
 
     private static TextBadgeRule CloneTextBadgeRule(TextBadgeRule rule)

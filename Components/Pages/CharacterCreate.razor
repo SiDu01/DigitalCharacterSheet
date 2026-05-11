@@ -18,13 +18,25 @@
 
     <section class="creation-split">
         <section class="creation-flow">
-            <section class="creation-step">
+            <nav class="creation-step-nav" aria-label="Character creation steps">
+                @foreach (var step in CreationSteps)
+                {
+                    <button type="button"
+                            class="creation-step-tab @(currentStep == step.Key ? "active" : "")"
+                            @onclick="() => SetStep(step.Key)">
+                        <span>@step.Number</span>
+                        <strong>@step.Label</strong>
+                    </button>
+                }
+            </nav>
+
+            <section class="creation-step @(IsStep("Identity") ? "" : "hidden")">
                 <p class="eyebrow">Identity</p>
                 <input placeholder="Name" @bind="newName" @bind:event="oninput" />
             </section>
 
-            <section class="creation-step">
-                <p class="eyebrow">Race</p>
+            <section class="creation-step @(IsStep("Ancestry") ? "" : "hidden")">
+                <p class="eyebrow">Ancestry</p>
                 <select @bind="selectedRaceName" @bind:after="SelectRaceGroup">
                     <option value="">Select race</option>
                     @foreach (var raceGroup in raceGroups)
@@ -76,7 +88,7 @@
 
             </section>
 
-            <section class="creation-step">
+            <section class="creation-step @(IsStep("Background") ? "" : "hidden")">
                 <p class="eyebrow">Background</p>
                 <select @bind="selectedBackgroundName" @bind:after="SelectBackgroundGroup">
                     <option value="">Select background</option>
@@ -107,7 +119,7 @@
 
             </section>
 
-            <section class="creation-step">
+            <section class="creation-step @(IsStep("Classes") ? "" : "hidden")">
                 <p class="eyebrow">Classes</p>
                 <div class="class-picker">
                     <select @bind="selectedClassName" @bind:after="SelectClassGroup">
@@ -178,7 +190,7 @@
 
             @if (AllDefenseChoiceRequirements.Count > 0 || AllAbilityChoiceRequirements.Count > 0 || optionChoiceHints.Count > 0)
             {
-                <section class="creation-step pending-choice-panel">
+                <section class="creation-step pending-choice-panel @(IsStep("Review") ? "" : "hidden")">
                     <p class="eyebrow">Pending Choices</p>
                     @if (AllAbilityChoiceRequirements.Count > 0)
                     {
@@ -196,7 +208,7 @@
                 </section>
             }
 
-            <section class="creation-step">
+            <section class="creation-step @(IsStep("Feats") ? "" : "hidden")">
                 <p class="eyebrow">Feats</p>
                 <ChoiceHintList Hints="@ChoiceHintsFor("Feats")" />
                 <select @bind="selectedFeatName" @bind:after="SelectFeatGroup">
@@ -237,7 +249,7 @@
 
             </section>
 
-            <section class="creation-step">
+            <section class="creation-step @(IsStep("Abilities") ? "" : "hidden")">
                 <p class="eyebrow">Abilities</p>
                 <ChoiceHintList Hints="@ChoiceHintsFor("Abilities")" />
                 <div class="ability-grid">
@@ -250,7 +262,7 @@
                 </div>
             </section>
 
-            <section class="creation-step">
+            <section class="creation-step @(IsStep("Proficiencies") ? "" : "hidden")">
                     <button type="button" class="section-toggle" @onclick="ToggleSavingThrows">
                         <span>Saving Throws</span>
                         <span>@(showSavingThrows ? "Hide" : "Show")</span>
@@ -279,7 +291,7 @@
                 }
             </section>
 
-            <section class="creation-step">
+            <section class="creation-step @(IsStep("Proficiencies") ? "" : "hidden")">
                     <button type="button" class="section-toggle" @onclick="ToggleSkills">
                         <span>Skills</span>
                         <span>@(showSkills ? "Hide" : "Show")</span>
@@ -321,7 +333,7 @@
                 }
             </section>
 
-            <section class="creation-step">
+            <section class="creation-step @(IsStep("Proficiencies") ? "" : "hidden")">
                 <button type="button" class="section-toggle" @onclick="ToggleTools">
                     <span>Tools</span>
                     <span>@(showTools ? "Hide" : "Show")</span>
@@ -357,7 +369,7 @@
                 }
             </section>
 
-            <section class="creation-step">
+            <section class="creation-step @(IsStep("Proficiencies") ? "" : "hidden")">
                 <button type="button" class="section-toggle" @onclick="ToggleLanguages">
                     <span>Languages</span>
                     <span>@(showLanguages ? "Hide" : "Show")</span>
@@ -392,6 +404,43 @@
                     </div>
                 }
             </section>
+
+            <section class="creation-step review-step @(IsStep("Review") ? "" : "hidden")">
+                <p class="eyebrow">Review</p>
+                <div class="creation-review-grid">
+                    <article>
+                        <span>Name</span>
+                        <strong>@(string.IsNullOrWhiteSpace(newName) ? "Unnamed character" : newName)</strong>
+                    </article>
+                    <article>
+                        <span>Ancestry</span>
+                        <strong>@(SelectedRace?.Name ?? "Not selected")</strong>
+                    </article>
+                    <article>
+                        <span>Background</span>
+                        <strong>@(SelectedBackground?.Name ?? "Not selected")</strong>
+                    </article>
+                    <article>
+                        <span>Classes</span>
+                        <strong>@(newClasses.Count == 0 ? "Not selected" : string.Join(" / ", newClasses.Select(characterClass => characterClass.DisplayName)))</strong>
+                    </article>
+                    <article>
+                        <span>Feats</span>
+                        <strong>@(newFeats.Count == 0 ? "None" : string.Join(", ", newFeats.Select(feat => feat.DisplayName)))</strong>
+                    </article>
+                    <article>
+                        <span>Abilities</span>
+                        <strong>STR @strength, DEX @dexterity, CON @constitution, INT @intelligence, WIS @wisdom, CHA @charisma</strong>
+                    </article>
+                </div>
+                <p class="muted compact-hint">Use Create when the summary and pending choices look right.</p>
+            </section>
+
+            <footer class="creation-step-actions">
+                <button type="button" class="text-button no-margin" disabled="@IsFirstStep" @onclick="PreviousStep">Previous</button>
+                <span>@CurrentStepLabel</span>
+                <button type="button" class="text-button no-margin" disabled="@IsLastStep" @onclick="NextStep">Next</button>
+            </footer>
 
             @if (!string.IsNullOrWhiteSpace(errorMessage))
             {
@@ -564,6 +613,7 @@
     private int selectedClassLevel = 1;
     private string errorMessage = "";
     private string detailKind = "";
+    private string currentStep = "Identity";
     private bool showSavingThrows;
     private bool showSkills;
     private bool showTools;
@@ -573,6 +623,17 @@
     private RaceGroup? selectedRaceGroup;
     private BackgroundGroup? selectedBackgroundGroup;
     private FeatGroup? selectedFeatGroup;
+    private static readonly IReadOnlyList<CreationStep> CreationSteps =
+    [
+        new("Identity", "Identity", "1"),
+        new("Ancestry", "Ancestry", "2"),
+        new("Background", "Background", "3"),
+        new("Classes", "Classes", "4"),
+        new("Feats", "Feats", "5"),
+        new("Abilities", "Abilities", "6"),
+        new("Proficiencies", "Proficiencies", "7"),
+        new("Review", "Review", "8")
+    ];
 
     private RaceDefinition? SelectedRace => selectedRaceDefinitionId is null ? null : raceDefinitions.FirstOrDefault(definition => definition.Id == selectedRaceDefinitionId.Value);
     private SubraceDefinition? SelectedSubrace => selectedSubraceDefinitionId is null ? null : subraceDefinitions.FirstOrDefault(definition => definition.Id == selectedSubraceDefinitionId.Value);
@@ -602,6 +663,10 @@
     private int ManualSkillChoiceCount => selectedManualSkillChoices.Count + selectedManualToolChoices.Count;
     private int ManualToolChoiceCount => selectedManualToolChoices.Count + selectedManualSkillChoices.Count;
     private int ManualLanguageChoiceCount => selectedManualLanguageChoices.Count;
+    private int CurrentStepIndex => Math.Max(0, CreationSteps.ToList().FindIndex(step => step.Key == currentStep));
+    private bool IsFirstStep => CurrentStepIndex == 0;
+    private bool IsLastStep => CurrentStepIndex >= CreationSteps.Count - 1;
+    private string CurrentStepLabel => CreationSteps[CurrentStepIndex].Label;
     private OptionDetail? SelectedDetail => detailKind switch
     {
         "Race" when SelectedRace is not null => BuildRaceDetail(SelectedRace, SelectedSubrace),
@@ -638,6 +703,35 @@
             .Select(group => new FeatGroup(group))
             .OrderBy(group => group.Name)
             .ToList();
+    }
+
+    private bool IsStep(string step)
+    {
+        return string.Equals(currentStep, step, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void SetStep(string step)
+    {
+        if (CreationSteps.Any(candidate => string.Equals(candidate.Key, step, StringComparison.OrdinalIgnoreCase)))
+        {
+            currentStep = step;
+        }
+    }
+
+    private void NextStep()
+    {
+        if (!IsLastStep)
+        {
+            currentStep = CreationSteps[CurrentStepIndex + 1].Key;
+        }
+    }
+
+    private void PreviousStep()
+    {
+        if (!IsFirstStep)
+        {
+            currentStep = CreationSteps[CurrentStepIndex - 1].Key;
+        }
     }
 
     private async Task SelectRaceGroup()
@@ -1988,4 +2082,5 @@
     private sealed record OptionDetailFeatureGroup(string Title, IReadOnlyList<OptionDetailFeatureLevel> Levels);
     private sealed record OptionDetailProgressionTable(string Title, IReadOnlyList<string> Columns, IReadOnlyList<OptionDetailProgressionRow> Rows);
     private sealed record OptionDetailProgressionRow(IReadOnlyList<string> Values);
+    private sealed record CreationStep(string Key, string Label, string Number);
 }

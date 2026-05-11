@@ -25,7 +25,7 @@
                 @if (OnToggleBookmark.HasDelegate)
                 {
                     <button class="icon-button bookmark-button @(IsBookmarked ? "active" : "")"
-                            title="Bookmark umschalten"
+                            title="Toggle bookmark"
                             @onclick="ToggleBookmark">
                         @(IsBookmarked ? "★" : "☆")
                     </button>
@@ -50,17 +50,17 @@
                 <p>@Spell.MaterialComponent</p>
                 @if (!string.IsNullOrWhiteSpace(Spell.MaterialCostDisplay))
                 {
-                    <p class="muted">Kosten: @Spell.MaterialCostDisplay</p>
+                    <p class="muted">Cost: @Spell.MaterialCostDisplay</p>
                 }
                 @if (Spell.ConsumesMaterial)
                 {
-                    <p class="muted">Wird verbraucht.</p>
+                    <p class="muted">Consumed.</p>
                 }
             </section>
         }
 
         <section class="detail-section">
-            <h2>Beschreibung</h2>
+            <h2>Description</h2>
             @foreach (var paragraph in SplitParagraphs(Spell.Description))
             {
                 <p><MarkupText Text="@paragraph" /></p>

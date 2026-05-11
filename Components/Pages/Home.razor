@@ -29,17 +29,34 @@
             <header class="settings-panel-header">
                 <div>
                     <p class="eyebrow">Bookmarks</p>
-                    <h2>Gemerkte Eintraege</h2>
+                    <h2>Saved Entries</h2>
                 </div>
             </header>
+            <section class="home-panel-tools" aria-label="Bookmark filters">
+                @foreach (var type in EntryTypeFilters)
+                {
+                    <button type="button"
+                            class="source-version @(selectedBookmarkType == type ? "active" : "")"
+                            @onclick="() => SetBookmarkFilter(type)">
+                        @(string.IsNullOrWhiteSpace(type) ? "All" : type)
+                    </button>
+                }
+            </section>
 
             @if (isLoading)
             {
-                <p class="muted">Dashboard wird geladen...</p>
+                <section class="home-empty-state">
+                    <p class="eyebrow">Loading</p>
+                    <h3>Loading dashboard...</h3>
+                </section>
             }
             else if (bookmarks.Count == 0)
             {
-                <p class="muted">Noch keine Bookmarks gesetzt.</p>
+                <section class="home-empty-state">
+                    <p class="eyebrow">Empty</p>
+                    <h3>No bookmarks yet.</h3>
+                    <p class="muted">Mark characters, spells, or items with the star to find them here again.</p>
+                </section>
             }
             else
             {
@@ -47,12 +64,12 @@
                     @foreach (var entry in bookmarks)
                     {
                         <article class="home-recent-row">
-                            <button type="button" class="home-recent-content" @onclick="() => OpenRoute(entry.Route)">
+                            <button type="button" class="home-recent-content" @onclick="() => OpenEntry(entry)">
                                 <span class="source-code">@entry.EntryType</span>
                                 <strong>@entry.Title</strong>
                                 <small>@entry.Subtitle</small>
                             </button>
-                            <button type="button" class="icon-button bookmark-button active" title="Bookmark entfernen" @onclick="() => ToggleBookmark(entry)">★</button>
+                            <button type="button" class="icon-button bookmark-button active" title="Remove bookmark" @onclick="() => ToggleBookmark(entry)">★</button>
                         </article>
                     }
                 </section>
@@ -65,15 +82,36 @@
                     <p class="eyebrow">Recently Viewed</p>
                     <h2>Entries</h2>
                 </div>
+                @if (recentEntries.Count > 0)
+                {
+                    <button type="button" class="text-button no-margin" @onclick="ClearRecentEntries">Clear</button>
+                }
             </header>
+            <section class="home-panel-tools" aria-label="Recent filters">
+                @foreach (var type in RecentTypeFilters)
+                {
+                    <button type="button"
+                            class="source-version @(selectedRecentType == type ? "active" : "")"
+                            @onclick="() => SetRecentFilter(type)">
+                        @(string.IsNullOrWhiteSpace(type) ? "All" : type)
+                    </button>
+                }
+            </section>
 
             @if (isLoading)
             {
-                <p class="muted">Dashboard wird geladen...</p>
+                <section class="home-empty-state">
+                    <p class="eyebrow">Loading</p>
+                    <h3>Loading dashboard...</h3>
+                </section>
             }
             else if (recentEntries.Count == 0)
             {
-                <p class="muted">Noch keine Spells oder Items angesehen.</p>
+                <section class="home-empty-state">
+                    <p class="eyebrow">Empty</p>
+                    <h3>No entries viewed yet.</h3>
+                    <p class="muted">Opened spells and items appear in this list automatically.</p>
+                </section>
             }
             else
             {
@@ -81,14 +119,14 @@
                     @foreach (var entry in recentEntries)
                     {
                         <article class="home-recent-row">
-                            <button type="button" class="home-recent-content" @onclick="() => OpenRoute(entry.Route)">
+                            <button type="button" class="home-recent-content" @onclick="() => OpenEntry(entry)">
                                 <span class="source-code">@entry.EntryType</span>
                                 <strong>@entry.Title</strong>
                                 <small>@entry.Subtitle</small>
                             </button>
                             <button type="button"
                                     class="icon-button bookmark-button @(RecentActivity.IsBookmarked(entry.EntryType, entry.EntityId) ? "active" : "")"
-                                    title="Bookmark umschalten"
+                                    title="Toggle bookmark"
                                     @onclick="() => ToggleBookmark(entry)">
                                 @(RecentActivity.IsBookmarked(entry.EntryType, entry.EntityId) ? "★" : "☆")
                             </button>
@@ -107,13 +145,17 @@
     private int itemCount;
     private List<RecentActivityEntry> bookmarks = [];
     private List<RecentActivityEntry> recentEntries = [];
+    private string selectedBookmarkType = "";
+    private string selectedRecentType = "";
+    private static readonly string[] EntryTypeFilters = ["", "Character", "Spell", "Item"];
+    private static readonly string[] RecentTypeFilters = ["", "Spell", "Item"];
 
     private IReadOnlyList<HomeTile> DashboardTiles =>
     [
-        new("Characters", "Characters verwalten, erstellen und spielen", characterCount.ToString(), "characters"),
-        new("Spells", "Spellbook, Filter und Detailansicht", spellCount.ToString(), "spells"),
-        new("Items", "Ausrüstung, magische Items und Inventar", itemCount.ToString(), "items"),
-        new("Settings", "Theme, Sources, Import und Export", "", "settings")
+        new("Characters", "Manage, create, and play characters", characterCount.ToString(), "characters"),
+        new("Spells", "Spellbook, filters, and detail view", spellCount.ToString(), "spells"),
+        new("Items", "Equipment, magic items, and inventory", itemCount.ToString(), "items"),
+        new("Settings", "Theme, sources, import, and export", "", "settings")
     ];
 
     protected override async Task OnInitializedAsync()
@@ -122,10 +164,7 @@
         characterCount = characters.Count;
         spellCount = (await Database.GetSpellSummariesAsync()).Count;
         itemCount = (await Database.GetItemDefinitionsAsync()).Count;
-        bookmarks = RecentActivity.GetBookmarks(null, 24).ToList();
-        recentEntries = RecentActivity.GetRecentEntries(null, 8)
-            .Where(entry => !string.Equals(entry.EntryType, "Character", StringComparison.OrdinalIgnoreCase))
-            .ToList();
+        RefreshActivityLists();
         isLoading = false;
     }
 
@@ -137,10 +176,50 @@
         }
     }
 
+    private void OpenEntry(RecentActivityEntry entry)
+    {
+        OpenRoute(BuildEntryRoute(entry));
+    }
+
+    private static string BuildEntryRoute(RecentActivityEntry entry)
+    {
+        return string.Equals(entry.EntryType, "Item", StringComparison.OrdinalIgnoreCase)
+            && entry.EntityId > 0
+            && (string.IsNullOrWhiteSpace(entry.Route) || string.Equals(entry.Route, "items", StringComparison.OrdinalIgnoreCase))
+                ? $"items/{entry.EntityId}"
+                : entry.Route;
+    }
+
     private void ToggleBookmark(RecentActivityEntry entry)
     {
-        RecentActivity.ToggleBookmark(entry.EntryType, entry.EntityId, entry.Title, entry.Subtitle, entry.Route);
-        bookmarks = RecentActivity.GetBookmarks(null, 24).ToList();
+        RecentActivity.ToggleBookmark(entry.EntryType, entry.EntityId, entry.Title, entry.Subtitle, BuildEntryRoute(entry));
+        RefreshActivityLists();
+    }
+
+    private void SetBookmarkFilter(string entryType)
+    {
+        selectedBookmarkType = entryType;
+        RefreshActivityLists();
+    }
+
+    private void SetRecentFilter(string entryType)
+    {
+        selectedRecentType = entryType;
+        RefreshActivityLists();
+    }
+
+    private void ClearRecentEntries()
+    {
+        RecentActivity.ClearRecentEntries(string.IsNullOrWhiteSpace(selectedRecentType) ? null : selectedRecentType);
+        RefreshActivityLists();
+    }
+
+    private void RefreshActivityLists()
+    {
+        bookmarks = RecentActivity.GetBookmarks(string.IsNullOrWhiteSpace(selectedBookmarkType) ? null : selectedBookmarkType, 24).ToList();
+        recentEntries = RecentActivity.GetRecentEntries(string.IsNullOrWhiteSpace(selectedRecentType) ? null : selectedRecentType, 16)
+            .Where(entry => !string.Equals(entry.EntryType, "Character", StringComparison.OrdinalIgnoreCase))
+            .ToList();
     }
 
     private sealed record HomeTile(string Title, string Subtitle, string CountText, string Route);

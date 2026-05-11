@@ -1,4 +1,5 @@
 @page "/items"
+@page "/items/{ItemId:int}"
 @implements IAsyncDisposable
 @inject AppDatabase Database
 @inject IJSRuntime JsRuntime
@@ -24,20 +25,20 @@
     @if (!string.IsNullOrWhiteSpace(loadError))
     {
         <section class="sheet-panel">
-            <p class="eyebrow">Datenbankfehler</p>
+            <p class="eyebrow">Database error</p>
             <pre class="error-details">@loadError</pre>
         </section>
     }
     else if (isLoading)
     {
-        <p class="muted">Datenbank wird vorbereitet...</p>
+        <p class="muted">Preparing database...</p>
     }
     else
     {
         @if (string.IsNullOrWhiteSpace(selectedCategory))
         {
             <section class="spell-toolbar item-category-toolbar">
-                <input class="search-input" placeholder="Alle Kategorien durchsuchen" @bind="searchText" @bind:event="oninput" @bind:after="ApplyFilter" />
+                <input class="search-input" placeholder="Search all categories" @bind="searchText" @bind:event="oninput" @bind:after="ApplyFilter" />
                 @if (!string.IsNullOrWhiteSpace(searchText))
                 {
                     <button type="button" class="text-button no-margin" @onclick="ResetCategorySearch">Reset</button>
@@ -91,7 +92,7 @@
                         @if (visibleItemGroupCount < filteredItemGroups.Count)
                         {
                             <div class="spell-list-sentinel" @ref="itemListSentinel">
-                                Weitere Items werden geladen...
+                                Loading more items...
                             </div>
                         }
                     </section>
@@ -101,15 +102,17 @@
                         {
                             <div class="empty-detail">
                                 <p class="eyebrow">Equipment</p>
-                                <h2>Suchergebnis auswählen</h2>
-                                <p class="muted">Die Suche läuft über alle Kategorien gleichzeitig.</p>
+                                <h2>Select a search result</h2>
+                                <p class="muted">Search runs across all categories at once.</p>
                             </div>
                         }
                         else
                         {
                             <ItemDetailContent Item="selectedItem"
                                                Versions="selectedItemGroup?.Versions"
-                                               OnSelectVersion="SelectVersion" />
+                                               OnSelectVersion="SelectVersion"
+                                               OnToggleBookmark="ToggleBookmark"
+                                               IsBookmarked="@IsSelectedItemBookmarked" />
                         }
                     </aside>
                 </section>
@@ -118,7 +121,7 @@
         else
         {
             <section class="spell-toolbar">
-                <input class="search-input" placeholder="Item suchen" @bind="searchText" @bind:event="oninput" @bind:after="ApplyFilter" />
+                <input class="search-input" placeholder="Search item" @bind="searchText" @bind:event="oninput" @bind:after="ApplyFilter" />
 
                 <button type="button"
                         class="text-button no-margin spell-filter-button @(IsFilterPaneOpen ? "active" : "")"
@@ -178,7 +181,7 @@
                 @if (visibleItemGroupCount < filteredItemGroups.Count)
                 {
                     <div class="spell-list-sentinel" @ref="itemListSentinel">
-                        Weitere Items werden geladen...
+                        Loading more items...
                     </div>
                 }
             </section>
@@ -199,7 +202,7 @@
                             <label class="stacked-field">
                                 <span>Source</span>
                                 <select @bind="draftSource">
-                                    <option value="">Alle Quellen</option>
+                                    <option value="">All sources</option>
                                     @foreach (var source in sources)
                                     {
                                         <option value="@source">@source</option>
@@ -210,7 +213,7 @@
                             <label class="stacked-field">
                                 <span>Rarity</span>
                                 <select @bind="draftRarity">
-                                    <option value="">Alle Rarities</option>
+                                    <option value="">All rarities</option>
                                     @foreach (var rarity in rarities)
                                     {
                                         <option value="@rarity">@FormatRarity(rarity)</option>
@@ -221,7 +224,7 @@
                             <label class="stacked-field">
                                 <span>Type</span>
                                 <select @bind="draftTypeCode">
-                                    <option value="">Alle Types</option>
+                                    <option value="">All types</option>
                                     @foreach (var typeCode in typeCodes)
                                     {
                                         <option value="@typeCode">@typeCode</option>
@@ -232,7 +235,7 @@
                             <label class="stacked-field">
                                 <span>Kind</span>
                                 <select @bind="draftItemKind">
-                                    <option value="">Alle Kinds</option>
+                                    <option value="">All kinds</option>
                                     @foreach (var itemKind in itemKinds)
                                     {
                                         <option value="@itemKind">@FormatItemKind(itemKind)</option>
@@ -282,7 +285,9 @@
                 {
                     <ItemDetailContent Item="selectedItem"
                                        Versions="selectedItemGroup?.Versions"
-                                       OnSelectVersion="SelectVersion" />
+                                       OnSelectVersion="SelectVersion"
+                                       OnToggleBookmark="ToggleBookmark"
+                                       IsBookmarked="@IsSelectedItemBookmarked" />
                 }
             </aside>
         </section>
@@ -291,6 +296,8 @@
 </section>
 
 @code {
+    [Parameter] public int? ItemId { get; set; }
+
     private List<ItemDefinition> allItems = [];
     private List<ItemGroup> itemGroups = [];
     private List<ItemGroup> filteredItemGroups = [];
@@ -334,12 +341,13 @@
     private string VisibleCountText => string.IsNullOrWhiteSpace(selectedCategory)
         ? string.IsNullOrWhiteSpace(searchText)
             ? $"{itemGroups.Count} Items"
-            : $"{Math.Min(visibleItemGroupCount, filteredItemGroups.Count)} von {filteredItemGroups.Count} gefunden"
-        : $"{Math.Min(visibleItemGroupCount, filteredItemGroups.Count)} von {filteredItemGroups.Count} angezeigt";
+            : $"{Math.Min(visibleItemGroupCount, filteredItemGroups.Count)} of {filteredItemGroups.Count} found"
+        : $"{Math.Min(visibleItemGroupCount, filteredItemGroups.Count)} of {filteredItemGroups.Count} shown";
     private List<FilterChip> ActiveFilterChips => BuildActiveFilterChips();
     private int ActiveFilterCount => ActiveFilterChips.Count;
     private bool IsFilterPaneOpen => rightPaneMode == "Filters";
     private List<ItemCategoryTile> ItemCategoryTiles => BuildItemCategoryTiles();
+    private bool IsSelectedItemBookmarked => selectedItem is not null && RecentActivity.IsBookmarked("Item", selectedItem.Id);
 
     protected override async Task OnInitializedAsync()
     {
@@ -353,6 +361,10 @@
             rarities = allItems.Select(item => item.Rarity).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct().OrderBy(value => RaritySortKey(value)).ThenBy(value => value).ToList();
             typeCodes = allItems.Select(item => item.TypeCode).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct().OrderBy(value => value).ToList();
             itemKinds = allItems.Select(item => item.ItemKind).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct().OrderBy(value => value).ToList();
+            if (ItemId is not null)
+            {
+                SelectItemById(ItemId.Value);
+            }
         }
         catch (Exception exception)
         {
@@ -482,7 +494,7 @@
         selectedItem = group.ResolveVersion(selectedItem);
         if (selectedItem is not null)
         {
-            RecentActivity.Track("Item", selectedItem.Id, selectedItem.ListName, BuildItemRecentSubtitle(selectedItem), "items");
+            TrackItem(selectedItem);
         }
         rightPaneMode = "Details";
     }
@@ -490,7 +502,39 @@
     private void SelectVersion(ItemDefinition item)
     {
         selectedItem = item;
-        RecentActivity.Track("Item", item.Id, item.ListName, BuildItemRecentSubtitle(item), "items");
+        TrackItem(item);
+    }
+
+    private void SelectItemById(int itemId)
+    {
+        var item = allItems.FirstOrDefault(item => item.Id == itemId);
+        if (item is null)
+        {
+            return;
+        }
+
+        selectedCategory = item.Category;
+        selectedItemKind = "";
+        selectedSource = "";
+        selectedRarity = "";
+        selectedTypeCode = "";
+        searchText = "";
+        filteredItemGroups = GroupItems(ApplyLocalFilter(allItems)).ToList();
+        selectedItemGroup = filteredItemGroups.FirstOrDefault(group => group.Versions.Any(version => version.Id == item.Id))
+            ?? itemGroups.FirstOrDefault(group => group.Versions.Any(version => version.Id == item.Id));
+        selectedItem = selectedItemGroup?.Versions.FirstOrDefault(version => version.Id == item.Id) ?? item;
+        rightPaneMode = "Details";
+        TrackItem(selectedItem);
+    }
+
+    private void TrackItem(ItemDefinition item)
+    {
+        RecentActivity.Track("Item", item.Id, item.ListName, BuildItemRecentSubtitle(item), $"items/{item.Id}");
+    }
+
+    private void ToggleBookmark(ItemDefinition item)
+    {
+        RecentActivity.ToggleBookmark("Item", item.Id, item.ListName, BuildItemRecentSubtitle(item), $"items/{item.Id}");
     }
 
     private static string BuildItemRecentSubtitle(ItemDefinition item)

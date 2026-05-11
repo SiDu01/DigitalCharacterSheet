@@ -17,7 +17,7 @@
     </header>
 
     <section class="spell-toolbar">
-        <input class="search-input" placeholder="Spell suchen" @bind="filter.SearchText" @bind:event="oninput" @bind:after="ApplyFilter" />
+        <input class="search-input" placeholder="Search spell" @bind="filter.SearchText" @bind:event="oninput" @bind:after="ApplyFilter" />
 
         <button type="button"
                 class="text-button no-margin spell-filter-button @(IsFilterPaneOpen ? "active" : "")"
@@ -48,13 +48,13 @@
     @if (!string.IsNullOrWhiteSpace(loadError))
     {
         <section class="sheet-panel">
-            <p class="eyebrow">Datenbankfehler</p>
+            <p class="eyebrow">Database error</p>
             <pre class="error-details">@loadError</pre>
         </section>
     }
     else if (isLoading)
     {
-        <p class="muted">Datenbank wird vorbereitet...</p>
+        <p class="muted">Preparing database...</p>
     }
     else
     {
@@ -84,13 +84,13 @@
                             </div>
                             <div class="spell-row-actions">
                                 <button class="icon-button favorite-button @(group.IsFavorite ? "active" : "")"
-                                        title="Favorite markieren"
+                                        title="Toggle favorite"
                                         @onclick="async () => await ToggleFavorite(spell)"
                                         @onclick:stopPropagation>
                                     @(group.IsFavorite ? "Fav" : "F")
                                 </button>
                                 <button class="icon-button @(group.IsPrepared ? "active" : "")"
-                                        title="Prepared markieren"
+                                        title="Toggle prepared"
                                         @onclick="async () => await TogglePrepared(spell)"
                                         @onclick:stopPropagation>
                                     @(group.IsPrepared ? "P" : "+")
@@ -102,7 +102,7 @@
                 @if (visibleSpellGroupCount < filteredSpellGroups.Count)
                 {
                     <div class="spell-list-sentinel" @ref="spellListSentinel">
-                        Weitere Spells werden geladen...
+                        Loading more spells...
                     </div>
                 }
             </section>
@@ -123,7 +123,7 @@
                             <label class="stacked-field">
                                 <span>Class</span>
                                 <select @bind="draftClassName">
-                                    <option value="">Alle Klassen</option>
+                                    <option value="">All classes</option>
                                     @foreach (var className in classNames)
                                     {
                                         <option value="@className">@className</option>
@@ -134,7 +134,7 @@
                             <label class="stacked-field">
                                 <span>School</span>
                                 <select @bind="draftSchool">
-                                    <option value="">Alle Schools</option>
+                                    <option value="">All schools</option>
                                     @foreach (var school in schools)
                                     {
                                         <option value="@school">@school</option>
@@ -145,7 +145,7 @@
                             <label class="stacked-field">
                                 <span>Source</span>
                                 <select @bind="draftSource">
-                                    <option value="">Alle Quellen</option>
+                                    <option value="">All sources</option>
                                     @foreach (var source in sources)
                                     {
                                         <option value="@source">@source</option>
@@ -156,19 +156,19 @@
                             <label class="stacked-field">
                                 <span>Component</span>
                                 <select @bind="draftComponent">
-                                    <option value="">Alle Components</option>
+                                    <option value="">All components</option>
                                     <option value="V">Verbal</option>
                                     <option value="S">Somatic</option>
                                     <option value="M">Material</option>
                                     <option value="M-Cost">Materialkosten</option>
-                                    <option value="M-Consumed">Material verbraucht</option>
+                                    <option value="M-Consumed">Material consumed</option>
                                 </select>
                             </label>
 
                             <label class="stacked-field">
                                 <span>Save</span>
                                 <select @bind="draftSave">
-                                    <option value="">Alle Saves</option>
+                                    <option value="">All saves</option>
                                     @foreach (var savingThrow in savingThrows)
                                     {
                                         <option value="@savingThrow">@savingThrow</option>
@@ -179,7 +179,7 @@
                             <label class="stacked-field">
                                 <span>Damage</span>
                                 <select @bind="draftDamageType">
-                                    <option value="">Alle Damage Types</option>
+                                    <option value="">All damage types</option>
                                     @foreach (var damageType in damageTypes)
                                     {
                                         <option value="@damageType">@damageType</option>
@@ -287,7 +287,7 @@
     private const int InitialVisibleSpellGroupCount = 80;
     private const int VisibleSpellGroupIncrement = 80;
     private IEnumerable<SpellGroup> VisibleSpellGroups => filteredSpellGroups.Take(visibleSpellGroupCount);
-    private string VisibleCountText => $"{Math.Min(visibleSpellGroupCount, filteredSpellGroups.Count)} von {filteredSpellGroups.Count} angezeigt";
+    private string VisibleCountText => $"{Math.Min(visibleSpellGroupCount, filteredSpellGroups.Count)} of {filteredSpellGroups.Count} shown";
     private List<FilterChip> ActiveFilterChips => BuildActiveFilterChips();
     private int ActiveFilterCount => ActiveFilterChips.Count;
     private bool IsFilterPaneOpen => rightPaneMode == "Filters";

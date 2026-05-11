@@ -107,6 +107,21 @@ public sealed class RecentActivityService
         return true;
     }
 
+    public void ClearRecentEntries(string? entryType = null)
+    {
+        EnsureLoaded();
+        if (string.IsNullOrWhiteSpace(entryType))
+        {
+            _entries!.Clear();
+        }
+        else
+        {
+            _entries!.RemoveAll(entry => string.Equals(entry.EntryType, entryType, StringComparison.OrdinalIgnoreCase));
+        }
+
+        Save();
+    }
+
     private void EnsureLoaded()
     {
         if (_entries is not null)

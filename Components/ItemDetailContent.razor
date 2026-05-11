@@ -29,6 +29,14 @@
                 <h1>@Item.ListName</h1>
                 <p>@BuildSubtitle(Item)</p>
             </div>
+            @if (OnToggleBookmark.HasDelegate)
+            {
+                <button class="icon-button bookmark-button @(IsBookmarked ? "active" : "")"
+                        title="Toggle bookmark"
+                        @onclick="ToggleBookmark">
+                    @(IsBookmarked ? "★" : "☆")
+                </button>
+            }
         </header>
 
         <dl class="detail-grid">
@@ -135,6 +143,8 @@
     [Parameter, EditorRequired] public ItemDefinition? Item { get; set; }
     [Parameter] public IReadOnlyList<ItemDefinition>? Versions { get; set; }
     [Parameter] public EventCallback<ItemDefinition> OnSelectVersion { get; set; }
+    [Parameter] public EventCallback<ItemDefinition> OnToggleBookmark { get; set; }
+    [Parameter] public bool IsBookmarked { get; set; }
 
     private IReadOnlyList<ItemDefinition> SourceVersions => Versions is { Count: > 0 } ? Versions : Item is null ? [] : [Item];
     private IReadOnlyList<ItemDefinition> ActiveSourceVersions => SelectedBaseSourceVersions.Count > 0 ? SelectedBaseSourceVersions : SourceVersions;
@@ -153,6 +163,14 @@
     private async Task SelectVersion(ItemDefinition version)
     {
         await OnSelectVersion.InvokeAsync(version);
+    }
+
+    private async Task ToggleBookmark()
+    {
+        if (Item is not null)
+        {
+            await OnToggleBookmark.InvokeAsync(Item);
+        }
     }
 
     private static string BuildSourceTitle(ItemDefinition item)
