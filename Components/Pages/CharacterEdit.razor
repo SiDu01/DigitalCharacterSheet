@@ -121,7 +121,8 @@
                         {
                             <AbilityChoiceList Requirements="AllAbilityChoiceRequirements"
                                                SelectedChoices="selectedAbilityChoices"
-                                               OnChange="SetAbilityChoice" />
+                                               OnChange="SetAbilityChoice"
+                                               OnModeChange="SetAbilityChoiceMode" />
                         }
                         @if (AllDefenseChoiceRequirements.Count > 0)
                         {
@@ -777,7 +778,8 @@
 
     private async Task RefreshOptionEffectsAsync(bool applyAbilityAndSaveEffects)
     {
-        var effects = await Database.GetCharacterOptionEffectsAsync(BuildDraftCharacter());
+        var effects = await Database.GetCharacterOptionEffectsAsync(BuildDraftCharacter(includeAbilityChoices: false));
+        CharacterAbilityChoiceService.AddSelectedBonuses(effects.AbilityBonuses, AllAbilityChoiceRequirements, selectedAbilityChoices);
         automaticSavingThrowProficiencies = effects.SavingThrowProficiencies.ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (applyAbilityAndSaveEffects)
         {
@@ -944,7 +946,7 @@
         language.IsProficient = false;
     }
 
-    private Character BuildDraftCharacter()
+    private Character BuildDraftCharacter(bool includeAbilityChoices = true)
     {
         var raceDefinition = selectedRaceDefinitionId is null
             ? null
@@ -960,11 +962,11 @@
             RaceDefinitionId = raceDefinition?.Id,
             SubraceDefinitionId = character?.SubraceDefinitionId,
             RaceName = raceDefinition?.Name ?? "",
-            RaceChoicesJson = BuildRaceChoicesJson(),
+            RaceChoicesJson = BuildRaceChoicesJson(includeAbilityChoices),
             BackgroundDefinitionId = backgroundDefinition?.Id,
             BackgroundName = backgroundDefinition?.Name ?? "",
-            BackgroundChoicesJson = BuildBackgroundChoicesJson(),
-            FeatChoicesJson = BuildFeatChoicesJson(),
+            BackgroundChoicesJson = BuildBackgroundChoicesJson(includeAbilityChoices),
+            FeatChoicesJson = BuildFeatChoicesJson(includeAbilityChoices),
             ClassName = string.Join(" / ", classes.Select(characterClass => characterClass.ClassName).Distinct()),
             Level = classes.Count == 0 ? null : classes.Sum(characterClass => characterClass.Level),
             Strength = strength,
@@ -1048,7 +1050,7 @@
             .ToList();
     }
 
-    private string BuildRaceChoicesJson()
+    private string BuildRaceChoicesJson(bool includeAbilityChoices = true)
     {
         var choices = new Dictionary<string, object>();
         var size = ReadChoiceValue(character?.RaceChoicesJson, "size");
@@ -1058,23 +1060,32 @@
         }
 
         AddDefenseChoices(choices, RaceDefenseChoiceRequirements);
-        AddAbilityChoices(choices, RaceAbilityChoiceRequirements);
+        if (includeAbilityChoices)
+        {
+            AddAbilityChoices(choices, RaceAbilityChoiceRequirements);
+        }
         return choices.Count == 0 ? "{}" : JsonSerializer.Serialize(choices);
     }
 
-    private string BuildBackgroundChoicesJson()
+    private string BuildBackgroundChoicesJson(bool includeAbilityChoices = true)
     {
         var choices = new Dictionary<string, object>();
         AddDefenseChoices(choices, BackgroundDefenseChoiceRequirements);
-        AddAbilityChoices(choices, BackgroundAbilityChoiceRequirements);
+        if (includeAbilityChoices)
+        {
+            AddAbilityChoices(choices, BackgroundAbilityChoiceRequirements);
+        }
         return choices.Count == 0 ? "{}" : JsonSerializer.Serialize(choices);
     }
 
-    private string BuildFeatChoicesJson()
+    private string BuildFeatChoicesJson(bool includeAbilityChoices = true)
     {
         var choices = new Dictionary<string, object>();
         AddDefenseChoices(choices, FeatDefenseChoiceRequirements);
-        AddAbilityChoices(choices, FeatAbilityChoiceRequirements);
+        if (includeAbilityChoices)
+        {
+            AddAbilityChoices(choices, FeatAbilityChoiceRequirements);
+        }
         return choices.Count == 0 ? "{}" : JsonSerializer.Serialize(choices);
     }
 
@@ -1094,11 +1105,15 @@
 
     private void AddAbilityChoices(Dictionary<string, object> choices, IReadOnlyList<CharacterAbilityChoiceRequirement> requirements)
     {
-        var selected = requirements
+        var activeRequirements = CharacterAbilityChoiceService.GetActiveRequirements(requirements, selectedAbilityChoices);
+        var selected = activeRequirements
             .Where(requirement => selectedAbilityChoices.TryGetValue(requirement.Key, out var values) && values.Count > 0)
             .ToDictionary(
                 requirement => requirement.Key,
-                requirement => selectedAbilityChoices[requirement.Key].Take(requirement.Count).ToList(),
+                requirement => selectedAbilityChoices[requirement.Key]
+                    .Where(value => requirement.Options.Contains(value, StringComparer.OrdinalIgnoreCase))
+                    .Take(requirement.Count)
+                    .ToList(),
                 StringComparer.OrdinalIgnoreCase);
         if (selected.Count > 0)
         {
@@ -1131,6 +1146,16 @@
         {
             selectedAbilityChoices.Remove(choice.Key);
         }
+    }
+
+    private void SetAbilityChoiceMode((string ModeGroupKey, string ModeKey) choice)
+    {
+        foreach (var requirement in AllAbilityChoiceRequirements.Where(requirement => string.Equals(requirement.ModeGroupKey, choice.ModeGroupKey, StringComparison.OrdinalIgnoreCase)))
+        {
+            selectedAbilityChoices.Remove(requirement.Key);
+        }
+
+        selectedAbilityChoices[CharacterAbilityChoiceService.BuildModeMarkerKey(choice.ModeGroupKey)] = [choice.ModeKey];
     }
 
     private void ToggleDefenseChoice((string Key, string Option, bool IsSelected) choice)
@@ -1267,7 +1292,10 @@
 
     private void PruneAbilityChoices()
     {
-        var validKeys = AllAbilityChoiceRequirements.Select(requirement => requirement.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var validKeys = AllAbilityChoiceRequirements
+            .Select(requirement => requirement.Key)
+            .Concat(AllAbilityChoiceRequirements.Select(requirement => CharacterAbilityChoiceService.BuildModeMarkerKey(requirement.ModeGroupKey)))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var key in selectedAbilityChoices.Keys.Where(key => !validKeys.Contains(key)).ToList())
         {
             selectedAbilityChoices.Remove(key);

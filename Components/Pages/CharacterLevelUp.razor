@@ -193,7 +193,8 @@
                                 {
                                     <AbilityChoiceList Requirements="LevelUpAbilityChoiceRequirements"
                                                        SelectedChoices="selectedAbilityChoices"
-                                                       OnChange="SetLevelUpAbilityChoice" />
+                                                       OnChange="SetLevelUpAbilityChoice"
+                                                       OnModeChange="SetLevelUpAbilityChoiceMode" />
                                 }
                             }
 
@@ -837,7 +838,10 @@
 
     private void PruneLevelUpAbilityChoices()
     {
-        var validKeys = LevelUpAbilityChoiceRequirements.Select(requirement => requirement.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var validKeys = LevelUpAbilityChoiceRequirements
+            .Select(requirement => requirement.Key)
+            .Concat(LevelUpAbilityChoiceRequirements.Select(requirement => CharacterAbilityChoiceService.BuildModeMarkerKey(requirement.ModeGroupKey)))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var key in selectedAbilityChoices.Keys.Where(key => !validKeys.Contains(key)).ToList())
         {
             selectedAbilityChoices.Remove(key);
@@ -846,7 +850,8 @@
 
     private bool AbilityChoicesAreComplete(IReadOnlyList<CharacterAbilityChoiceRequirement> requirements)
     {
-        return requirements.All(requirement =>
+        var activeRequirements = CharacterAbilityChoiceService.GetActiveRequirements(requirements, selectedAbilityChoices);
+        return activeRequirements.All(requirement =>
             selectedAbilityChoices.TryGetValue(requirement.Key, out var values)
             && values.Where(value => requirement.Options.Contains(value, StringComparer.OrdinalIgnoreCase)).Take(requirement.Count).Count() == requirement.Count);
     }
@@ -863,7 +868,7 @@
             root["abilityChoices"] = abilityChoices;
         }
 
-        foreach (var requirement in requirements)
+        foreach (var requirement in CharacterAbilityChoiceService.GetActiveRequirements(requirements, selectedAbilityChoices))
         {
             if (!selectedAbilityChoices.TryGetValue(requirement.Key, out var values))
             {
@@ -883,6 +888,16 @@
         }
 
         return root.ToJsonString();
+    }
+
+    private void SetLevelUpAbilityChoiceMode((string ModeGroupKey, string ModeKey) choice)
+    {
+        foreach (var requirement in LevelUpAbilityChoiceRequirements.Where(requirement => string.Equals(requirement.ModeGroupKey, choice.ModeGroupKey, StringComparison.OrdinalIgnoreCase)))
+        {
+            selectedAbilityChoices.Remove(requirement.Key);
+        }
+
+        selectedAbilityChoices[CharacterAbilityChoiceService.BuildModeMarkerKey(choice.ModeGroupKey)] = [choice.ModeKey];
     }
 
     private void ApplyAbilityChoiceBonusesToCharacter(Character target, IReadOnlyList<CharacterAbilityChoiceRequirement> requirements)
@@ -1037,8 +1052,14 @@
     {
         return featureName.Contains("Ability Score Improvement", StringComparison.OrdinalIgnoreCase)
             || featureName.Contains("Epic Boon", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(featureName, "Feat", StringComparison.OrdinalIgnoreCase)
-            || featureName.Contains("Feat", StringComparison.OrdinalIgnoreCase);
+            || ContainsFeatWord(featureName);
+    }
+
+    private static bool ContainsFeatWord(string featureName)
+    {
+        return featureName
+            .Split([' ', '-', ':', ';', ',', '.', '(', ')', '[', ']'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(part => string.Equals(part, "Feat", StringComparison.OrdinalIgnoreCase));
     }
 
     private IReadOnlyList<LevelUpFeatureLevel> BuildNewFeatureLevels()

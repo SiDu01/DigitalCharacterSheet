@@ -1,27 +1,57 @@
 @if (Requirements.Count > 0)
 {
     <div class="ability-choice-list">
-        @foreach (var requirement in Requirements)
+        @foreach (var group in Requirements.GroupBy(requirement => requirement.ModeGroupKey, StringComparer.OrdinalIgnoreCase))
         {
-            var selected = SelectedChoices.TryGetValue(requirement.Key, out var values) ? values : [];
             <div class="ability-choice-group">
                 <div>
-                    <strong>@requirement.SourceName</strong>
-                    <small>@BuildHint(requirement)</small>
+                    <strong>@group.First().SourceName</strong>
+                    <small>Choose an ability score mode.</small>
                 </div>
-                <div class="ability-choice-selects">
-                    @for (var index = 0; index < requirement.Count; index++)
-                    {
-                        var selectedValue = index < selected.Count ? selected[index] : "";
-                        <select value="@selectedValue" @onchange="args => SetChoice(requirement, index, args.Value?.ToString())">
-                            <option value="">Select ability</option>
-                            @foreach (var ability in requirement.Options)
-                            {
-                                <option value="@ability">@CharacterAbilityChoiceService.FormatAbilityName(ability)</option>
-                            }
-                        </select>
-                    }
-                </div>
+                @{
+                    var modeGroups = group.GroupBy(requirement => requirement.ModeKey, StringComparer.OrdinalIgnoreCase).ToList();
+                    var selectedMode = CharacterAbilityChoiceService.ReadSelectedMode(group.Key, SelectedChoices)
+                        ?? modeGroups.FirstOrDefault(mode => mode.Any(requirement => SelectedChoices.TryGetValue(requirement.Key, out var values) && values.Count > 0))?.Key
+                        ?? modeGroups.First().Key;
+                    var activeRequirements = modeGroups.First(mode => string.Equals(mode.Key, selectedMode, StringComparison.OrdinalIgnoreCase)).ToList();
+                }
+                @if (modeGroups.Count > 1)
+                {
+                    <div class="ability-mode-selects">
+                        @foreach (var mode in modeGroups)
+                        {
+                            <button type="button"
+                                    class="mode-button @(string.Equals(mode.Key, selectedMode, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
+                                    @onclick="async () => await ChangeMode(group.Key, mode.Key)">
+                                @mode.First().ModeName
+                            </button>
+                        }
+                    </div>
+                }
+                @foreach (var requirement in activeRequirements)
+                {
+                    var selected = SelectedChoices.TryGetValue(requirement.Key, out var values) ? values : [];
+                    var selectedInMode = activeRequirements
+                        .SelectMany(activeRequirement => SelectedChoices.TryGetValue(activeRequirement.Key, out var activeValues) ? activeValues : [])
+                        .ToList();
+                    <div class="ability-choice-selects">
+                        <small>@BuildHint(requirement)</small>
+                        @for (var index = 0; index < requirement.Count; index++)
+                        {
+                            var choiceIndex = index;
+                            var selectedValue = choiceIndex < selected.Count ? selected[choiceIndex] : "";
+                            <select value="@selectedValue" @onchange="args => SetChoice(requirement, choiceIndex, args.Value?.ToString())">
+                                <option value="">Select ability</option>
+                                @foreach (var ability in requirement.Options)
+                                {
+                                    <option value="@ability" disabled="@IsAbilityUnavailable(activeRequirements, selectedInMode, selectedValue, ability)">
+                                        @CharacterAbilityChoiceService.FormatAbilityShortName(ability)
+                                    </option>
+                                }
+                            </select>
+                        }
+                    </div>
+                }
             </div>
         }
     </div>
@@ -31,17 +61,30 @@
     [Parameter] public IReadOnlyList<CharacterAbilityChoiceRequirement> Requirements { get; set; } = [];
     [Parameter] public IReadOnlyDictionary<string, List<string>> SelectedChoices { get; set; } = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
     [Parameter] public EventCallback<(string Key, int Index, string Value)> OnChange { get; set; }
+    [Parameter] public EventCallback<(string ModeGroupKey, string ModeKey)> OnModeChange { get; set; }
 
     private async Task SetChoice(CharacterAbilityChoiceRequirement requirement, int index, string? value)
     {
         await OnChange.InvokeAsync((requirement.Key, index, value ?? ""));
     }
 
+    private async Task ChangeMode(string modeGroupKey, string modeKey)
+    {
+        await OnModeChange.InvokeAsync((modeGroupKey, modeKey));
+    }
+
     private static string BuildHint(CharacterAbilityChoiceRequirement requirement)
     {
         var bonusText = requirement.BonusPerSelection == 1 ? "+1" : $"+{requirement.BonusPerSelection}";
         return requirement.Count == 1
-            ? $"Choose one ability ({bonusText})."
-            : $"Choose {requirement.Count} ability increases ({bonusText} each).";
+            ? $"Choose {bonusText}."
+            : $"Choose {requirement.Count} x {bonusText}.";
+    }
+
+    private static bool IsAbilityUnavailable(IReadOnlyList<CharacterAbilityChoiceRequirement> activeRequirements, IReadOnlyList<string> selected, string selectedValue, string ability)
+    {
+        return activeRequirements.All(requirement => !requirement.AllowsDuplicateSelection)
+            && !string.Equals(selectedValue, ability, StringComparison.OrdinalIgnoreCase)
+            && selected.Contains(ability, StringComparer.OrdinalIgnoreCase);
     }
 }

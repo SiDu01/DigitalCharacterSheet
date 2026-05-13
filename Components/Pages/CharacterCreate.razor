@@ -53,27 +53,17 @@
                         <button type="button" class="text-button no-margin" disabled="@IsLastStep" @onclick="NextStep">Next</button>
                     </div>
                 </div>
-                <select @bind="selectedRaceName" @bind:after="SelectRaceGroup">
-                    <option value="">Select race</option>
+                <section class="creator-option-list" aria-label="Available ancestry options">
                     @foreach (var raceGroup in raceGroups)
                     {
-                        <option value="@raceGroup.Name">@raceGroup.Name</option>
+                        <button type="button"
+                                class="creator-option-row @(string.Equals(selectedRaceName, raceGroup.Name, StringComparison.OrdinalIgnoreCase) ? "selected" : "")"
+                                @onclick="async () => await SelectRaceGroup(raceGroup)">
+                            <span>@raceGroup.Name</span>
+                            <small>@string.Join(" / ", raceGroup.Versions.Select(version => version.Source).Distinct())</small>
+                        </button>
                     }
-                </select>
-
-                @if (selectedRaceGroup is not null)
-                {
-                    <div class="source-switcher">
-                        @foreach (var version in selectedRaceGroup.Versions)
-                        {
-                            <button type="button"
-                                    class="source-version @(version.Id == selectedRaceDefinitionId ? "active" : "")"
-                                    @onclick="async () => await SelectRaceVersion(version)">
-                                @version.Source
-                            </button>
-                        }
-                    </div>
-                }
+                </section>
 
                 @if (RaceSizeOptions.Count > 1)
                 {
@@ -112,32 +102,17 @@
                         <button type="button" class="text-button no-margin" disabled="@IsLastStep" @onclick="NextStep">Next</button>
                     </div>
                 </div>
-                <select @bind="selectedBackgroundName" @bind:after="SelectBackgroundGroup">
-                    <option value="">Select background</option>
+                <section class="creator-option-list" aria-label="Available background options">
                     @foreach (var backgroundGroup in backgroundGroups)
                     {
-                        <option value="@backgroundGroup.Name">@backgroundGroup.Name</option>
+                        <button type="button"
+                                class="creator-option-row @(string.Equals(selectedBackgroundName, backgroundGroup.Name, StringComparison.OrdinalIgnoreCase) ? "selected" : "")"
+                                @onclick="async () => await SelectBackgroundGroup(backgroundGroup)">
+                            <span>@backgroundGroup.Name</span>
+                            <small>@string.Join(" / ", backgroundGroup.Versions.Select(version => version.Source).Distinct())</small>
+                        </button>
                     }
-                </select>
-
-                @if (selectedBackgroundGroup is not null)
-                {
-                    <div class="source-switcher">
-                        @foreach (var version in selectedBackgroundGroup.Versions)
-                        {
-                            <button type="button"
-                                    class="source-version @(version.Id == selectedBackgroundDefinitionId ? "active" : "")"
-                                    @onclick="() => SelectBackgroundVersion(version)">
-                                @version.Source
-                            </button>
-                        }
-                    </div>
-                }
-
-                @if (!string.IsNullOrWhiteSpace(SelectedBackground?.FeatsJson))
-                {
-                    <p class="muted compact-hint">This background has feat choices saved for a later rule step.</p>
-                }
+                </section>
 
             </section>
 
@@ -164,17 +139,6 @@
                 @if (selectedClassGroup is not null)
                 {
                     <div class="class-source-row">
-                        <div class="source-switcher class-source-switcher" aria-label="Class source versions">
-                            @foreach (var version in selectedClassGroup.Versions)
-                            {
-                                <button type="button"
-                                        class="source-version @(version.Id == selectedClassDefinitionId ? "active" : "")"
-                                        @onclick="async () => await SelectClassVersion(version)">
-                                    @version.Source
-                                </button>
-                            }
-                        </div>
-
                         <select @bind="selectedSubclassDefinitionId" @bind:after="SelectSubclass">
                             <option value="">No subclass</option>
                             @foreach (var subclassDefinition in subclassDefinitions)
@@ -202,7 +166,7 @@
                         @foreach (var characterClass in newClasses)
                         {
                             <div class="selected-class-row">
-                                <span>@characterClass.DisplayName</span>
+                                <button type="button" class="text-link-button" @onclick="async () => await ShowClassDetails(characterClass)">@characterClass.DisplayName</button>
                                 <button type="button" class="icon-button" title="Remove class" @onclick="() => RemoveClass(characterClass)">-</button>
                             </div>
                         }
@@ -215,26 +179,6 @@
                 }
             </section>
 
-            @if (AllDefenseChoiceRequirements.Count > 0 || AllAbilityChoiceRequirements.Count > 0 || optionChoiceHints.Count > 0)
-            {
-                <section class="creator-step-screen pending-choice-panel @(IsStep("Review") ? "" : "hidden")">
-                    <p class="eyebrow">Pending Choices</p>
-                    @if (AllAbilityChoiceRequirements.Count > 0)
-                    {
-                        <AbilityChoiceList Requirements="AllAbilityChoiceRequirements"
-                                           SelectedChoices="selectedAbilityChoices"
-                                           OnChange="SetAbilityChoice" />
-                    }
-                    @if (AllDefenseChoiceRequirements.Count > 0)
-                    {
-                        <DefenseChoiceList Requirements="AllDefenseChoiceRequirements"
-                                           SelectedChoices="selectedDefenseChoices"
-                                           OnToggle="ToggleDefenseChoice" />
-                    }
-                    <ChoiceHintList Hints="optionChoiceHints" />
-                </section>
-            }
-
             <section class="creator-step-screen @(IsStep("Feats") ? "" : "hidden")">
                 <div class="creator-step-heading">
                     <p class="eyebrow">Feats</p>
@@ -244,9 +188,28 @@
                     </div>
                 </div>
                 <ChoiceHintList Hints="@ChoiceHintsFor("Feats")" />
+                @if (GrantedFeatSummaries.Count > 0)
+                {
+                    <section class="granted-feat-panel">
+                        @foreach (var grantedFeat in GrantedFeatSummaries)
+                        {
+                            <article class="granted-feat-row">
+                                <strong>@grantedFeat</strong>
+                                <label class="switch-toggle">
+                                    <input type="checkbox" @bind="applyGrantedFeats" @bind:after="RecomputeOptionEffectsAsync" />
+                                    <span>Apply</span>
+                                </label>
+                            </article>
+                        }
+                    </section>
+                }
+                <label class="switch-toggle">
+                    <input type="checkbox" @bind="showOnlyOriginFeats" @bind:after="OnOriginFeatFilterChanged" />
+                    <span>Show only Origin Feats</span>
+                </label>
                 <select @bind="selectedFeatName" @bind:after="SelectFeatGroup">
                     <option value="">Select feat</option>
-                    @foreach (var featGroup in featGroups)
+                    @foreach (var featGroup in FilteredFeatGroups)
                     {
                         <option value="@featGroup.Name">@featGroup.Name</option>
                     }
@@ -254,16 +217,6 @@
 
                 @if (selectedFeatGroup is not null)
                 {
-                    <div class="source-switcher">
-                        @foreach (var version in selectedFeatGroup.Versions)
-                        {
-                            <button type="button"
-                                    class="source-version @(version.Id == selectedFeatDefinitionId ? "active" : "")"
-                                    @onclick="() => SelectFeatVersion(version)">
-                                @version.Source
-                            </button>
-                        }
-                    </div>
                     <button type="button" class="text-button" @onclick="AddFeat">Add Feat</button>
                 }
 
@@ -273,7 +226,7 @@
                         @foreach (var feat in newFeats)
                         {
                             <div class="selected-class-row">
-                                <span>@feat.DisplayName</span>
+                                <button type="button" class="text-link-button" @onclick="() => ShowFeatDetails(feat)">@feat.DisplayName</button>
                                 <button type="button" class="icon-button" title="Remove feat" @onclick="() => RemoveFeat(feat)">-</button>
                             </div>
                         }
@@ -322,7 +275,7 @@
                         {
                             <label>
                                 <span>@ability.Label</span>
-                                <select value="@GetAbilityValue(ability.Code)" @onchange="args => AssignAbilityScore(ability.Code, args.Value?.ToString(), StandardArrayScores)">
+                                <select value="@GetAbilityBaseValue(ability.Code)" @onchange="args => AssignAbilityScore(ability.Code, args.Value?.ToString(), StandardArrayScores)">
                                     <option value="">Select score</option>
                                     @foreach (var score in StandardArrayScores)
                                     {
@@ -342,15 +295,17 @@
                     <div class="point-buy-grid">
                         @foreach (var ability in AbilityCodes)
                         {
-                            var value = GetAbilityValue(ability.Code);
+                            var baseValue = GetAbilityBaseValue(ability.Code);
+                            var bonus = GetAppliedAbilityBonus(ability.Code);
+                            var finalValue = GetAbilityValue(ability.Code);
                             <article>
                                 <span>@ability.Label</span>
                                 <div class="point-buy-controls">
-                                    <button type="button" class="mini-button" disabled="@(value <= 8)" @onclick="() => ChangePointBuyScore(ability.Code, -1)">-</button>
-                                    <strong>@value</strong>
-                                    <button type="button" class="mini-button" disabled="@(value >= 15 || !CanIncreasePointBuyScore(ability.Code))" @onclick="() => ChangePointBuyScore(ability.Code, 1)">+</button>
+                                    <button type="button" class="mini-button" disabled="@(baseValue <= 8)" @onclick="() => ChangePointBuyScore(ability.Code, -1)">-</button>
+                                    <strong>@finalValue</strong>
+                                    <button type="button" class="mini-button" disabled="@(baseValue >= 15 || !CanIncreasePointBuyScore(ability.Code))" @onclick="() => ChangePointBuyScore(ability.Code, 1)">+</button>
                                 </div>
-                                <small>Cost @PointBuyCost(value)</small>
+                                <small>Base @baseValue@(bonus == 0 ? "" : $" + {bonus}") · Cost @PointBuyCost(baseValue)</small>
                             </article>
                         }
                     </div>
@@ -366,7 +321,7 @@
                         {
                             <label>
                                 <span>@ability.Label</span>
-                                <select value="@GetAbilityValue(ability.Code)" disabled="@(rolledScores.Count == 0)" @onchange="args => AssignAbilityScore(ability.Code, args.Value?.ToString(), rolledScores)">
+                                <select value="@GetAbilityBaseValue(ability.Code)" disabled="@(rolledScores.Count == 0)" @onchange="args => AssignAbilityScore(ability.Code, args.Value?.ToString(), rolledScores)">
                                     <option value="">Select roll</option>
                                     @foreach (var score in rolledScores)
                                     {
@@ -380,57 +335,99 @@
             </section>
 
             <section class="creator-step-screen @(IsStep("Proficiencies") ? "" : "hidden")">
-                    <div class="creator-step-heading">
-                        <p class="eyebrow">Proficiencies</p>
-                        <div class="creator-step-controls">
-                            <button type="button" class="text-button no-margin" disabled="@IsFirstStep" @onclick="PreviousStep">Previous</button>
-                            <button type="button" class="text-button no-margin" disabled="@IsLastStep" @onclick="NextStep">Next</button>
-                        </div>
+                <div class="creator-step-heading">
+                    <p class="eyebrow">Proficiencies</p>
+                    <div class="creator-step-controls">
+                        <button type="button" class="text-button no-margin" disabled="@IsFirstStep" @onclick="PreviousStep">Previous</button>
+                        <button type="button" class="text-button no-margin" disabled="@IsLastStep" @onclick="NextStep">Next</button>
                     </div>
-                    <button type="button" class="section-toggle" @onclick="ToggleSavingThrows">
-                        <span>Saving Throws</span>
-                        <span>@(showSavingThrows ? "Hide" : "Show")</span>
-                    </button>
-                    <ChoiceHintList Hints="@ChoiceHintsFor("Saving Throws")" />
-                    @if (showSavingThrows)
+                </div>
+                <section class="creator-option-list proficiency-category-list" aria-label="Proficiency categories">
+                    @foreach (var category in ProficiencySections)
                     {
-                    <div class="proficiency-list">
-                        @foreach (var savingThrow in savingThrows)
-                        {
-                            <div class="proficiency-row">
-                                <div class="proficiency-main">
-                                    <span>@savingThrow.AbilityName</span>
-                                    <label class="toggle no-min"><input type="checkbox" @bind="savingThrow.IsProficient" /> Prof</label>
-                                    <select @bind="savingThrow.RollMode">
-                                        @foreach (var rollMode in RollModes)
-                                        {
-                                            <option value="@rollMode">@rollMode</option>
-                                        }
-                                    </select>
-                                </div>
-                                <input class="proficiency-notes" placeholder="Notes" @bind="savingThrow.Notes" @bind:event="oninput" />
-                            </div>
-                        }
-                    </div>
-                }
+                        <button type="button"
+                                class="creator-option-row @(string.Equals(selectedProficiencySection, category, StringComparison.OrdinalIgnoreCase) ? "selected" : "")"
+                                @onclick="() => SetProficiencySection(category)">
+                            <span>@category</span>
+                            <small>@BuildProficiencySectionSummary(category)</small>
+                        </button>
+                    }
+                </section>
             </section>
 
-            <section class="creator-step-screen @(IsStep("Proficiencies") ? "" : "hidden")">
-                    <button type="button" class="section-toggle" @onclick="ToggleSkills">
-                        <span>Skills</span>
-                        <span>@(showSkills ? "Hide" : "Show")</span>
-                    </button>
-                    <ChoiceHintList Hints="@ChoiceHintsFor("Skills")" />
-                    @if (SkillChoiceLimit > 0)
+            <section class="creator-step-screen review-step @(IsStep("Review") ? "" : "hidden")">
+                <div class="creator-step-heading">
+                    <p class="eyebrow">Review</p>
+                    <div class="creator-step-controls">
+                        <button type="button" class="text-button no-margin" disabled="@IsFirstStep" @onclick="PreviousStep">Previous</button>
+                        <button type="button" class="text-button no-margin" disabled="@IsLastStep" @onclick="NextStep">Next</button>
+                    </div>
+                </div>
+                <p class="muted compact-hint">Check the full summary on the right, then use Create when everything looks right.</p>
+            </section>
+
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <p class="validation-message">@errorMessage</p>
+            }
+        </section>
+
+        <aside class="creator-detail-panel">
+            @if (IsStep("Abilities"))
+            {
+                <section class="detail-section">
+                    <h2>Ability Choices</h2>
+                    @if (AllAbilityChoiceRequirements.Count == 0 && ChoiceHintsFor("Abilities").Count == 0)
                     {
-                        <div class="choice-counter @(ManualSkillChoiceCount > SkillChoiceLimit ? "invalid" : "")">
-                            <span>Skill/tool choices used</span>
-                            <strong>@ManualSkillChoiceCount / @SkillChoiceLimit</strong>
+                        <p class="muted">No additional ability choices are currently available.</p>
+                    }
+                    else
+                    {
+                        <AbilityChoiceList Requirements="AllAbilityChoiceRequirements"
+                                           SelectedChoices="selectedAbilityChoices"
+                                           OnChange="SetAbilityChoice"
+                                           OnModeChange="SetAbilityChoiceMode" />
+                        <ChoiceHintList Hints="@ChoiceHintsFor("Abilities")" />
+                    }
+                </section>
+            }
+            else if (IsStep("Proficiencies"))
+            {
+                <section class="detail-section">
+                    <h2>@selectedProficiencySection</h2>
+                    @if (selectedProficiencySection == "Saving Throws")
+                    {
+                        <ChoiceHintList Hints="@ChoiceHintsFor("Saving Throws")" />
+                        <div class="proficiency-list detail-proficiency-list">
+                            @foreach (var savingThrow in savingThrows)
+                            {
+                                <div class="proficiency-row">
+                                    <div class="proficiency-main">
+                                        <span>@savingThrow.AbilityName</span>
+                                        <label class="toggle no-min"><input type="checkbox" @bind="savingThrow.IsProficient" /> Prof</label>
+                                        <select @bind="savingThrow.RollMode">
+                                            @foreach (var rollMode in RollModes)
+                                            {
+                                                <option value="@rollMode">@rollMode</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <input class="proficiency-notes" placeholder="Notes" @bind="savingThrow.Notes" @bind:event="oninput" />
+                                </div>
+                            }
                         </div>
                     }
-                    @if (showSkills)
+                    else if (selectedProficiencySection == "Skills")
                     {
-                        <div class="proficiency-list">
+                        <ChoiceHintList Hints="@ChoiceHintsFor("Skills")" />
+                        @if (SkillChoiceLimit > 0)
+                        {
+                            <div class="choice-counter @(ManualSkillChoiceCount > SkillChoiceLimit ? "invalid" : "")">
+                                <span>Skill/tool choices used</span>
+                                <strong>@ManualSkillChoiceCount / @SkillChoiceLimit</strong>
+                            </div>
+                        }
+                        <div class="proficiency-list detail-proficiency-list">
                             @foreach (var skill in skills)
                             {
                                 <div class="proficiency-row skill-row">
@@ -444,136 +441,101 @@
                                             Prof
                                         </label>
                                         <select @bind="skill.RollMode">
-                                        @foreach (var rollMode in RollModes)
-                                        {
-                                            <option value="@rollMode">@rollMode</option>
-                                        }
-                                    </select>
+                                            @foreach (var rollMode in RollModes)
+                                            {
+                                                <option value="@rollMode">@rollMode</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <input class="proficiency-notes" placeholder="Notes" @bind="skill.Notes" @bind:event="oninput" />
                                 </div>
-                                <input class="proficiency-notes" placeholder="Notes" @bind="skill.Notes" @bind:event="oninput" />
-                            </div>
-                        }
-                    </div>
-                }
-            </section>
-
-            <section class="creator-step-screen @(IsStep("Proficiencies") ? "" : "hidden")">
-                <button type="button" class="section-toggle" @onclick="ToggleTools">
-                    <span>Tools</span>
-                    <span>@(showTools ? "Hide" : "Show")</span>
-                </button>
-                <ChoiceHintList Hints="@ChoiceHintsFor("Tools")" />
-                @if (ToolChoiceLimit > 0)
-                {
-                    <div class="choice-counter @(ManualToolChoiceCount > ToolChoiceLimit ? "invalid" : "")">
-                        <span>Tool choices used</span>
-                        <strong>@ManualToolChoiceCount / @ToolChoiceLimit</strong>
-                    </div>
-                }
-                @if (showTools)
-                {
-                    <div class="proficiency-list">
-                        @foreach (var tool in toolProficiencies)
+                            }
+                        </div>
+                    }
+                    else if (selectedProficiencySection == "Tools")
+                    {
+                        <ChoiceHintList Hints="@ChoiceHintsFor("Tools")" />
+                        @if (ToolChoiceLimit > 0)
                         {
-                            <div class="proficiency-row">
-                                <div class="proficiency-main two-column">
-                                    <span>@tool.Name</span>
-                                    <label class="toggle no-min">
-                                        <input type="checkbox"
-                                               checked="@tool.IsProficient"
-                                               disabled="@IsToolChoiceDisabled(tool)"
-                                               @onchange="eventArgs => ToggleToolProficiency(tool, eventArgs.Value is true)" />
-                                        Prof
-                                    </label>
-                                </div>
-                                <input class="proficiency-notes" placeholder="Notes" @bind="tool.Notes" @bind:event="oninput" />
+                            <div class="choice-counter @(ManualToolChoiceCount > ToolChoiceLimit ? "invalid" : "")">
+                                <span>Tool choices used</span>
+                                <strong>@ManualToolChoiceCount / @ToolChoiceLimit</strong>
                             </div>
                         }
-                    </div>
-                }
-            </section>
-
-            <section class="creator-step-screen @(IsStep("Proficiencies") ? "" : "hidden")">
-                <button type="button" class="section-toggle" @onclick="ToggleLanguages">
-                    <span>Languages</span>
-                    <span>@(showLanguages ? "Hide" : "Show")</span>
-                </button>
-                <ChoiceHintList Hints="@ChoiceHintsFor("Languages")" />
-                @if (LanguageChoiceLimit > 0)
-                {
-                    <div class="choice-counter @(ManualLanguageChoiceCount > LanguageChoiceLimit ? "invalid" : "")">
-                        <span>Language choices used</span>
-                        <strong>@ManualLanguageChoiceCount / @LanguageChoiceLimit</strong>
-                    </div>
-                }
-                @if (showLanguages)
-                {
-                    <div class="proficiency-list">
-                        @foreach (var language in languageProficiencies)
+                        <div class="proficiency-list detail-proficiency-list">
+                            @foreach (var tool in toolProficiencies)
+                            {
+                                <div class="proficiency-row">
+                                    <div class="proficiency-main two-column">
+                                        <span>@tool.Name</span>
+                                        <label class="toggle no-min">
+                                            <input type="checkbox"
+                                                   checked="@tool.IsProficient"
+                                                   disabled="@IsToolChoiceDisabled(tool)"
+                                                   @onchange="eventArgs => ToggleToolProficiency(tool, eventArgs.Value is true)" />
+                                            Prof
+                                        </label>
+                                    </div>
+                                    <input class="proficiency-notes" placeholder="Notes" @bind="tool.Notes" @bind:event="oninput" />
+                                </div>
+                            }
+                        </div>
+                    }
+                    else if (selectedProficiencySection == "Languages")
+                    {
+                        <ChoiceHintList Hints="@ChoiceHintsFor("Languages")" />
+                        @if (LanguageChoiceLimit > 0)
                         {
-                            <div class="proficiency-row">
-                                <div class="proficiency-main two-column">
-                                    <span>@language.Name</span>
-                                    <label class="toggle no-min">
-                                        <input type="checkbox"
-                                               checked="@language.IsProficient"
-                                               disabled="@IsLanguageChoiceDisabled(language)"
-                                               @onchange="eventArgs => ToggleLanguageProficiency(language, eventArgs.Value is true)" />
-                                        Prof
-                                    </label>
-                                </div>
-                                <input class="proficiency-notes" placeholder="Notes" @bind="language.Notes" @bind:event="oninput" />
+                            <div class="choice-counter @(ManualLanguageChoiceCount > LanguageChoiceLimit ? "invalid" : "")">
+                                <span>Language choices used</span>
+                                <strong>@ManualLanguageChoiceCount / @LanguageChoiceLimit</strong>
                             </div>
                         }
-                    </div>
-                }
-            </section>
-
-            <section class="creator-step-screen review-step @(IsStep("Review") ? "" : "hidden")">
-                <div class="creator-step-heading">
-                    <p class="eyebrow">Review</p>
-                    <div class="creator-step-controls">
-                        <button type="button" class="text-button no-margin" disabled="@IsFirstStep" @onclick="PreviousStep">Previous</button>
-                        <button type="button" class="text-button no-margin" disabled="@IsLastStep" @onclick="NextStep">Next</button>
-                    </div>
-                </div>
-                <div class="creation-review-grid">
-                    <article>
-                        <span>Name</span>
-                        <strong>@(string.IsNullOrWhiteSpace(newName) ? "Unnamed character" : newName)</strong>
-                    </article>
-                    <article>
-                        <span>Ancestry</span>
-                        <strong>@(SelectedRace?.Name ?? "Not selected")</strong>
-                    </article>
-                    <article>
-                        <span>Background</span>
-                        <strong>@(SelectedBackground?.Name ?? "Not selected")</strong>
-                    </article>
-                    <article>
-                        <span>Classes</span>
-                        <strong>@(newClasses.Count == 0 ? "Not selected" : string.Join(" / ", newClasses.Select(characterClass => characterClass.DisplayName)))</strong>
-                    </article>
-                    <article>
-                        <span>Feats</span>
-                        <strong>@(newFeats.Count == 0 ? "None" : string.Join(", ", newFeats.Select(feat => feat.DisplayName)))</strong>
-                    </article>
-                    <article>
-                        <span>Abilities</span>
-                        <strong>STR @strength, DEX @dexterity, CON @constitution, INT @intelligence, WIS @wisdom, CHA @charisma</strong>
-                    </article>
-                </div>
-                <p class="muted compact-hint">Use Create when the summary and pending choices look right.</p>
-            </section>
-
-            @if (!string.IsNullOrWhiteSpace(errorMessage))
-            {
-                <p class="validation-message">@errorMessage</p>
+                        <div class="proficiency-list detail-proficiency-list">
+                            @foreach (var language in languageProficiencies)
+                            {
+                                <div class="proficiency-row">
+                                    <div class="proficiency-main two-column">
+                                        <span>@language.Name</span>
+                                        <label class="toggle no-min">
+                                            <input type="checkbox"
+                                                   checked="@language.IsProficient"
+                                                   disabled="@IsLanguageChoiceDisabled(language)"
+                                                   @onchange="eventArgs => ToggleLanguageProficiency(language, eventArgs.Value is true)" />
+                                            Prof
+                                        </label>
+                                    </div>
+                                    <input class="proficiency-notes" placeholder="Notes" @bind="language.Notes" @bind:event="oninput" />
+                                </div>
+                            }
+                        </div>
+                    }
+                    <DefenseChoiceList Requirements="AllDefenseChoiceRequirements"
+                                       SelectedChoices="selectedDefenseChoices"
+                                       OnToggle="ToggleDefenseChoice" />
+                </section>
             }
-        </section>
-
-        <aside class="creator-detail-panel">
-            @if (SelectedDetail is null)
+            else if (IsStep("Review"))
+            {
+                <section class="detail-section">
+                    <h2>Character Summary</h2>
+                    <dl class="detail-grid option-detail-grid">
+                        <div><dt>Name</dt><dd>@(string.IsNullOrWhiteSpace(newName) ? "Unnamed character" : newName)</dd></div>
+                        <div><dt>Ancestry</dt><dd>@(SelectedRace?.Name ?? "Not selected")</dd></div>
+                        <div><dt>Background</dt><dd>@(SelectedBackground?.Name ?? "Not selected")</dd></div>
+                        <div><dt>Classes</dt><dd>@(newClasses.Count == 0 ? "Not selected" : string.Join(" / ", newClasses.Select(characterClass => characterClass.DisplayName)))</dd></div>
+                        <div><dt>Feats</dt><dd>@(newFeats.Count == 0 ? "None" : string.Join(", ", newFeats.Select(feat => feat.DisplayName)))</dd></div>
+                        <div><dt>Abilities</dt><dd>STR @strength, DEX @dexterity, CON @constitution, INT @intelligence, WIS @wisdom, CHA @charisma</dd></div>
+                        <div><dt>Saving Throws</dt><dd>@FormatSavingThrowSummary()</dd></div>
+                        <div><dt>Skills</dt><dd>@FormatSkillSummary()</dd></div>
+                        <div><dt>Tools</dt><dd>@FormatToolSummary()</dd></div>
+                        <div><dt>Languages</dt><dd>@FormatLanguageSummary()</dd></div>
+                        <div><dt>Ability Choices</dt><dd>@FormatAbilityChoiceSummary()</dd></div>
+                        <div><dt>Defense Choices</dt><dd>@FormatDefenseChoiceSummary()</dd></div>
+                    </dl>
+                </section>
+            }
+            else if (SelectedDetail is null)
             {
                 <div class="empty-detail">
                     <p class="eyebrow">Details</p>
@@ -586,15 +548,73 @@
                 <header class="detail-header compact-detail-header">
                     <div>
                         <p class="eyebrow">@SelectedDetail.Kind</p>
-                        <h1>@SelectedDetail.Name</h1>
+                        <div class="detail-title-with-hint">
+                            <h1>@SelectedDetail.Name</h1>
+                            @if (ShouldShowBackgroundFeatHint)
+                            {
+                                <span>This background has feat choices saved for a later rule step.</span>
+                            }
+                        </div>
                         <p>@SelectedDetail.Source@(SelectedDetail.Page is null ? "" : $" p. {SelectedDetail.Page}")</p>
                     </div>
                 </header>
+                @if (detailKind == "Race" && selectedRaceGroup is not null)
+                {
+                    <div class="source-switcher detail-source-switcher">
+                        @foreach (var version in selectedRaceGroup.Versions)
+                        {
+                            <button type="button"
+                                    class="source-version @(version.Id == selectedRaceDefinitionId ? "active" : "")"
+                                    @onclick="async () => await SelectRaceVersion(version)">
+                                @version.Source
+                            </button>
+                        }
+                    </div>
+                }
+                else if (detailKind == "Background" && selectedBackgroundGroup is not null)
+                {
+                    <div class="source-switcher detail-source-switcher">
+                        @foreach (var version in selectedBackgroundGroup.Versions)
+                        {
+                            <button type="button"
+                                    class="source-version @(version.Id == selectedBackgroundDefinitionId ? "active" : "")"
+                                    @onclick="async () => await SelectBackgroundVersion(version)">
+                                @version.Source
+                            </button>
+                        }
+                    </div>
+                }
+                else if (detailKind == "Class" && selectedClassGroup is not null)
+                {
+                    <div class="source-switcher detail-source-switcher">
+                        @foreach (var version in selectedClassGroup.Versions)
+                        {
+                            <button type="button"
+                                    class="source-version @(version.Id == selectedClassDefinitionId ? "active" : "")"
+                                    @onclick="async () => await SelectClassVersion(version)">
+                                @version.Source
+                            </button>
+                        }
+                    </div>
+                }
+                else if (detailKind == "Feat" && selectedFeatGroup is not null)
+                {
+                    <div class="source-switcher detail-source-switcher">
+                        @foreach (var version in selectedFeatGroup.Versions)
+                        {
+                            <button type="button"
+                                    class="source-version @(version.Id == selectedFeatDefinitionId ? "active" : "")"
+                                    @onclick="async () => await SelectFeatVersion(version)">
+                                @version.Source
+                            </button>
+                        }
+                    </div>
+                }
 
                 <dl class="detail-grid option-detail-grid">
                     @foreach (var stat in SelectedDetail.Stats)
                     {
-                        <div><dt>@stat.Label</dt><dd>@stat.Value</dd></div>
+                        <div class="@BuildDetailStatClass(stat.Label)"><dt>@stat.Label</dt><dd>@stat.Value</dd></div>
                     }
                 </dl>
 
@@ -715,6 +735,8 @@
     private Dictionary<string, List<string>> selectedAbilityChoices = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, int> appliedAbilityBonuses = new(StringComparer.OrdinalIgnoreCase);
     private bool isCreating;
+    private bool applyGrantedFeats = true;
+    private bool showOnlyOriginFeats;
     private string newName = "";
     private int strength = 10;
     private int dexterity = 10;
@@ -741,11 +763,13 @@
     private string errorMessage = "";
     private string detailKind = "";
     private string currentStep = "Identity";
+    private string selectedProficiencySection = "Saving Throws";
     private bool showSavingThrows;
     private bool showSkills;
     private bool showTools;
     private bool showLanguages;
     private static readonly string[] RollModes = ["Normal", "Advantage", "Disadvantage"];
+    private static readonly string[] ProficiencySections = ["Saving Throws", "Skills", "Tools", "Languages"];
     private static readonly string[] AbilityScoreModes = ["Manual", "Standard Array", "Point Buy", "Roll"];
     private static readonly int[] StandardArrayScores = [15, 14, 13, 12, 10, 8];
     private static readonly AbilityCode[] AbilityCodes =
@@ -777,6 +801,14 @@
     private SubraceDefinition? SelectedSubrace => selectedSubraceDefinitionId is null ? null : subraceDefinitions.FirstOrDefault(definition => definition.Id == selectedSubraceDefinitionId.Value);
     private BackgroundDefinition? SelectedBackground => selectedBackgroundDefinitionId is null ? null : backgroundDefinitions.FirstOrDefault(definition => definition.Id == selectedBackgroundDefinitionId.Value);
     private FeatDefinition? SelectedFeat => selectedFeatDefinitionId is null ? null : featDefinitions.FirstOrDefault(definition => definition.Id == selectedFeatDefinitionId.Value);
+    private IReadOnlyList<FeatGroup> FilteredFeatGroups => (showOnlyOriginFeats
+            ? featDefinitions.Where(IsOriginFeat)
+            : featDefinitions)
+        .GroupBy(definition => definition.Name, StringComparer.OrdinalIgnoreCase)
+        .Select(group => new FeatGroup(group))
+        .OrderBy(group => group.Name)
+        .ToList();
+    private IReadOnlyList<string> GrantedFeatSummaries => BuildGrantedFeatSummaries().ToList();
     private ClassDefinition? SelectedClass => selectedClassDefinitionId is null ? null : classDefinitions.FirstOrDefault(definition => definition.Id == selectedClassDefinitionId.Value);
     private SubclassDefinition? SelectedSubclass => selectedSubclassDefinitionId is null ? null : subclassDefinitions.FirstOrDefault(definition => definition.Id == selectedSubclassDefinitionId.Value);
     private List<string> RaceSizeOptions => GetStringArray(SelectedRace?.SizeJson).ToList();
@@ -801,7 +833,7 @@
     private int ManualSkillChoiceCount => selectedManualSkillChoices.Count + selectedManualToolChoices.Count;
     private int ManualToolChoiceCount => selectedManualToolChoices.Count + selectedManualSkillChoices.Count;
     private int ManualLanguageChoiceCount => selectedManualLanguageChoices.Count;
-    private int PointBuySpent => AbilityCodes.Sum(ability => PointBuyCost(GetAbilityValue(ability.Code)));
+    private int PointBuySpent => AbilityCodes.Sum(ability => PointBuyCost(GetAbilityBaseValue(ability.Code)));
     private int PointBuyRemaining => 27 - PointBuySpent;
     private int CurrentStepIndex => Math.Max(0, CreationSteps.ToList().FindIndex(step => step.Key == currentStep));
     private bool IsFirstStep => CurrentStepIndex == 0;
@@ -815,6 +847,8 @@
         "Feat" when SelectedFeat is not null => BuildFeatDetail(SelectedFeat),
         _ => null
     };
+    private bool ShouldShowBackgroundFeatHint =>
+        detailKind == "Background" && !string.IsNullOrWhiteSpace(SelectedBackground?.FeatsJson);
 
     protected override async Task OnInitializedAsync()
     {
@@ -855,6 +889,7 @@
         if (CreationSteps.Any(candidate => string.Equals(candidate.Key, step, StringComparison.OrdinalIgnoreCase)))
         {
             currentStep = step;
+            RefreshDetailForStep();
         }
     }
 
@@ -862,7 +897,7 @@
     {
         if (!IsLastStep)
         {
-            currentStep = CreationSteps[CurrentStepIndex + 1].Key;
+            SetStep(CreationSteps[CurrentStepIndex + 1].Key);
         }
     }
 
@@ -870,8 +905,20 @@
     {
         if (!IsFirstStep)
         {
-            currentStep = CreationSteps[CurrentStepIndex - 1].Key;
+            SetStep(CreationSteps[CurrentStepIndex - 1].Key);
         }
+    }
+
+    private void RefreshDetailForStep()
+    {
+        detailKind = currentStep switch
+        {
+            "Ancestry" when SelectedRace is not null => "Race",
+            "Background" when SelectedBackground is not null => "Background",
+            "Classes" when SelectedClass is not null => "Class",
+            "Feats" when SelectedFeat is not null => "Feat",
+            _ => ""
+        };
     }
 
     private void SetAbilityScoreMode(string mode)
@@ -886,7 +933,7 @@
         {
             foreach (var ability in AbilityCodes)
             {
-                SetAbilityValue(ability.Code, Math.Clamp(GetAbilityValue(ability.Code), 8, 15));
+                SetAbilityBaseValue(ability.Code, Math.Clamp(GetAbilityBaseValue(ability.Code), 8, 15));
             }
         }
         else if (mode == "Standard Array")
@@ -911,6 +958,21 @@
             "cha" => charisma,
             _ => 10
         };
+    }
+
+    private int GetAbilityBaseValue(string abilityCode)
+    {
+        return Math.Clamp(GetAbilityValue(abilityCode) - GetAppliedAbilityBonus(abilityCode), 1, 30);
+    }
+
+    private int GetAppliedAbilityBonus(string abilityCode)
+    {
+        return appliedAbilityBonuses.GetValueOrDefault(abilityCode);
+    }
+
+    private void SetAbilityBaseValue(string abilityCode, int value)
+    {
+        SetAbilityValue(abilityCode, Math.Clamp(value + GetAppliedAbilityBonus(abilityCode), 1, 30));
     }
 
     private void SetAbilityValue(string abilityCode, string? value)
@@ -955,7 +1017,7 @@
             return;
         }
 
-        SetAbilityValue(abilityCode, score);
+        SetAbilityBaseValue(abilityCode, score);
     }
 
     private bool IsAssignedScoreUnavailable(string abilityCode, int score, IReadOnlyList<int> availableScores)
@@ -969,28 +1031,28 @@
         {
             var usedCount = AbilityCodes
                 .Where(ability => ability.Code != abilityCode)
-                .Count(ability => GetAbilityValue(ability.Code) == score);
+                .Count(ability => GetAbilityBaseValue(ability.Code) == score);
             return usedCount >= selectedIndex.Count;
         }
 
-        return AbilityCodes.Any(ability => ability.Code != abilityCode && GetAbilityValue(ability.Code) == score);
+        return AbilityCodes.Any(ability => ability.Code != abilityCode && GetAbilityBaseValue(ability.Code) == score);
     }
 
     private void ChangePointBuyScore(string abilityCode, int delta)
     {
-        var current = GetAbilityValue(abilityCode);
+        var current = GetAbilityBaseValue(abilityCode);
         var next = Math.Clamp(current + delta, 8, 15);
         if (next > current && !CanIncreasePointBuyScore(abilityCode))
         {
             return;
         }
 
-        SetAbilityValue(abilityCode, next);
+        SetAbilityBaseValue(abilityCode, next);
     }
 
     private bool CanIncreasePointBuyScore(string abilityCode)
     {
-        var current = GetAbilityValue(abilityCode);
+        var current = GetAbilityBaseValue(abilityCode);
         if (current >= 15)
         {
             return false;
@@ -1037,7 +1099,7 @@
     {
         for (var index = 0; index < AbilityCodes.Length && index < scores.Count; index++)
         {
-            SetAbilityValue(AbilityCodes[index].Code, scores[index]);
+            SetAbilityBaseValue(AbilityCodes[index].Code, scores[index]);
         }
     }
 
@@ -1045,6 +1107,13 @@
     {
         selectedRaceGroup = raceGroups.FirstOrDefault(group => group.Name == selectedRaceName);
         await SelectRaceVersion(selectedRaceGroup?.Primary);
+    }
+
+    private async Task SelectRaceGroup(RaceGroup raceGroup)
+    {
+        selectedRaceName = raceGroup.Name;
+        selectedRaceGroup = raceGroup;
+        await SelectRaceVersion(raceGroup.Primary);
     }
 
     private async Task SelectRaceVersion(RaceDefinition? raceDefinition)
@@ -1081,6 +1150,13 @@
         await SelectBackgroundVersion(selectedBackgroundGroup?.Primary);
     }
 
+    private async Task SelectBackgroundGroup(BackgroundGroup backgroundGroup)
+    {
+        selectedBackgroundName = backgroundGroup.Name;
+        selectedBackgroundGroup = backgroundGroup;
+        await SelectBackgroundVersion(backgroundGroup.Primary);
+    }
+
     private async Task SelectBackgroundVersion(BackgroundDefinition? backgroundDefinition)
     {
         selectedBackgroundDefinitionId = backgroundDefinition?.Id;
@@ -1092,7 +1168,7 @@
 
     private async Task SelectFeatGroup()
     {
-        selectedFeatGroup = featGroups.FirstOrDefault(group => group.Name == selectedFeatName);
+        selectedFeatGroup = FilteredFeatGroups.FirstOrDefault(group => group.Name == selectedFeatName);
         await SelectFeatVersion(selectedFeatGroup?.Primary);
     }
 
@@ -1134,6 +1210,50 @@
         {
             selectedSubclassDefinitionId = null;
         }
+    }
+
+    private async Task ShowClassDetails(CharacterClass characterClass)
+    {
+        var classDefinition = classDefinitions.FirstOrDefault(definition => definition.Id == characterClass.ClassDefinitionId);
+        if (classDefinition is null)
+        {
+            return;
+        }
+
+        selectedClassName = classDefinition.Name;
+        selectedClassGroup = classGroups.FirstOrDefault(group => group.Name == classDefinition.Name);
+        selectedClassDefinitionId = classDefinition.Id;
+        selectedSubclassDefinitionId = characterClass.SubclassDefinitionId;
+        await LoadSubclassesForSelectedClass();
+        detailKind = "Class";
+    }
+
+    private void ShowFeatDetails(CharacterFeat characterFeat)
+    {
+        var featDefinition = featDefinitions.FirstOrDefault(definition => definition.Id == characterFeat.FeatDefinitionId);
+        if (featDefinition is null)
+        {
+            return;
+        }
+
+        selectedFeatName = featDefinition.Name;
+        selectedFeatGroup = FilteredFeatGroups.FirstOrDefault(group => group.Name == featDefinition.Name)
+            ?? featGroups.FirstOrDefault(group => group.Name == featDefinition.Name);
+        selectedFeatDefinitionId = featDefinition.Id;
+        detailKind = "Feat";
+    }
+
+    private async Task OnOriginFeatFilterChanged()
+    {
+        if (showOnlyOriginFeats && SelectedFeat is not null && !IsOriginFeat(SelectedFeat))
+        {
+            selectedFeatName = "";
+            selectedFeatGroup = null;
+            selectedFeatDefinitionId = null;
+            detailKind = "";
+        }
+
+        await RecomputeOptionEffectsAsync();
     }
 
     private async Task AddClass()
@@ -1295,13 +1415,195 @@
         showLanguages = !showLanguages;
     }
 
+    private void SetProficiencySection(string section)
+    {
+        if (ProficiencySections.Contains(section))
+        {
+            selectedProficiencySection = section;
+        }
+    }
+
+    private string BuildProficiencySectionSummary(string section)
+    {
+        return section switch
+        {
+            "Saving Throws" => $"{savingThrows.Count(savingThrow => savingThrow.IsProficient)} proficient",
+            "Skills" => SkillChoiceLimit > 0
+                ? $"{ManualSkillChoiceCount} / {SkillChoiceLimit} choices"
+                : $"{skills.Count(skill => skill.IsProficient)} proficient",
+            "Tools" => ToolChoiceLimit > 0
+                ? $"{ManualToolChoiceCount} / {ToolChoiceLimit} choices"
+                : $"{toolProficiencies.Count(tool => tool.IsProficient)} proficient",
+            "Languages" => LanguageChoiceLimit > 0
+                ? $"{ManualLanguageChoiceCount} / {LanguageChoiceLimit} choices"
+                : $"{languageProficiencies.Count(language => language.IsProficient)} known",
+            _ => ""
+        };
+    }
+
+    private string FormatSavingThrowSummary()
+    {
+        var selected = savingThrows
+            .Where(savingThrow => savingThrow.IsProficient || savingThrow.RollMode != "Normal" || !string.IsNullOrWhiteSpace(savingThrow.Notes))
+            .Select(savingThrow => FormatTrackedChoice(savingThrow.AbilityName, savingThrow.IsProficient, savingThrow.RollMode, savingThrow.Notes))
+            .ToList();
+        return selected.Count == 0 ? "None selected" : string.Join(", ", selected);
+    }
+
+    private string FormatSkillSummary()
+    {
+        var selected = skills
+            .Where(skill => skill.IsProficient || skill.RollMode != "Normal" || !string.IsNullOrWhiteSpace(skill.Notes))
+            .Select(skill => FormatTrackedChoice($"{skill.Name} ({skill.AbilityCode.ToUpperInvariant()})", skill.IsProficient, skill.RollMode, skill.Notes))
+            .ToList();
+        return selected.Count == 0 ? "None selected" : string.Join(", ", selected);
+    }
+
+    private string FormatToolSummary()
+    {
+        var selected = toolProficiencies
+            .Where(tool => tool.IsProficient || !string.IsNullOrWhiteSpace(tool.Notes))
+            .Select(tool => FormatTrackedChoice(tool.Name, tool.IsProficient, "Normal", tool.Notes))
+            .ToList();
+        return selected.Count == 0 ? "None selected" : string.Join(", ", selected);
+    }
+
+    private string FormatLanguageSummary()
+    {
+        var selected = languageProficiencies
+            .Where(language => language.IsProficient || !string.IsNullOrWhiteSpace(language.Notes))
+            .Select(language => FormatTrackedChoice(language.Name, language.IsProficient, "Normal", language.Notes))
+            .ToList();
+        return selected.Count == 0 ? "None selected" : string.Join(", ", selected);
+    }
+
+    private string FormatAbilityChoiceSummary()
+    {
+        var selected = CharacterAbilityChoiceService.GetActiveRequirements(AllAbilityChoiceRequirements, selectedAbilityChoices)
+            .Where(requirement => selectedAbilityChoices.TryGetValue(requirement.Key, out var values) && values.Count > 0)
+            .SelectMany(requirement => selectedAbilityChoices[requirement.Key]
+                .Where(value => requirement.Options.Contains(value, StringComparer.OrdinalIgnoreCase))
+                .Take(requirement.Count)
+                .Select(value => $"{requirement.SourceName}: {CharacterAbilityChoiceService.FormatAbilityShortName(value)} +{requirement.BonusPerSelection}"))
+            .ToList();
+        return selected.Count == 0 ? "None selected" : string.Join(", ", selected);
+    }
+
+    private string FormatDefenseChoiceSummary()
+    {
+        var selected = AllDefenseChoiceRequirements
+            .Where(requirement => selectedDefenseChoices.TryGetValue(requirement.Key, out var values) && values.Count > 0)
+            .SelectMany(requirement => selectedDefenseChoices[requirement.Key]
+                .Take(requirement.Count)
+                .Select(value => $"{requirement.SourceName}: {value}"))
+            .ToList();
+        return selected.Count == 0 ? "None selected" : string.Join(", ", selected);
+    }
+
+    private static string FormatTrackedChoice(string name, bool isProficient, string rollMode, string notes)
+    {
+        var parts = new List<string>();
+        if (isProficient)
+        {
+            parts.Add("Prof");
+        }
+        if (rollMode != "Normal")
+        {
+            parts.Add(rollMode);
+        }
+        if (!string.IsNullOrWhiteSpace(notes))
+        {
+            parts.Add(notes);
+        }
+
+        return parts.Count == 0 ? name : $"{name} ({string.Join("; ", parts)})";
+    }
+
+    private IEnumerable<string> BuildGrantedFeatSummaries()
+    {
+        foreach (var featReference in ReadGrantedFeatReferences(SelectedRace?.RawJson))
+        {
+            yield return FormatGrantedFeatReference(featReference);
+        }
+
+        foreach (var featReference in ReadGrantedFeatReferences(SelectedSubrace?.RawJson))
+        {
+            yield return FormatGrantedFeatReference(featReference);
+        }
+
+        foreach (var featReference in ReadGrantedFeatReferences(SelectedBackground?.FeatsJson))
+        {
+            yield return FormatGrantedFeatReference(featReference);
+        }
+    }
+
+    private string FormatGrantedFeatReference((string Name, string Source) featReference)
+    {
+        var featDefinition = featDefinitions.FirstOrDefault(definition =>
+            string.Equals(definition.Name, featReference.Name, StringComparison.OrdinalIgnoreCase)
+            && (string.IsNullOrWhiteSpace(featReference.Source)
+                || string.Equals(definition.Source, featReference.Source, StringComparison.OrdinalIgnoreCase)));
+        return featDefinition is null
+            ? featReference.Name
+            : featDefinition.DisplayName;
+    }
+
+    private static IEnumerable<(string Name, string Source)> ReadGrantedFeatReferences(string? rawJson)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            yield break;
+        }
+
+        using var document = JsonDocument.Parse(rawJson);
+        var featsElement = document.RootElement;
+        if (document.RootElement.ValueKind == JsonValueKind.Object
+            && !document.RootElement.TryGetProperty("feats", out featsElement))
+        {
+            yield break;
+        }
+
+        if (featsElement.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var entry in featsElement.EnumerateArray())
+        {
+            if (entry.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            foreach (var property in entry.EnumerateObject())
+            {
+                if (property.Value.ValueKind != JsonValueKind.True)
+                {
+                    continue;
+                }
+
+                var parts = property.Name.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (parts.Length > 0)
+                {
+                    yield return (parts[0], parts.Length > 1 ? parts[1].ToUpperInvariant() : "");
+                }
+            }
+        }
+    }
+
+    private static bool IsOriginFeat(FeatDefinition feat)
+    {
+        return string.Equals(feat.Category, "O", StringComparison.OrdinalIgnoreCase);
+    }
+
     private async Task RecomputeOptionEffectsAsync()
     {
         errorMessage = "";
 
         try
         {
-            var effects = await Database.GetCharacterOptionEffectsAsync(BuildDraftCharacter());
+            var effects = await Database.GetCharacterOptionEffectsAsync(BuildDraftCharacter(includeAbilityChoices: false));
+            CharacterAbilityChoiceService.AddSelectedBonuses(effects.AbilityBonuses, AllAbilityChoiceRequirements, selectedAbilityChoices);
             ApplyAbilityBonusDelta(effects.AbilityBonuses);
 
             automaticSavingThrowProficiencies = effects.SavingThrowProficiencies.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -1481,7 +1783,7 @@
         language.IsProficient = false;
     }
 
-    private Character BuildDraftCharacter()
+    private Character BuildDraftCharacter(bool includeAbilityChoices = true)
     {
         var raceDefinition = SelectedRace;
         var backgroundDefinition = SelectedBackground;
@@ -1491,11 +1793,11 @@
             RaceDefinitionId = raceDefinition?.Id,
             SubraceDefinitionId = SelectedSubrace?.Id,
             RaceName = raceDefinition?.Name ?? "",
-            RaceChoicesJson = BuildRaceChoicesJson(),
+            RaceChoicesJson = BuildRaceChoicesJson(includeAbilityChoices),
             BackgroundDefinitionId = backgroundDefinition?.Id,
             BackgroundName = backgroundDefinition?.Name ?? "",
-            BackgroundChoicesJson = BuildBackgroundChoicesJson(),
-            FeatChoicesJson = BuildFeatChoicesJson(),
+            BackgroundChoicesJson = BuildBackgroundChoicesJson(includeAbilityChoices),
+            FeatChoicesJson = BuildFeatChoicesJson(includeAbilityChoices),
             ClassName = string.Join(" / ", newClasses.Select(characterClass => characterClass.ClassName).Distinct()),
             PrimaryClassDefinitionId = primaryClassDefinitionId,
             Level = newClasses.Count == 0 ? null : newClasses.Sum(characterClass => characterClass.Level),
@@ -1580,32 +1882,50 @@
             .ToList();
     }
 
-    private string BuildRaceChoicesJson()
+    private string BuildRaceChoicesJson(bool includeAbilityChoices = true)
     {
         var choices = new Dictionary<string, object>();
         if (!string.IsNullOrWhiteSpace(selectedRaceSize))
         {
             choices["size"] = selectedRaceSize;
         }
+        if (!applyGrantedFeats)
+        {
+            choices["applyGrantedFeats"] = false;
+        }
 
         AddDefenseChoices(choices, RaceDefenseChoiceRequirements);
-        AddAbilityChoices(choices, RaceAbilityChoiceRequirements);
+        if (includeAbilityChoices)
+        {
+            AddAbilityChoices(choices, RaceAbilityChoiceRequirements);
+        }
         return choices.Count == 0 ? "{}" : JsonSerializer.Serialize(choices);
     }
 
-    private string BuildBackgroundChoicesJson()
+    private string BuildBackgroundChoicesJson(bool includeAbilityChoices = true)
     {
         var choices = new Dictionary<string, object>();
+        if (!applyGrantedFeats)
+        {
+            choices["applyGrantedFeats"] = false;
+        }
+
         AddDefenseChoices(choices, BackgroundDefenseChoiceRequirements);
-        AddAbilityChoices(choices, BackgroundAbilityChoiceRequirements);
+        if (includeAbilityChoices)
+        {
+            AddAbilityChoices(choices, BackgroundAbilityChoiceRequirements);
+        }
         return choices.Count == 0 ? "{}" : JsonSerializer.Serialize(choices);
     }
 
-    private string BuildFeatChoicesJson()
+    private string BuildFeatChoicesJson(bool includeAbilityChoices = true)
     {
         var choices = new Dictionary<string, object>();
         AddDefenseChoices(choices, FeatDefenseChoiceRequirements);
-        AddAbilityChoices(choices, FeatAbilityChoiceRequirements);
+        if (includeAbilityChoices)
+        {
+            AddAbilityChoices(choices, FeatAbilityChoiceRequirements);
+        }
         return choices.Count == 0 ? "{}" : JsonSerializer.Serialize(choices);
     }
 
@@ -1625,11 +1945,15 @@
 
     private void AddAbilityChoices(Dictionary<string, object> choices, IReadOnlyList<CharacterAbilityChoiceRequirement> requirements)
     {
-        var selected = requirements
+        var activeRequirements = CharacterAbilityChoiceService.GetActiveRequirements(requirements, selectedAbilityChoices);
+        var selected = activeRequirements
             .Where(requirement => selectedAbilityChoices.TryGetValue(requirement.Key, out var values) && values.Count > 0)
             .ToDictionary(
                 requirement => requirement.Key,
-                requirement => selectedAbilityChoices[requirement.Key].Take(requirement.Count).ToList(),
+                requirement => selectedAbilityChoices[requirement.Key]
+                    .Where(value => requirement.Options.Contains(value, StringComparer.OrdinalIgnoreCase))
+                    .Take(requirement.Count)
+                    .ToList(),
                 StringComparer.OrdinalIgnoreCase);
         if (selected.Count > 0)
         {
@@ -1637,7 +1961,7 @@
         }
     }
 
-    private void SetAbilityChoice((string Key, int Index, string Value) choice)
+    private async Task SetAbilityChoice((string Key, int Index, string Value) choice)
     {
         var requirement = AllAbilityChoiceRequirements.FirstOrDefault(requirement => string.Equals(requirement.Key, choice.Key, StringComparison.OrdinalIgnoreCase));
         if (requirement is null || choice.Index < 0 || choice.Index >= requirement.Count)
@@ -1662,6 +1986,19 @@
         {
             selectedAbilityChoices.Remove(choice.Key);
         }
+
+        await RecomputeOptionEffectsAsync();
+    }
+
+    private async Task SetAbilityChoiceMode((string ModeGroupKey, string ModeKey) choice)
+    {
+        foreach (var requirement in AllAbilityChoiceRequirements.Where(requirement => string.Equals(requirement.ModeGroupKey, choice.ModeGroupKey, StringComparison.OrdinalIgnoreCase)))
+        {
+            selectedAbilityChoices.Remove(requirement.Key);
+        }
+
+        selectedAbilityChoices[CharacterAbilityChoiceService.BuildModeMarkerKey(choice.ModeGroupKey)] = [choice.ModeKey];
+        await RecomputeOptionEffectsAsync();
     }
 
     private void ToggleDefenseChoice((string Key, string Option, bool IsSelected) choice)
@@ -1810,7 +2147,10 @@
 
     private void PruneAbilityChoices()
     {
-        var validKeys = AllAbilityChoiceRequirements.Select(requirement => requirement.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var validKeys = AllAbilityChoiceRequirements
+            .Select(requirement => requirement.Key)
+            .Concat(AllAbilityChoiceRequirements.Select(requirement => CharacterAbilityChoiceService.BuildModeMarkerKey(requirement.ModeGroupKey)))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var key in selectedAbilityChoices.Keys.Where(key => !validKeys.Contains(key)).ToList())
         {
             selectedAbilityChoices.Remove(key);
@@ -1833,7 +2173,7 @@
             [
                 new OptionDetailStat("Size", FormatSizeList(GetStringArray(race.SizeJson))),
                 new OptionDetailStat("Speed", FormatJsonSummary(race.SpeedJson)),
-                new OptionDetailStat("Ability", FormatJsonSummary(race.AbilityJson))
+                new OptionDetailStat("Ability", CharacterAbilityChoiceService.DescribeAbilityEntries(race.RawJson))
             ],
             sections,
             [],
@@ -1848,9 +2188,9 @@
             background.Source,
             background.Page,
             [
-                new OptionDetailStat("Ability", FormatJsonSummary(background.AbilityJson)),
-                new OptionDetailStat("Skills", FormatJsonSummary(background.SkillProficienciesJson)),
-                new OptionDetailStat("Tools", FormatJsonSummary(background.ToolProficienciesJson))
+                new OptionDetailStat("Ability", CharacterAbilityChoiceService.DescribeAbilityEntries(background.RawJson)),
+                new OptionDetailStat("Skills", FormatEnabledNames(background.SkillProficienciesJson)),
+                new OptionDetailStat("Tools", FormatEnabledNames(background.ToolProficienciesJson))
             ],
             BuildSections(background.RawJson).ToList(),
             [],
@@ -2366,6 +2706,118 @@
             .Replace("\"", "")
             .Replace(":", ": ")
             .Replace(",", ", ");
+    }
+
+    private static string BuildDetailStatClass(string label)
+    {
+        var key = new string(label
+            .Where(char.IsLetterOrDigit)
+            .Select(char.ToLowerInvariant)
+            .ToArray());
+        return $"detail-stat detail-stat-{key}";
+    }
+
+    private static string FormatEnabledNames(string rawJson)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            return "None";
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(rawJson);
+            var names = new List<string>();
+            CollectEnabledNames(document.RootElement, names);
+            return names.Count == 0 ? "None" : string.Join(", ", names.Distinct(StringComparer.OrdinalIgnoreCase).Select(ToTitle));
+        }
+        catch
+        {
+            return FormatJsonSummary(rawJson);
+        }
+    }
+
+    private static void CollectEnabledNames(JsonElement element, List<string> names)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.Value.ValueKind == JsonValueKind.True)
+                {
+                    names.Add(property.Name);
+                }
+                else if (property.Value.ValueKind == JsonValueKind.Object || property.Value.ValueKind == JsonValueKind.Array)
+                {
+                    CollectEnabledNames(property.Value, names);
+                }
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                CollectEnabledNames(item, names);
+            }
+        }
+    }
+
+    private static string FormatAbilityBonuses(string rawJson)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            return "None";
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(rawJson);
+            var bonuses = new List<string>();
+            CollectAbilityBonuses(document.RootElement, bonuses);
+            return bonuses.Count == 0 ? FormatJsonSummary(rawJson) : string.Join(", ", bonuses);
+        }
+        catch
+        {
+            return FormatJsonSummary(rawJson);
+        }
+    }
+
+    private static void CollectAbilityBonuses(JsonElement element, List<string> bonuses)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetInt32(out var value))
+                {
+                    bonuses.Add($"{property.Name.ToUpperInvariant()} {(value >= 0 ? "+" : "")}{value}");
+                }
+                else if (property.Value.ValueKind == JsonValueKind.Object || property.Value.ValueKind == JsonValueKind.Array)
+                {
+                    CollectAbilityBonuses(property.Value, bonuses);
+                }
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                CollectAbilityBonuses(item, bonuses);
+            }
+        }
+    }
+
+    private static string ToTitle(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "";
+        }
+
+        return string.Join(" ", value
+            .Replace("_", " ")
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(part => char.ToUpperInvariant(part[0]) + (part.Length > 1 ? part[1..] : "")));
     }
 
     private static string ReadJsonString(JsonElement element, string propertyName)

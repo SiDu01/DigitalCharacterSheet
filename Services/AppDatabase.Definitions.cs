@@ -100,6 +100,7 @@ public sealed partial class AppDatabase
                 .FirstOrDefaultAsync();
             AddOptionEffects(effects, race?.RawJson, "Race");
             AddSelectedAbilityChoiceEffects(effects, race?.RawJson, $"Race:{race?.Id ?? 0}", race is null ? "Race" : $"Race: {race.Name}", character.RaceChoicesJson);
+            await AddGrantedFeatEffectsAsync(effects, ExtractFeatsJson(race?.RawJson), character.RaceChoicesJson, race?.Name ?? "Race");
         }
 
         if (character.SubraceDefinitionId is not null)
@@ -109,6 +110,7 @@ public sealed partial class AppDatabase
                 .FirstOrDefaultAsync();
             AddOptionEffects(effects, subrace?.RawJson, "Race version");
             AddSelectedAbilityChoiceEffects(effects, subrace?.RawJson, $"Subrace:{subrace?.Id ?? 0}", subrace is null ? "Race version" : $"Race version: {subrace.Name}", character.RaceChoicesJson);
+            await AddGrantedFeatEffectsAsync(effects, ExtractFeatsJson(subrace?.RawJson), character.RaceChoicesJson, subrace?.Name ?? "Race version");
         }
 
         if (character.BackgroundDefinitionId is not null)
@@ -118,7 +120,7 @@ public sealed partial class AppDatabase
                 .FirstOrDefaultAsync();
             AddOptionEffects(effects, background?.RawJson, string.IsNullOrWhiteSpace(background?.Name) ? "Background" : $"Background {background.Name}");
             AddSelectedAbilityChoiceEffects(effects, background?.RawJson, $"Background:{background?.Id ?? 0}", background is null ? "Background" : $"Background: {background.Name}", character.BackgroundChoicesJson);
-            await AddGrantedFeatEffectsAsync(effects, background?.FeatsJson, background?.Name ?? "Background");
+            await AddGrantedFeatEffectsAsync(effects, background?.FeatsJson, character.BackgroundChoicesJson, background?.Name ?? "Background");
         }
 
         foreach (var feat in character.Feats.Where(feat => feat.FeatDefinitionId > 0))
@@ -177,9 +179,9 @@ public sealed partial class AppDatabase
         }
     }
 
-    private async Task AddGrantedFeatEffectsAsync(CharacterOptionEffects effects, string? featsJson, string sourceName)
+    private async Task AddGrantedFeatEffectsAsync(CharacterOptionEffects effects, string? featsJson, string choicesJson, string sourceName)
     {
-        if (string.IsNullOrWhiteSpace(featsJson))
+        if (string.IsNullOrWhiteSpace(featsJson) || !ShouldApplyGrantedFeats(choicesJson))
         {
             return;
         }
@@ -204,11 +206,36 @@ public sealed partial class AppDatabase
             AddChoiceHint(
                 effects,
                 "Feats",
-                $"Background {sourceName}",
+                sourceName,
                 1,
                 $"Grants {featDefinition.Name} ({featDefinition.Source}).");
             AddOptionEffects(effects, featDefinition.RawJson, $"Feat {featDefinition.Name}");
         }
+    }
+
+    private static bool ShouldApplyGrantedFeats(string choicesJson)
+    {
+        if (string.IsNullOrWhiteSpace(choicesJson))
+        {
+            return true;
+        }
+
+        using var document = JsonDocument.Parse(choicesJson);
+        return !document.RootElement.TryGetProperty("applyGrantedFeats", out var applyGrantedFeats)
+            || applyGrantedFeats.ValueKind != JsonValueKind.False;
+    }
+
+    private static string ExtractFeatsJson(string? rawJson)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            return "";
+        }
+
+        using var document = JsonDocument.Parse(rawJson);
+        return document.RootElement.TryGetProperty("feats", out var feats)
+            ? feats.GetRawText()
+            : "";
     }
 
     private static IEnumerable<(string Name, string Source)> ReadGrantedFeatReferences(JsonElement featsElement)

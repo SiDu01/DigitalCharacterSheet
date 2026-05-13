@@ -690,7 +690,7 @@ main {
     gap: 1rem;
     flex: 1 1 auto;
     min-height: 0;
-    align-items: start;
+    align-items: stretch;
     overflow: hidden;
 }
 
@@ -707,7 +707,8 @@ main {
 }
 
 .creator-step-panel {
-    align-self: start;
+    align-self: stretch;
+    height: 100%;
 }
 
 .creator-detail-panel {
@@ -753,6 +754,78 @@ main {
     justify-content: flex-end;
     gap: .35rem;
     flex: 0 0 auto;
+}
+
+.creator-option-list {
+    display: grid;
+    align-content: start;
+    grid-auto-rows: max-content;
+    gap: .4rem;
+    min-height: 0;
+    max-height: min(30rem, calc(100dvh - 18rem));
+    overflow: auto;
+    padding-right: .15rem;
+}
+
+.creator-option-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .55rem;
+    min-width: 0;
+    padding: .58rem .65rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    color: var(--app-text);
+    background: #fff;
+    text-align: left;
+}
+
+.creator-option-row:hover {
+    border-color: #93c5fd;
+}
+
+.creator-option-row.selected {
+    border-color: var(--app-primary);
+    color: var(--app-primary-text);
+    background: var(--app-panel-soft);
+}
+
+.creator-option-row span {
+    min-width: 0;
+    overflow: hidden;
+    font-size: .88rem;
+    font-weight: 850;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.text-link-button {
+    min-width: 0;
+    border: 0;
+    padding: 0;
+    color: var(--app-primary-text);
+    background: transparent;
+    text-align: left;
+    font: inherit;
+    font-weight: 850;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detail-source-switcher {
+    margin: -.35rem 0 .75rem;
+}
+
+.creator-option-row small {
+    max-width: 8rem;
+    overflow: hidden;
+    color: var(--app-muted);
+    font-size: .68rem;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .creation-split {
@@ -1008,8 +1081,39 @@ main {
     margin-bottom: .7rem;
 }
 
+.detail-title-with-hint {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: .5rem;
+    min-width: 0;
+}
+
+.detail-title-with-hint span {
+    padding: .12rem .45rem;
+    border: 1px solid var(--app-border);
+    border-radius: 999px;
+    color: var(--app-muted);
+    background: var(--app-panel-soft);
+    font-size: .68rem;
+    font-weight: 800;
+}
+
 .option-detail-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.creator-detail-panel .option-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.creator-detail-panel .detail-stat-ability {
+    grid-column: 1 / -1;
+}
+
+.creator-detail-panel .detail-grid dd {
+    overflow-wrap: anywhere;
+    line-height: 1.35;
 }
 
 .class-source-switcher {
@@ -1423,6 +1527,41 @@ main {
 
 .toggle.no-min {
     min-height: 0;
+}
+
+.granted-feat-panel {
+    display: grid;
+    gap: .45rem;
+}
+
+.granted-feat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    min-width: 0;
+    padding: .55rem .65rem;
+    border: 1px solid var(--app-border);
+    border-radius: 7px;
+    background: var(--app-panel-soft);
+}
+
+.granted-feat-row strong {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--app-text);
+    font-size: .88rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.creator-step-screen .switch-toggle input,
+.creator-detail-panel .switch-toggle input {
+    width: 2.35rem;
+    min-height: 0;
+    height: 1.25rem;
+    padding: 0;
+    border-radius: 999px;
 }
 
 .character-stat-summary {
@@ -4024,6 +4163,7 @@ button.source-badge {
 [data-theme="leather"] .creation-step,
 [data-theme="leather"] .creator-step-panel,
 [data-theme="leather"] .creator-detail-panel,
+[data-theme="leather"] .creator-option-row,
 [data-theme="leather"] .sheet-panel,
 [data-theme="leather"] .combat-stat-card,
 [data-theme="leather"] .combat-quick-stat,
@@ -4056,7 +4196,8 @@ button.source-badge {
 }
 
 [data-theme="leather"] .creation-step-tab.active,
-[data-theme="leather"] .creation-step-badge.active {
+[data-theme="leather"] .creation-step-badge.active,
+[data-theme="leather"] .creator-option-row.selected {
     border-color: var(--app-primary);
     color: var(--app-primary-text);
 }
@@ -4252,6 +4393,7 @@ button.source-badge {
 }
 
 [data-theme="leather"] .selected-class-row,
+[data-theme="leather"] .granted-feat-row,
 [data-theme="leather"] .level-up-class-card,
 [data-theme="leather"] .slot-row,
 [data-theme="leather"] .compact-slot,
