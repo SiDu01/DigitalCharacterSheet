@@ -5,15 +5,8 @@
 
 <PageTitle>Edit Character</PageTitle>
 
-<section class="character-page character-create-page">
-    <button class="back-button" title="Back" aria-label="Back" @onclick="OpenCharacter">‹</button>
-
-    <header class="page-header">
-        <div>
-            <p class="eyebrow">Character Edit</p>
-            <h1>@(character is null ? "Edit Character" : character.Name)</h1>
-        </div>
-    </header>
+<section class="character-page character-create-page character-edit-page">
+    <button class="back-button" title="Back" aria-label="Back" @onclick="OpenCharacter">&lsaquo;</button>
 
     @if (isLoading)
     {
@@ -25,38 +18,95 @@
     }
     else
     {
-        <section class="creation-split">
-            <section class="creation-flow">
-                <section class="creation-step">
-                    <p class="eyebrow">Identity</p>
+        <header class="page-header character-edit-header">
+            <div>
+                <p class="eyebrow">Character Edit</p>
+                <h1>@name</h1>
+                <p class="muted compact-hint">Edit stored base values and decisions. Rule-derived effects are recalculated from the selected sources.</p>
+            </div>
+            <div class="creation-header-actions">
+                <button type="button" class="text-button no-margin" @onclick="OpenCharacter">Cancel</button>
+                <button type="button" class="text-button no-margin" @onclick="ApplyOptionEffects">Recalculate</button>
+                <button type="button" class="primary-action" disabled="@isSaving" @onclick="SaveCharacter">Save</button>
+            </div>
+        </header>
+
+        <section class="character-edit-workspace">
+            <aside class="character-edit-nav" aria-label="Character edit sections">
+                @foreach (var section in EditSections)
+                {
+                    <button type="button"
+                            class="character-edit-nav-item @(activeEditSection == section.Key ? "active" : "")"
+                            @onclick="() => SetEditSection(section.Key)">
+                        <span>@(section.Label)</span>
+                        <small>@(BuildEditSectionSummary(section.Key))</small>
+                    </button>
+                }
+            </aside>
+
+            <section class="character-edit-panel">
+                <section class="creation-step @(IsEditSection("Overview") ? "" : "hidden")">
+                    <div class="creator-step-heading">
+                        <p class="eyebrow">Overview</p>
+                    </div>
+                    <section class="edit-summary-grid">
+                        <article>
+                            <span>Stored Base</span>
+                            <strong>@BuildAbilitySummary()</strong>
+                        </article>
+                        <article>
+                            <span>Progression</span>
+                            <strong>@BuildClassSummary()</strong>
+                        </article>
+                        <article>
+                            <span>Sources</span>
+                            <strong>@BuildSourceSummary()</strong>
+                        </article>
+                        <article>
+                            <span>Manual Choices</span>
+                            <strong>@BuildManualChoiceSummary()</strong>
+                        </article>
+                    </section>
+
+                    @if (optionEffectMessages.Count > 0)
+                    {
+                        <p class="muted compact-hint">@string.Join("; ", optionEffectMessages)</p>
+                    }
+                </section>
+
+                <section class="creation-step @(IsEditSection("Identity") ? "" : "hidden")">
+                    <div class="creator-step-heading">
+                        <p class="eyebrow">Identity</p>
+                    </div>
                     <input placeholder="Name" @bind="name" @bind:event="oninput" />
-                    <button type="button" class="primary-action" disabled="@isSaving" @onclick="SaveCharacter">Save</button>
+
+                    <label class="stacked-field">
+                        <span>Race</span>
+                        <select @bind="selectedRaceDefinitionId" @bind:after='() => SelectDetail("Race")'>
+                            <option value="">Select race</option>
+                            @foreach (var raceDefinition in raceDefinitions)
+                            {
+                                <option value="@raceDefinition.Id">@raceDefinition.DisplayName</option>
+                            }
+                        </select>
+                    </label>
+
+                    <label class="stacked-field">
+                        <span>Background</span>
+                        <select @bind="selectedBackgroundDefinitionId" @bind:after='() => SelectDetail("Background")'>
+                            <option value="">Select background</option>
+                            @foreach (var backgroundDefinition in backgroundDefinitions)
+                            {
+                                <option value="@backgroundDefinition.Id">@backgroundDefinition.DisplayName</option>
+                            }
+                        </select>
+                    </label>
                 </section>
 
-                <section class="creation-step">
-                    <p class="eyebrow">Race</p>
-                    <select @bind="selectedRaceDefinitionId" @bind:after='() => SelectDetail("Race")'>
-                        <option value="">Select race</option>
-                        @foreach (var raceDefinition in raceDefinitions)
-                        {
-                            <option value="@raceDefinition.Id">@raceDefinition.DisplayName</option>
-                        }
-                    </select>
-                </section>
-
-                <section class="creation-step">
-                    <p class="eyebrow">Background</p>
-                    <select @bind="selectedBackgroundDefinitionId" @bind:after='() => SelectDetail("Background")'>
-                        <option value="">Select background</option>
-                        @foreach (var backgroundDefinition in backgroundDefinitions)
-                        {
-                            <option value="@backgroundDefinition.Id">@backgroundDefinition.DisplayName</option>
-                        }
-                    </select>
-                </section>
-
-                <section class="creation-step">
-                    <p class="eyebrow">Classes</p>
+                <section class="creation-step @(IsEditSection("Classes") ? "" : "hidden")">
+                    <div class="creator-step-heading">
+                        <p class="eyebrow">Classes</p>
+                    </div>
                     <div class="class-picker">
                         <select @bind="selectedClassName" @bind:after="SelectClassGroup">
                             <option value="0">Select class</option>
@@ -98,15 +148,38 @@
                         <section class="selected-class-list">
                             @foreach (var characterClass in classes)
                             {
-                                <div class="selected-class-row">
-                                    <span>@characterClass.DisplayName</span>
-                                    <button type="button" class="icon-button" title="Remove class" @onclick="() => RemoveClass(characterClass)">-</button>
-                                </div>
+                                <article class="edit-class-card">
+                                    <header>
+                                        <div>
+                                            <strong>@characterClass.ClassName</strong>
+                                            <span>@characterClass.ClassSource</span>
+                                        </div>
+                                        <button type="button" class="icon-button" title="Remove class" @onclick="() => RemoveClass(characterClass)">-</button>
+                                    </header>
+
+                                    <div class="edit-class-controls">
+                                        <label class="edit-class-level-field">
+                                            <span>Level</span>
+                                            <input class="compact-number-input" title="Class level" type="number" min="1" max="20" value="@characterClass.Level" @onchange="args => SetClassLevel(characterClass, args.Value?.ToString())" />
+                                        </label>
+
+                                        <label class="stacked-field">
+                                            <span>Subclass</span>
+                                            <select value="@FormatNullableId(characterClass.SubclassDefinitionId)" @onchange="args => SetClassSubclass(characterClass, args.Value?.ToString())">
+                                                <option value="">No subclass</option>
+                                                @foreach (var subclassDefinition in GetSubclassOptions(characterClass))
+                                                {
+                                                    <option value="@subclassDefinition.Id">@subclassDefinition.DisplayName</option>
+                                                }
+                                            </select>
+                                        </label>
+                                    </div>
+                                </article>
                             }
                         </section>
                     }
 
-                    <button type="button" class="text-button no-margin" @onclick="ApplyOptionEffects">Apply option bonuses</button>
+                    <button type="button" class="text-button no-margin" @onclick="ApplyOptionEffects">Recalculate rule effects</button>
                     @if (optionEffectMessages.Count > 0)
                     {
                         <p class="muted compact-hint">@string.Join("; ", optionEffectMessages)</p>
@@ -115,8 +188,10 @@
 
                 @if (AllDefenseChoiceRequirements.Count > 0 || AllAbilityChoiceRequirements.Count > 0 || optionChoiceHints.Count > 0)
                 {
-                    <section class="creation-step pending-choice-panel">
-                        <p class="eyebrow">Pending Choices</p>
+                    <section class="creation-step pending-choice-panel @(IsEditSection("Choices") ? "" : "hidden")">
+                        <div class="creator-step-heading">
+                            <p class="eyebrow">Choices</p>
+                        </div>
                         @if (AllAbilityChoiceRequirements.Count > 0)
                         {
                             <AbilityChoiceList Requirements="AllAbilityChoiceRequirements"
@@ -133,9 +208,20 @@
                         <ChoiceHintList Hints="optionChoiceHints" />
                     </section>
                 }
+                else
+                {
+                    <section class="creation-step pending-choice-panel @(IsEditSection("Choices") ? "" : "hidden")">
+                        <div class="creator-step-heading">
+                            <p class="eyebrow">Choices</p>
+                        </div>
+                        <p class="muted compact-hint">No rule choices are currently required by selected race, background, feats, or class options.</p>
+                    </section>
+                }
 
-                <section class="creation-step">
-                    <p class="eyebrow">Feats</p>
+                <section class="creation-step @(IsEditSection("Feats") ? "" : "hidden")">
+                    <div class="creator-step-heading">
+                        <p class="eyebrow">Feats</p>
+                    </div>
                     <div class="class-picker">
                         <select @bind="selectedFeatDefinitionId" @bind:after='() => SelectDetail("Feat")'>
                             <option value="">Select feat</option>
@@ -161,8 +247,11 @@
                     }
                 </section>
 
-                <section class="creation-step">
-                    <p class="eyebrow">Abilities</p>
+                <section class="creation-step @(IsEditSection("Abilities") ? "" : "hidden")">
+                    <div class="creator-step-heading">
+                        <p class="eyebrow">Base Abilities</p>
+                    </div>
+                    <p class="muted compact-hint">These are stored base scores. Ability bonuses from selected options are resolved separately when effects are recalculated.</p>
                     <div class="ability-grid">
                         <label><span>STR</span><input type="number" min="1" max="30" @bind="strength" /></label>
                         <label><span>DEX</span><input type="number" min="1" max="30" @bind="dexterity" /></label>
@@ -173,7 +262,7 @@
                     </div>
                 </section>
 
-                <section class="creation-step">
+                <section class="creation-step @(IsEditSection("Proficiencies") ? "" : "hidden")">
                     <button type="button" class="section-toggle" @onclick="ToggleSavingThrows">
                         <span>Saving Throws</span>
                         <span>@(showSavingThrows ? "Hide" : "Show")</span>
@@ -202,7 +291,7 @@
                     }
                 </section>
 
-                <section class="creation-step">
+                <section class="creation-step @(IsEditSection("Proficiencies") ? "" : "hidden")">
                     <button type="button" class="section-toggle" @onclick="ToggleSkills">
                         <span>Skills</span>
                         <span>@(showSkills ? "Hide" : "Show")</span>
@@ -244,7 +333,7 @@
                     }
                 </section>
 
-                <section class="creation-step">
+                <section class="creation-step @(IsEditSection("Proficiencies") ? "" : "hidden")">
                     <button type="button" class="section-toggle" @onclick="ToggleTools">
                         <span>Tools</span>
                         <span>@(showTools ? "Hide" : "Show")</span>
@@ -280,7 +369,7 @@
                     }
                 </section>
 
-                <section class="creation-step">
+                <section class="creation-step @(IsEditSection("Proficiencies") ? "" : "hidden")">
                     <button type="button" class="section-toggle" @onclick="ToggleLanguages">
                         <span>Languages</span>
                         <span>@(showLanguages ? "Hide" : "Show")</span>
@@ -322,13 +411,19 @@
                 }
             </section>
 
-            <aside class="creation-detail-pane">
+            <aside class="creator-detail-panel character-edit-detail-panel">
                 @if (SelectedDetail is null)
                 {
                     <div class="empty-detail">
-                        <p class="eyebrow">Details</p>
-                        <h2>Select an option</h2>
-                        <p class="muted">Race, background, class, and feat details appear here while you edit the character.</p>
+                        <p class="eyebrow">Reference</p>
+                        <h2>Stored inputs first</h2>
+                        <p class="muted">Select a race, background, class, or feat to inspect its source definition. The character stores the selection and choices; sheet values are resolved from those references.</p>
+                        <section class="edit-reference-list">
+                            <article><span>Race</span><strong>@(SelectedRace?.DisplayName ?? "None")</strong></article>
+                            <article><span>Background</span><strong>@(SelectedBackground?.DisplayName ?? "None")</strong></article>
+                            <article><span>Classes</span><strong>@BuildClassSummary()</strong></article>
+                            <article><span>Feats</span><strong>@(feats.Count == 0 ? "None" : string.Join(", ", feats.Select(feat => feat.DisplayName)))</strong></article>
+                        </section>
                     </div>
                 }
                 else
@@ -447,6 +542,7 @@
     private List<BackgroundDefinition> backgroundDefinitions = [];
     private List<FeatDefinition> featDefinitions = [];
     private List<CharacterClass> classes = [];
+    private Dictionary<int, List<SubclassDefinition>> subclassOptionsByClassDefinitionId = [];
     private List<CharacterFeat> feats = [];
     private List<CharacterSavingThrow> savingThrows = CharacterSavingThrow.CreateDefaults();
     private List<CharacterSkill> skills = CharacterSkill.CreateDefaults();
@@ -486,7 +582,18 @@
     private bool showSkills;
     private bool showTools;
     private bool showLanguages;
+    private string activeEditSection = "Overview";
     private static readonly string[] RollModes = ["Normal", "Advantage", "Disadvantage"];
+    private static readonly IReadOnlyList<EditSection> EditSections =
+    [
+        new("Overview", "Overview"),
+        new("Identity", "Identity"),
+        new("Classes", "Classes"),
+        new("Abilities", "Abilities"),
+        new("Choices", "Choices"),
+        new("Feats", "Feats"),
+        new("Proficiencies", "Proficiencies")
+    ];
     private RaceDefinition? SelectedRace => selectedRaceDefinitionId is null ? null : raceDefinitions.FirstOrDefault(definition => definition.Id == selectedRaceDefinitionId.Value);
     private BackgroundDefinition? SelectedBackground => selectedBackgroundDefinitionId is null ? null : backgroundDefinitions.FirstOrDefault(definition => definition.Id == selectedBackgroundDefinitionId.Value);
     private FeatDefinition? SelectedFeat => selectedFeatDefinitionId is null ? null : featDefinitions.FirstOrDefault(definition => definition.Id == selectedFeatDefinitionId.Value);
@@ -552,6 +659,7 @@
                 .GroupBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(group => group.Key, group => group.First().Value.ToList(), StringComparer.OrdinalIgnoreCase);
             classes = character.Classes.ToList();
+            await LoadSubclassOptionsForClassesAsync();
             feats = character.Feats.ToList();
             savingThrows = character.SavingThrows.ToList();
             skills = character.Skills.ToList();
@@ -614,7 +722,7 @@
         }
     }
 
-    private void AddClass()
+    private async Task AddClass()
     {
         errorMessage = "";
 
@@ -654,6 +762,7 @@
             SubclassSource = subclassDefinition?.Source ?? "",
             Level = selectedClassLevel
         });
+        await LoadSubclassOptionsForClassAsync(classDefinition.Id);
 
         selectedClassName = "0";
         selectedClassGroup = null;
@@ -666,6 +775,66 @@
     private void RemoveClass(CharacterClass characterClass)
     {
         classes.Remove(characterClass);
+    }
+
+    private async Task LoadSubclassOptionsForClassesAsync()
+    {
+        foreach (var classDefinitionId in classes
+            .Select(characterClass => characterClass.ClassDefinitionId)
+            .Where(classDefinitionId => classDefinitionId > 0)
+            .Distinct())
+        {
+            await LoadSubclassOptionsForClassAsync(classDefinitionId);
+        }
+    }
+
+    private async Task LoadSubclassOptionsForClassAsync(int classDefinitionId)
+    {
+        if (subclassOptionsByClassDefinitionId.ContainsKey(classDefinitionId))
+        {
+            return;
+        }
+
+        subclassOptionsByClassDefinitionId[classDefinitionId] = (await Database.GetSubclassDefinitionsAsync(classDefinitionId)).ToList();
+    }
+
+    private IReadOnlyList<SubclassDefinition> GetSubclassOptions(CharacterClass characterClass)
+    {
+        return subclassOptionsByClassDefinitionId.GetValueOrDefault(characterClass.ClassDefinitionId) ?? [];
+    }
+
+    private void SetClassLevel(CharacterClass characterClass, string? value)
+    {
+        characterClass.Level = int.TryParse(value, out var parsed)
+            ? Math.Clamp(parsed, 1, 20)
+            : characterClass.Level;
+    }
+
+    private void SetClassSubclass(CharacterClass characterClass, string? value)
+    {
+        if (!int.TryParse(value, out var subclassDefinitionId))
+        {
+            characterClass.SubclassDefinitionId = null;
+            characterClass.SubclassName = "";
+            characterClass.SubclassSource = "";
+            return;
+        }
+
+        var subclassDefinition = GetSubclassOptions(characterClass)
+            .FirstOrDefault(definition => definition.Id == subclassDefinitionId);
+        if (subclassDefinition is null)
+        {
+            return;
+        }
+
+        characterClass.SubclassDefinitionId = subclassDefinition.Id;
+        characterClass.SubclassName = subclassDefinition.Name;
+        characterClass.SubclassSource = subclassDefinition.Source;
+    }
+
+    private static string FormatNullableId(int? value)
+    {
+        return value?.ToString() ?? "";
     }
 
     private void AddFeat()
@@ -742,6 +911,79 @@
     private void OpenCharacter()
     {
         Navigation.NavigateTo($"characters/{Id}");
+    }
+
+    private void SetEditSection(string section)
+    {
+        activeEditSection = section;
+
+        if (section == "Identity")
+        {
+            detailKind = SelectedRace is not null ? "Race" : SelectedBackground is not null ? "Background" : "";
+        }
+        else if (section == "Classes" && SelectedClass is not null)
+        {
+            detailKind = "Class";
+        }
+        else if (section == "Feats" && SelectedFeat is not null)
+        {
+            detailKind = "Feat";
+        }
+    }
+
+    private bool IsEditSection(string section)
+    {
+        return string.Equals(activeEditSection, section, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string BuildEditSectionSummary(string section)
+    {
+        return section switch
+        {
+            "Overview" => BuildClassSummary(),
+            "Identity" => BuildSourceSummary(),
+            "Classes" => classes.Count == 0 ? "No class" : $"{classes.Sum(characterClass => characterClass.Level)} total levels",
+            "Abilities" => BuildAbilitySummary(),
+            "Choices" => BuildChoiceSummary(),
+            "Feats" => feats.Count == 0 ? "No feats" : $"{feats.Count} feats",
+            "Proficiencies" => BuildManualChoiceSummary(),
+            _ => ""
+        };
+    }
+
+    private string BuildAbilitySummary()
+    {
+        return $"STR {strength}, DEX {dexterity}, CON {constitution}, INT {intelligence}, WIS {wisdom}, CHA {charisma}";
+    }
+
+    private string BuildClassSummary()
+    {
+        return classes.Count == 0
+            ? "No class set"
+            : string.Join(" / ", classes.Select(characterClass => $"{characterClass.ClassName} {characterClass.Level}"));
+    }
+
+    private string BuildSourceSummary()
+    {
+        var parts = new[]
+        {
+            SelectedRace?.DisplayName,
+            SelectedBackground?.DisplayName
+        }.Where(value => !string.IsNullOrWhiteSpace(value)).ToList();
+
+        return parts.Count == 0 ? "No race or background" : string.Join(" / ", parts);
+    }
+
+    private string BuildChoiceSummary()
+    {
+        var count = AllAbilityChoiceRequirements.Count + AllDefenseChoiceRequirements.Count + optionChoiceHints.Count;
+        return count == 0 ? "No pending choices" : $"{count} available choices";
+    }
+
+    private string BuildManualChoiceSummary()
+    {
+        var count = selectedManualSkillChoices.Count + selectedManualToolChoices.Count + selectedManualLanguageChoices.Count;
+        return count == 0 ? "No manual proficiencies" : $"{count} manual proficiencies";
     }
 
     private void SelectDetail(string kind)
@@ -1836,4 +2078,5 @@
     private sealed record OptionDetailFeatureGroup(string Title, IReadOnlyList<OptionDetailFeatureLevel> Levels);
     private sealed record OptionDetailProgressionTable(string Title, IReadOnlyList<string> Columns, IReadOnlyList<OptionDetailProgressionRow> Rows);
     private sealed record OptionDetailProgressionRow(IReadOnlyList<string> Values);
+    private sealed record EditSection(string Key, string Label);
 }
