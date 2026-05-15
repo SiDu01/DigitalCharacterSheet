@@ -367,3 +367,4 @@ FodyWeavers.xsd
 *.apk
 *.aab
 *.db3
+/external Resources

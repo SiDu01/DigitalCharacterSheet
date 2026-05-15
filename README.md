@@ -1,70 +1,66 @@
 # Digital Character Sheet
 
-Digital Character Sheet is a .NET MAUI Blazor Hybrid app for Android tablets. The current focus is a D&D character sheet with spells, character creation/editing, class/subclass features, level-up support, items, source filtering, themes, and tablet-friendly views.
+Digital Character Sheet is an Android-first D&D 5e character tracking app built with .NET 9, .NET MAUI, Blazor Hybrid, and SQLite. The app is designed for tablet play at the table; the Windows target is primarily used for local development and quick UI testing.
 
-The project intentionally does not include the raw `5e Tools` data files. Each developer builds their own local seed database from their own local `5e Tools\data` folder.
+The app manages character creation, character editing, the character sheet, spells, combat views, features, items, inventory, level-up, source preferences, themes, bookmarks, recent entries, and import/export.
 
-## Requirements
+Raw `5e Tools` JSON is intentionally not shipped in the app. Reference data is imported into a local SQLite seed database during development, and runtime builds use that database as their packaged data source.
 
-- .NET 9 SDK with MAUI workloads
-- Visual Studio with MAUI/Android support, or the .NET CLI
-- Android SDK platform tools for tablet installation via ADB
-- A local checkout/download of `5e Tools` data when building the seed database
+## Repository Layout
 
-## Seed Database
-
-The app expects a local seed database here:
+The MAUI app project lives at the repository root.
 
 ```text
-Resources\Raw\seed\digital-character-sheet.db3
+.
+|-- Components/              Blazor layouts, shared components, and pages
+|-- Data/                    SQLite entity types
+|-- Models/                  UI/domain models used by pages and services
+|-- Services/                Database, rule mapping, settings, imports, activity services
+|-- Tools/SeedDatabaseBuilder
+|-- Resources/               MAUI assets, icons, fonts, optional seed database
+|-- wwwroot/                 Blazor host page and global CSS
+|-- Platforms/               MAUI platform projects
+|-- docs/                    Architecture and development documentation
 ```
 
-Create or refresh it with:
+## Core Commands
 
-```powershell
-dotnet run --project Tools\SeedDatabaseBuilder\SeedDatabaseBuilder.csproj
-```
-
-The builder asks for your local `5e Tools\data` folder and writes the `.db3` file into the app project's seed folder by default.
-
-The raw JSON files from `5e Tools` are not packaged into the app. Only the seed database is included in local builds.
-
-## Build For PC Testing
+Windows build:
 
 ```powershell
 dotnet build DigitalCharacterSheet.csproj -f net9.0-windows10.0.19041.0
 ```
 
-You can also start the Windows target from Visual Studio.
-
-## Build And Install On Android Tablet
-
-The tested tablet configuration is `Tablet`:
+Android tablet build:
 
 ```powershell
 dotnet build DigitalCharacterSheet.csproj -f net9.0-android -c Tablet
 ```
 
-The APK is created here:
-
-```text
-bin\Tablet\net9.0-android\com.companyname.digitalcharactersheet-Signed.apk
-```
-
-Install it with ADB:
+Seed database builder:
 
 ```powershell
-& 'C:\Program Files (x86)\Android\android-sdk\platform-tools\adb.exe' install --no-incremental -r 'bin\Tablet\net9.0-android\com.companyname.digitalcharactersheet-Signed.apk'
+dotnet run --project Tools\SeedDatabaseBuilder\SeedDatabaseBuilder.csproj
 ```
+
+## Seed Database
+
+The app expects the generated seed database here when packaging local builds:
+
+```text
+Resources\Raw\seed\digital-character-sheet.db3
+```
+
+The builder asks for a local `5e Tools\data` folder and writes the `.db3` file into the seed folder. If importer logic, schema, or source JSON mappings change, regenerate the seed database before expecting the app to reflect those changes.
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Data and Rules](docs/DATA_AND_RULES.md)
+- [Development Workflow](docs/DEVELOPMENT.md)
+- [Build Notes](BUILDING.md)
+- [Handoff](Handoff.md)
 
 ## Repository Hygiene
 
-Do not commit:
-
-- `Resources\Raw`
-- raw `5e Tools` JSON files
-- generated `.db3` seed databases
-- APK/AAB build outputs
-- `bin`, `obj`, `.vs`, or `*.user` files
-
-Detailed build notes live in `BUILDING.md`.
+Do not commit raw `5e Tools` JSON, generated seed databases, APK/AAB outputs, `bin`, `obj`, `.vs`, or `*.user` files.

@@ -100,6 +100,8 @@ Current database migration baseline:
 - `DatabaseVersion = 3`: adds `CharacterInventoryItems` for per-character inventory state such as quantity, equipped, attuned, notes and charges.
 - `DatabaseVersion = 4`: marks shield-like items as armor and creates concrete magic item definitions from supported generic magic variants.
 - `DatabaseVersion = 5`: adds magic variant grouping fields so generated variants appear as families such as `Cast-Off Armor`.
+- `DatabaseVersion = 6`: adds item bonus compatibility columns.
+- `DatabaseVersion = 7`: adds character combat state fields for hit points and conditions.
 
 For future schema changes:
 
