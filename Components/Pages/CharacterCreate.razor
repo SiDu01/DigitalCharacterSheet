@@ -45,7 +45,7 @@
                 <input placeholder="Name" @bind="newName" @bind:event="oninput" />
             </section>
 
-            <section class="creator-step-screen @(IsStep("Ancestry") ? "" : "hidden")">
+            <section class="creator-step-screen creator-ancestry-step @(IsStep("Ancestry") ? "" : "hidden")">
                 <div class="creator-step-heading">
                     <p class="eyebrow">Ancestry</p>
                     <div class="creator-step-controls">
@@ -64,37 +64,6 @@
                         </button>
                     }
                 </section>
-
-                @if (selectedRaceGroup is not null && selectedRaceGroup.Versions.Count > 1)
-                {
-                    <section class="creator-inline-source-panel">
-                        <span>Source</span>
-                        <div class="source-switcher">
-                            @foreach (var version in selectedRaceGroup.Versions)
-                            {
-                                var subraceCount = GetRaceVersionSubraceCount(version);
-                                <button type="button"
-                                        class="source-version @(version.Id == selectedRaceDefinitionId ? "active" : "")"
-                                        @onclick="async () => await SelectRaceVersion(version)">
-                                    @version.Source@(subraceCount == 0 ? "" : $" · {subraceCount} versions")
-                                </button>
-                            }
-                        </div>
-                    </section>
-                }
-
-                @if (RaceSizeOptions.Count > 1)
-                {
-                    <label class="stacked-field">
-                        <span>Size</span>
-                        <select @bind="selectedRaceSize">
-                            @foreach (var size in RaceSizeOptions)
-                            {
-                                <option value="@size">@FormatSize(size)</option>
-                            }
-                        </select>
-                    </label>
-                }
 
             </section>
 
@@ -574,6 +543,19 @@
                             </button>
                         }
                     </div>
+
+                    @if (RaceSizeOptions.Count > 1)
+                    {
+                        <label class="stacked-field detail-choice-field">
+                            <span>Size</span>
+                            <select @bind="selectedRaceSize">
+                                @foreach (var size in RaceSizeOptions)
+                                {
+                                    <option value="@size">@FormatSize(size)</option>
+                                }
+                            </select>
+                        </label>
+                    }
 
                     @if (subraceDefinitions.Count > 0)
                     {

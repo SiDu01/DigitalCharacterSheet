@@ -732,6 +732,17 @@ main {
     margin-top: .75rem;
 }
 
+.creator-ancestry-step {
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+    height: 100%;
+}
+
+.creator-ancestry-step .creator-option-list {
+    max-height: none;
+    height: 100%;
+}
+
 .creator-step-heading {
     display: flex;
     align-items: center;
@@ -829,23 +840,6 @@ main {
     border-radius: 6px;
     padding: .45rem .6rem;
     background: #fff;
-}
-
-.creator-inline-source-panel {
-    display: grid;
-    gap: .35rem;
-    min-width: 0;
-    padding: .55rem;
-    border: 1px solid var(--app-border);
-    border-radius: 7px;
-    background: var(--app-panel-soft);
-}
-
-.creator-inline-source-panel > span {
-    color: var(--app-muted);
-    font-size: .72rem;
-    font-weight: 850;
-    text-transform: uppercase;
 }
 
 .creator-option-row small {
@@ -4436,7 +4430,6 @@ button.source-badge {
 [data-theme="leather"] .creation-step-tab,
 [data-theme="leather"] .creation-step-badge,
 [data-theme="leather"] .creation-review-grid article,
-[data-theme="leather"] .creator-inline-source-panel,
 [data-theme="leather"] .character-edit-nav-item,
 [data-theme="leather"] .edit-summary-grid article,
 [data-theme="leather"] .edit-reference-list article {
@@ -4460,7 +4453,6 @@ button.source-badge {
 }
 
 [data-theme="leather"] .character-edit-nav-item small,
-[data-theme="leather"] .creator-inline-source-panel > span,
 [data-theme="leather"] .edit-summary-grid span,
 [data-theme="leather"] .edit-reference-list span,
 [data-theme="leather"] .edit-class-card header span,
