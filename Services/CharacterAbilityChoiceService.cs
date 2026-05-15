@@ -5,6 +5,7 @@ namespace DigitalCharacterSheet.Services;
 public static class CharacterAbilityChoiceService
 {
     private static readonly string[] AbilityOrder = ["str", "dex", "con", "int", "wis", "cha"];
+    public static IReadOnlyList<string> AllAbilityOptions => AbilityOrder;
 
     public static IReadOnlyList<CharacterAbilityChoiceRequirement> BuildRequirements(string? rawJson, string sourceKey, string sourceName)
     {
@@ -109,9 +110,10 @@ public static class CharacterAbilityChoiceService
         var selections = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         foreach (var property in abilityChoices.EnumerateObject())
         {
-            selections[property.Name] = ReadChoiceValues(property.Value)
-                .Where(IsAbilityCode)
-                .ToList();
+            var values = ReadChoiceValues(property.Value).ToList();
+            selections[property.Name] = IsModeMarkerKey(property.Name) || IsUnrestrictedMarkerKey(property.Name)
+                ? values.Where(value => !string.IsNullOrWhiteSpace(value)).ToList()
+                : values.Where(IsAbilityCode).ToList();
         }
 
         return selections;
@@ -149,7 +151,9 @@ public static class CharacterAbilityChoiceService
                 var selectedMode = ReadSelectedMode(group.Key, selectedChoices)
                     ?? group.FirstOrDefault(requirement => selectedChoices.TryGetValue(requirement.Key, out var values) && values.Count > 0)?.ModeKey
                     ?? group.First().ModeKey;
-                return group.Where(requirement => string.Equals(requirement.ModeKey, selectedMode, StringComparison.OrdinalIgnoreCase));
+                return group
+                    .Where(requirement => string.Equals(requirement.ModeKey, selectedMode, StringComparison.OrdinalIgnoreCase))
+                    .Select(requirement => ApplyUnrestrictedOptions(requirement, selectedChoices));
             })
             .ToList();
     }
@@ -159,11 +163,31 @@ public static class CharacterAbilityChoiceService
         return $"{modeGroupKey}:mode";
     }
 
+    public static string BuildUnrestrictedMarkerKey(string modeGroupKey)
+    {
+        return $"{modeGroupKey}:unrestricted";
+    }
+
     public static string? ReadSelectedMode(string modeGroupKey, IReadOnlyDictionary<string, List<string>> selectedChoices)
     {
         return selectedChoices.TryGetValue(BuildModeMarkerKey(modeGroupKey), out var modeValues)
             ? modeValues.FirstOrDefault()
             : null;
+    }
+
+    public static bool ReadIsUnrestricted(string modeGroupKey, IReadOnlyDictionary<string, List<string>> selectedChoices)
+    {
+        return selectedChoices.TryGetValue(BuildUnrestrictedMarkerKey(modeGroupKey), out var values)
+            && values.Any(value => string.Equals(value, "true", StringComparison.OrdinalIgnoreCase));
+    }
+
+    public static CharacterAbilityChoiceRequirement ApplyUnrestrictedOptions(
+        CharacterAbilityChoiceRequirement requirement,
+        IReadOnlyDictionary<string, List<string>> selectedChoices)
+    {
+        return ReadIsUnrestricted(requirement.ModeGroupKey, selectedChoices)
+            ? requirement with { Options = AbilityOrder }
+            : requirement;
     }
 
     public static string FormatAbilityName(string abilityCode)
@@ -390,6 +414,16 @@ public static class CharacterAbilityChoiceService
     private static bool IsAbilityCode(string value)
     {
         return value.ToLowerInvariant() is "str" or "dex" or "con" or "int" or "wis" or "cha";
+    }
+
+    private static bool IsModeMarkerKey(string key)
+    {
+        return key.EndsWith(":mode", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsUnrestrictedMarkerKey(string key)
+    {
+        return key.EndsWith(":unrestricted", StringComparison.OrdinalIgnoreCase);
     }
 }
 

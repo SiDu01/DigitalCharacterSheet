@@ -359,7 +359,9 @@
                         <AbilityChoiceList Requirements="AllAbilityChoiceRequirements"
                                            SelectedChoices="selectedAbilityChoices"
                                            OnChange="SetAbilityChoice"
-                                           OnModeChange="SetAbilityChoiceMode" />
+                                           OnModeChange="SetAbilityChoiceMode"
+                                           OnUnrestrictedChange="SetAbilityChoiceUnrestricted"
+                                           EnableUnrestrictedBackgroundChoices="true" />
                         <ChoiceHintList Hints="@ChoiceHintsFor("Abilities")" />
                     }
                 </section>
@@ -2012,6 +2014,14 @@
                     .Take(requirement.Count)
                     .ToList(),
                 StringComparer.OrdinalIgnoreCase);
+        foreach (var marker in selectedAbilityChoices
+            .Where(pair => pair.Value.Count > 0
+                && (pair.Key.EndsWith(":mode", StringComparison.OrdinalIgnoreCase)
+                    || pair.Key.EndsWith(":unrestricted", StringComparison.OrdinalIgnoreCase))))
+        {
+            selected[marker.Key] = marker.Value.ToList();
+        }
+
         if (selected.Count > 0)
         {
             choices["abilityChoices"] = selected;
@@ -2020,7 +2030,9 @@
 
     private async Task SetAbilityChoice((string Key, int Index, string Value) choice)
     {
-        var requirement = AllAbilityChoiceRequirements.FirstOrDefault(requirement => string.Equals(requirement.Key, choice.Key, StringComparison.OrdinalIgnoreCase));
+        var requirement = AllAbilityChoiceRequirements
+            .Select(requirement => CharacterAbilityChoiceService.ApplyUnrestrictedOptions(requirement, selectedAbilityChoices))
+            .FirstOrDefault(requirement => string.Equals(requirement.Key, choice.Key, StringComparison.OrdinalIgnoreCase));
         if (requirement is null || choice.Index < 0 || choice.Index >= requirement.Count)
         {
             return;
@@ -2055,6 +2067,34 @@
         }
 
         selectedAbilityChoices[CharacterAbilityChoiceService.BuildModeMarkerKey(choice.ModeGroupKey)] = [choice.ModeKey];
+        await RecomputeOptionEffectsAsync();
+    }
+
+    private async Task SetAbilityChoiceUnrestricted((string ModeGroupKey, bool IsUnrestricted) choice)
+    {
+        var markerKey = CharacterAbilityChoiceService.BuildUnrestrictedMarkerKey(choice.ModeGroupKey);
+        if (choice.IsUnrestricted)
+        {
+            selectedAbilityChoices[markerKey] = ["true"];
+        }
+        else
+        {
+            selectedAbilityChoices.Remove(markerKey);
+            foreach (var requirement in AllAbilityChoiceRequirements.Where(requirement => string.Equals(requirement.ModeGroupKey, choice.ModeGroupKey, StringComparison.OrdinalIgnoreCase)))
+            {
+                if (!selectedAbilityChoices.TryGetValue(requirement.Key, out var values))
+                {
+                    continue;
+                }
+
+                values.RemoveAll(value => !requirement.Options.Contains(value, StringComparer.OrdinalIgnoreCase));
+                if (values.Count == 0)
+                {
+                    selectedAbilityChoices.Remove(requirement.Key);
+                }
+            }
+        }
+
         await RecomputeOptionEffectsAsync();
     }
 
@@ -2207,6 +2247,7 @@
         var validKeys = AllAbilityChoiceRequirements
             .Select(requirement => requirement.Key)
             .Concat(AllAbilityChoiceRequirements.Select(requirement => CharacterAbilityChoiceService.BuildModeMarkerKey(requirement.ModeGroupKey)))
+            .Concat(AllAbilityChoiceRequirements.Select(requirement => CharacterAbilityChoiceService.BuildUnrestrictedMarkerKey(requirement.ModeGroupKey)))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var key in selectedAbilityChoices.Keys.Where(key => !validKeys.Contains(key)).ToList())
         {

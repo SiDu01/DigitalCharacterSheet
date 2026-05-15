@@ -13,7 +13,13 @@
                     var selectedMode = CharacterAbilityChoiceService.ReadSelectedMode(group.Key, SelectedChoices)
                         ?? modeGroups.FirstOrDefault(mode => mode.Any(requirement => SelectedChoices.TryGetValue(requirement.Key, out var values) && values.Count > 0))?.Key
                         ?? modeGroups.First().Key;
-                    var activeRequirements = modeGroups.First(mode => string.Equals(mode.Key, selectedMode, StringComparison.OrdinalIgnoreCase)).ToList();
+                    var activeRequirements = modeGroups
+                        .First(mode => string.Equals(mode.Key, selectedMode, StringComparison.OrdinalIgnoreCase))
+                        .Select(requirement => CharacterAbilityChoiceService.ApplyUnrestrictedOptions(requirement, SelectedChoices))
+                        .ToList();
+                    var isUnrestricted = CharacterAbilityChoiceService.ReadIsUnrestricted(group.Key, SelectedChoices);
+                    var canToggleUnrestricted = EnableUnrestrictedBackgroundChoices
+                        && group.First().SourceName.StartsWith("Background", StringComparison.OrdinalIgnoreCase);
                 }
                 @if (modeGroups.Count > 1)
                 {
@@ -27,6 +33,15 @@
                             </button>
                         }
                     </div>
+                }
+                @if (canToggleUnrestricted)
+                {
+                    <label class="switch-toggle ability-unrestricted-toggle">
+                        <input type="checkbox"
+                               checked="@isUnrestricted"
+                               @onchange="args => ToggleUnrestricted(group.Key, args.Value is true)" />
+                        <span>Allow any ability</span>
+                    </label>
                 }
                 @foreach (var requirement in activeRequirements)
                 {
@@ -62,6 +77,8 @@
     [Parameter] public IReadOnlyDictionary<string, List<string>> SelectedChoices { get; set; } = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
     [Parameter] public EventCallback<(string Key, int Index, string Value)> OnChange { get; set; }
     [Parameter] public EventCallback<(string ModeGroupKey, string ModeKey)> OnModeChange { get; set; }
+    [Parameter] public EventCallback<(string ModeGroupKey, bool IsUnrestricted)> OnUnrestrictedChange { get; set; }
+    [Parameter] public bool EnableUnrestrictedBackgroundChoices { get; set; }
 
     private async Task SetChoice(CharacterAbilityChoiceRequirement requirement, int index, string? value)
     {
@@ -71,6 +88,11 @@
     private async Task ChangeMode(string modeGroupKey, string modeKey)
     {
         await OnModeChange.InvokeAsync((modeGroupKey, modeKey));
+    }
+
+    private async Task ToggleUnrestricted(string modeGroupKey, bool isUnrestricted)
+    {
+        await OnUnrestrictedChange.InvokeAsync((modeGroupKey, isUnrestricted));
     }
 
     private static string BuildHint(CharacterAbilityChoiceRequirement requirement)

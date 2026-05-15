@@ -1730,6 +1730,11 @@ main {
     font-weight: 700;
 }
 
+.ability-unrestricted-toggle {
+    justify-self: start;
+    margin-top: -.1rem;
+}
+
 .ability-choice-selects {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
