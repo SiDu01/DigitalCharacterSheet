@@ -150,6 +150,128 @@
                 {
                     <p class="muted compact-hint">@string.Join("; ", optionEffectMessages)</p>
                 }
+
+                @if (HasClassFeatureChoices)
+                {
+                    <section class="level-up-choice creator-class-feature-choice">
+                        <p class="eyebrow">Class Feature Choices</p>
+
+                        @if (ClassFeatureFeatChoiceRows.Count > 0)
+                        {
+                            @foreach (var row in ClassFeatureFeatChoiceRows)
+                            {
+                                <label class="stacked-field">
+                                    <span>@row.ClassName level @row.SourceLevel: @row.FeatureName</span>
+                                    <select value="@GetClassFeatureFeatChoice(row.Key)" @onchange="args => SetClassFeatureFeatChoice(row.Key, args.Value?.ToString())">
+                                        <option value="">Select feat</option>
+                                        @foreach (var featDefinition in AvailableClassFeatureFeatDefinitions(row.Key))
+                                        {
+                                            <option value="@featDefinition.Id">@featDefinition.DisplayName</option>
+                                        }
+                                    </select>
+                                </label>
+                            }
+                        }
+
+                        @if (ClassFeatureAbilityChoiceRequirements.Count > 0)
+                        {
+                            <AbilityChoiceList Requirements="ClassFeatureAbilityChoiceRequirements"
+                                               SelectedChoices="selectedAbilityChoices"
+                                               OnChange="SetAbilityChoice"
+                                               OnModeChange="SetAbilityChoiceMode" />
+                        }
+
+                        @if (ClassFeatureFightingStyleChoiceCount > 0)
+                        {
+                            <p class="muted compact-hint">Select @ClassFeatureFightingStyleChoiceCount fighting style(s).</p>
+                            <div class="level-up-choice-grid">
+                                @foreach (var fightingStyle in FightingStyleOptions)
+                                {
+                                    <label class="toggle">
+                                        <input type="checkbox"
+                                               checked="@selectedClassFeatureFightingStyles.Contains(fightingStyle)"
+                                               disabled="@(!selectedClassFeatureFightingStyles.Contains(fightingStyle) && selectedClassFeatureFightingStyles.Count >= ClassFeatureFightingStyleChoiceCount)"
+                                               @onchange="args => ToggleClassFeatureChoice(selectedClassFeatureFightingStyles, fightingStyle, ClassFeatureFightingStyleChoiceCount, args)" />
+                                        @fightingStyle
+                                    </label>
+                                }
+                            </div>
+                        }
+
+                        @if (ClassFeatureExpertiseChoiceCount > 0)
+                        {
+                            <p class="muted compact-hint">Select @ClassFeatureExpertiseChoiceCount proficient skill(s) for Expertise.</p>
+                            <div class="level-up-choice-grid">
+                                @foreach (var skill in EligibleClassFeatureExpertiseSkills)
+                                {
+                                    <label class="toggle">
+                                        <input type="checkbox"
+                                               checked="@selectedClassFeatureExpertiseSkills.Contains(skill.Name)"
+                                               disabled="@(!selectedClassFeatureExpertiseSkills.Contains(skill.Name) && selectedClassFeatureExpertiseSkills.Count >= ClassFeatureExpertiseChoiceCount)"
+                                               @onchange="args => ToggleClassFeatureChoice(selectedClassFeatureExpertiseSkills, skill.Name, ClassFeatureExpertiseChoiceCount, args)" />
+                                        @skill.Name
+                                    </label>
+                                }
+                            </div>
+                        }
+
+                        @if (ClassFeatureSkillProficiencyChoiceCount > 0)
+                        {
+                            <p class="muted compact-hint">Select @ClassFeatureSkillProficiencyChoiceCount skill proficiency/proficiencies.</p>
+                            <div class="level-up-choice-grid">
+                                @foreach (var skill in EligibleClassFeatureSkillProficiencyChoices)
+                                {
+                                    <label class="toggle">
+                                        <input type="checkbox"
+                                               checked="@selectedClassFeatureSkillProficiencies.Contains(skill.Name)"
+                                               disabled="@(!selectedClassFeatureSkillProficiencies.Contains(skill.Name) && selectedClassFeatureSkillProficiencies.Count >= ClassFeatureSkillProficiencyChoiceCount)"
+                                               @onchange="args => ToggleClassFeatureChoice(selectedClassFeatureSkillProficiencies, skill.Name, ClassFeatureSkillProficiencyChoiceCount, args)" />
+                                        @skill.Name
+                                    </label>
+                                }
+                            </div>
+                        }
+
+                        @if (ClassFeatureToolProficiencyChoiceCount > 0)
+                        {
+                            <p class="muted compact-hint">Select @ClassFeatureToolProficiencyChoiceCount tool proficiency/proficiencies.</p>
+                            <div class="level-up-choice-grid">
+                                @foreach (var tool in EligibleClassFeatureToolProficiencyChoices)
+                                {
+                                    <label class="toggle">
+                                        <input type="checkbox"
+                                               checked="@selectedClassFeatureToolProficiencies.Contains(tool.Name)"
+                                               disabled="@(!selectedClassFeatureToolProficiencies.Contains(tool.Name) && selectedClassFeatureToolProficiencies.Count >= ClassFeatureToolProficiencyChoiceCount)"
+                                               @onchange="args => ToggleClassFeatureChoice(selectedClassFeatureToolProficiencies, tool.Name, ClassFeatureToolProficiencyChoiceCount, args)" />
+                                        @tool.Name
+                                    </label>
+                                }
+                            </div>
+                        }
+
+                        @if (ClassFeatureLanguageProficiencyChoiceCount > 0)
+                        {
+                            <p class="muted compact-hint">Select @ClassFeatureLanguageProficiencyChoiceCount language(s).</p>
+                            <div class="level-up-choice-grid">
+                                @foreach (var language in EligibleClassFeatureLanguageProficiencyChoices)
+                                {
+                                    <label class="toggle">
+                                        <input type="checkbox"
+                                               checked="@selectedClassFeatureLanguageProficiencies.Contains(language.Name)"
+                                               disabled="@(!selectedClassFeatureLanguageProficiencies.Contains(language.Name) && selectedClassFeatureLanguageProficiencies.Count >= ClassFeatureLanguageProficiencyChoiceCount)"
+                                               @onchange="args => ToggleClassFeatureChoice(selectedClassFeatureLanguageProficiencies, language.Name, ClassFeatureLanguageProficiencyChoiceCount, args)" />
+                                        @language.Name
+                                    </label>
+                                }
+                            </div>
+                        }
+
+                        @if (ClassFeatureGrantsHalfProficiency)
+                        {
+                            <p class="muted compact-hint">Half-Proficiency will be applied to skills without proficiency or expertise.</p>
+                        }
+                    </section>
+                }
             </section>
 
             <section class="creator-step-screen @(IsStep("Feats") ? "" : "hidden")">
@@ -715,6 +837,7 @@
     private List<ClassDefinition> classDefinitions = [];
     private List<ClassGroup> classGroups = [];
     private List<SubclassDefinition> subclassDefinitions = [];
+    private Dictionary<int, SubclassDefinition> addedSubclassDefinitions = [];
     private List<RaceDefinition> raceDefinitions = [];
     private List<RaceGroup> raceGroups = [];
     private List<SubraceDefinition> subraceDefinitions = [];
@@ -739,6 +862,12 @@
     private HashSet<string> selectedManualLanguageChoices = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, List<string>> selectedDefenseChoices = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, List<string>> selectedAbilityChoices = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, int> selectedClassFeatureFeatIds = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> selectedClassFeatureFightingStyles = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> selectedClassFeatureExpertiseSkills = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> selectedClassFeatureSkillProficiencies = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> selectedClassFeatureToolProficiencies = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> selectedClassFeatureLanguageProficiencies = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, int> appliedAbilityBonuses = new(StringComparer.OrdinalIgnoreCase);
     private bool isCreating;
     private bool applyGrantedFeats = true;
@@ -777,6 +906,20 @@
     private static readonly string[] RollModes = ["Normal", "Advantage", "Disadvantage"];
     private static readonly string[] ProficiencySections = ["Saving Throws", "Skills", "Tools", "Languages"];
     private static readonly string[] AbilityScoreModes = ["Manual", "Standard Array", "Point Buy", "Roll"];
+    private static readonly string[] FightingStyleOptions =
+    [
+        "Archery",
+        "Blind Fighting",
+        "Defense",
+        "Dueling",
+        "Great Weapon Fighting",
+        "Interception",
+        "Protection",
+        "Superior Technique",
+        "Thrown Weapon Fighting",
+        "Two-Weapon Fighting",
+        "Unarmed Fighting"
+    ];
     private static readonly int[] StandardArrayScores = [15, 14, 13, 12, 10, 8];
     private static readonly AbilityCode[] AbilityCodes =
     [
@@ -825,6 +968,76 @@
     private IReadOnlyList<CharacterAbilityChoiceRequirement> RaceAbilityChoiceRequirements => BuildRaceAbilityChoiceRequirements().ToList();
     private IReadOnlyList<CharacterAbilityChoiceRequirement> BackgroundAbilityChoiceRequirements => BuildBackgroundAbilityChoiceRequirements().ToList();
     private IReadOnlyList<CharacterAbilityChoiceRequirement> FeatAbilityChoiceRequirements => BuildFeatAbilityChoiceRequirements().ToList();
+    private IReadOnlyList<CreationFeatureLevel> CreationFeatureLevels => BuildCreationFeatureLevels().ToList();
+    private IReadOnlyList<CreationFeature> CreationFeatures => CreationFeatureLevels.SelectMany(level => level.Features).ToList();
+    private IReadOnlyList<ClassFeatureFeatChoiceRow> ClassFeatureFeatChoiceRows => CreationFeatures
+        .Where(feature => IsFeatChoiceFeature(feature.Name))
+        .Select(feature => new ClassFeatureFeatChoiceRow(feature.Key, feature.ClassDefinitionId, feature.ClassName, feature.Level, feature.Name))
+        .ToList();
+    private IReadOnlyList<MappedClassFeatureChoiceRow> MappedClassFeatureChoiceRows => CreationFeatures
+        .SelectMany(feature => DescriptionRuleMapper.MapFeature(feature.Name, feature.Paragraphs).Choices
+            .Select((choice, choiceIndex) => new MappedClassFeatureChoiceRow($"{feature.Key}:choice:{choiceIndex}", feature.ClassDefinitionId, feature.ClassName, feature.Level, feature.Name, choice)))
+        .ToList();
+    private IReadOnlyList<MappedRuleChoice> EffectiveClassFeatureMappedChoices => MappedClassFeatureChoiceRows
+        .Select(row => row.Choice)
+        .Where(choice => choice.Count > 0)
+        .ToList();
+    private IReadOnlyList<FeatDefinition> SelectedClassFeatureFeatDefinitions => selectedClassFeatureFeatIds.Values
+        .Distinct()
+        .Select(id => featDefinitions.FirstOrDefault(definition => definition.Id == id))
+        .Where(definition => definition is not null)
+        .Select(definition => definition!)
+        .ToList();
+    private IReadOnlyList<CharacterAbilityChoiceRequirement> ClassFeatureAbilityChoiceRequirements => SelectedClassFeatureFeatDefinitions
+        .SelectMany(feat => CharacterAbilityChoiceService.BuildRequirements(feat.RawJson, $"Feat:{feat.Id}", $"Feat: {feat.Name}"))
+        .ToList();
+    private bool HasClassFeatureChoices => ClassFeatureFeatChoiceRows.Count > 0
+        || ClassFeatureFightingStyleChoiceCount > 0
+        || ClassFeatureExpertiseChoiceCount > 0
+        || ClassFeatureSkillProficiencyChoiceCount > 0
+        || ClassFeatureToolProficiencyChoiceCount > 0
+        || ClassFeatureLanguageProficiencyChoiceCount > 0
+        || ClassFeatureGrantsHalfProficiency;
+    private int ClassFeatureFightingStyleChoiceCount => CreationFeatures.Count(feature => feature.Name.Contains("Fighting Style", StringComparison.OrdinalIgnoreCase));
+    private int ClassFeatureExpertiseChoiceCount => EffectiveClassFeatureMappedChoices
+        .Where(choice => choice.ChoiceType == "SkillExpertise")
+        .Sum(choice => choice.Count);
+    private int ClassFeatureSkillProficiencyChoiceCount => EffectiveClassFeatureMappedChoices
+        .Where(choice => choice.ChoiceType == "SkillProficiency")
+        .Sum(choice => choice.Count);
+    private int ClassFeatureToolProficiencyChoiceCount => EffectiveClassFeatureMappedChoices
+        .Where(choice => choice.ChoiceType == "ToolProficiency")
+        .Sum(choice => choice.Count);
+    private int ClassFeatureLanguageProficiencyChoiceCount => EffectiveClassFeatureMappedChoices
+        .Where(choice => choice.ChoiceType == "LanguageProficiency")
+        .Sum(choice => choice.Count);
+    private bool ClassFeatureGrantsHalfProficiency => CreationFeatures
+        .Select(feature => DescriptionRuleMapper.MapFeature(feature.Name, feature.Paragraphs))
+        .SelectMany(mapping => mapping.Effects)
+        .Any(effect => effect.EffectType == "SkillHalfProficiency");
+    private bool ClassFeatureChoicesAreComplete => ClassFeatureFeatChoiceRows.All(row => selectedClassFeatureFeatIds.ContainsKey(row.Key))
+        && AbilityChoicesAreComplete(ClassFeatureAbilityChoiceRequirements)
+        && (ClassFeatureFightingStyleChoiceCount == 0 || selectedClassFeatureFightingStyles.Count == ClassFeatureFightingStyleChoiceCount)
+        && (ClassFeatureExpertiseChoiceCount == 0 || selectedClassFeatureExpertiseSkills.Count == ClassFeatureExpertiseChoiceCount)
+        && (ClassFeatureSkillProficiencyChoiceCount == 0 || selectedClassFeatureSkillProficiencies.Count == ClassFeatureSkillProficiencyChoiceCount)
+        && (ClassFeatureToolProficiencyChoiceCount == 0 || selectedClassFeatureToolProficiencies.Count == ClassFeatureToolProficiencyChoiceCount)
+        && (ClassFeatureLanguageProficiencyChoiceCount == 0 || selectedClassFeatureLanguageProficiencies.Count == ClassFeatureLanguageProficiencyChoiceCount);
+    private IReadOnlyList<CharacterSkill> EligibleClassFeatureExpertiseSkills => skills
+        .Where(skill => SkillCanGainExpertise(skill))
+        .OrderBy(skill => skill.Name)
+        .ToList();
+    private IReadOnlyList<CharacterSkill> EligibleClassFeatureSkillProficiencyChoices => skills
+        .Where(skill => !skill.IsProficient && skill.ProficiencyLevel is not "Proficient" and not "Expertise")
+        .OrderBy(skill => skill.Name)
+        .ToList();
+    private IReadOnlyList<CharacterToolProficiency> EligibleClassFeatureToolProficiencyChoices => toolProficiencies
+        .Where(tool => !tool.IsProficient)
+        .OrderBy(tool => tool.Name)
+        .ToList();
+    private IReadOnlyList<CharacterLanguageProficiency> EligibleClassFeatureLanguageProficiencyChoices => languageProficiencies
+        .Where(language => !language.IsProficient)
+        .OrderBy(language => language.Name)
+        .ToList();
     private int SkillToolChoiceLimit => optionChoiceHints
         .Where(choice => string.Equals(choice.Category, "SkillTools", StringComparison.OrdinalIgnoreCase))
         .Sum(choice => choice.Count);
@@ -1347,6 +1560,10 @@
             SubclassSource = subclassDefinition?.Source ?? "",
             Level = selectedClassLevel
         });
+        if (subclassDefinition is not null)
+        {
+            addedSubclassDefinitions[subclassDefinition.Id] = subclassDefinition;
+        }
 
         primaryClassDefinitionId ??= classDefinition.Id;
 
@@ -1358,17 +1575,24 @@
         selectedClassLevel = 1;
         PruneDefenseChoices();
         PruneAbilityChoices();
+        PruneClassFeatureChoices();
         await RecomputeOptionEffectsAsync();
     }
 
     private async Task RemoveClass(CharacterClass characterClass)
     {
         newClasses.Remove(characterClass);
+        if (characterClass.SubclassDefinitionId is not null
+            && newClasses.All(existing => existing.SubclassDefinitionId != characterClass.SubclassDefinitionId))
+        {
+            addedSubclassDefinitions.Remove(characterClass.SubclassDefinitionId.Value);
+        }
         if (primaryClassDefinitionId == characterClass.ClassDefinitionId)
         {
             primaryClassDefinitionId = newClasses.FirstOrDefault()?.ClassDefinitionId;
         }
         PruneDefenseChoices();
+        PruneClassFeatureChoices();
         PruneAbilityChoices();
         await RecomputeOptionEffectsAsync();
     }
@@ -1431,11 +1655,24 @@
             return;
         }
 
+        if (HasClassFeatureChoices && !ClassFeatureChoicesAreComplete)
+        {
+            currentStep = "Classes";
+            detailKind = "Class";
+            errorMessage = "Please complete the class feature choices for the selected starting levels.";
+            return;
+        }
+
         try
         {
             isCreating = true;
             await RecomputeOptionEffectsAsync();
             var character = await Database.AddCharacterAsync(BuildDraftCharacter());
+            var grantedEffects = BuildClassFeatureGrantedEffects(character.Id).ToList();
+            if (grantedEffects.Count > 0)
+            {
+                await Database.AddCharacterGrantedEffectsAsync(character.Id, grantedEffects);
+            }
 
             Navigation.NavigateTo($"characters/{character.Id}");
         }
@@ -1480,6 +1717,137 @@
         {
             selectedProficiencySection = section;
         }
+    }
+
+    private string GetClassFeatureFeatChoice(string key)
+    {
+        return selectedClassFeatureFeatIds.TryGetValue(key, out var featDefinitionId)
+            ? featDefinitionId.ToString()
+            : "";
+    }
+
+    private void SetClassFeatureFeatChoice(string key, string? value)
+    {
+        if (!int.TryParse(value, out var featDefinitionId)
+            || featDefinitions.All(definition => definition.Id != featDefinitionId))
+        {
+            selectedClassFeatureFeatIds.Remove(key);
+        }
+        else
+        {
+            selectedClassFeatureFeatIds[key] = featDefinitionId;
+        }
+
+        PruneDefenseChoices();
+        PruneAbilityChoices();
+    }
+
+    private IReadOnlyList<FeatDefinition> AvailableClassFeatureFeatDefinitions(string currentChoiceKey)
+    {
+        var selectedElsewhere = selectedClassFeatureFeatIds
+            .Where(pair => !string.Equals(pair.Key, currentChoiceKey, StringComparison.OrdinalIgnoreCase))
+            .Select(pair => pair.Value)
+            .Concat(newFeats.Select(feat => feat.FeatDefinitionId))
+            .ToHashSet();
+
+        return featDefinitions
+            .Where(definition => string.Equals(definition.Name, "Ability Score Improvement", StringComparison.OrdinalIgnoreCase)
+                || !selectedElsewhere.Contains(definition.Id))
+            .OrderBy(definition => definition.Name)
+            .ThenBy(definition => definition.Source)
+            .ToList();
+    }
+
+    private void ToggleClassFeatureChoice(HashSet<string> selected, string value, int limit, ChangeEventArgs args)
+    {
+        if (args.Value is bool isChecked && isChecked)
+        {
+            if (selected.Count < limit)
+            {
+                selected.Add(value);
+            }
+            return;
+        }
+
+        selected.Remove(value);
+    }
+
+    private bool AbilityChoicesAreComplete(IReadOnlyList<CharacterAbilityChoiceRequirement> requirements)
+    {
+        var activeRequirements = CharacterAbilityChoiceService.GetActiveRequirements(requirements, selectedAbilityChoices);
+        return activeRequirements.All(requirement =>
+            selectedAbilityChoices.TryGetValue(requirement.Key, out var values)
+            && values.Where(value => requirement.Options.Contains(value, StringComparer.OrdinalIgnoreCase)).Take(requirement.Count).Count() == requirement.Count);
+    }
+
+    private IEnumerable<CharacterGrantedEffect> BuildClassFeatureGrantedEffects(int characterId)
+    {
+        var source = GetClassFeatureEffectSource();
+        if (source is null)
+        {
+            yield break;
+        }
+
+        foreach (var fightingStyle in selectedClassFeatureFightingStyles)
+        {
+            yield return BuildClassFeatureGrantedEffect(characterId, source, "FightingStyle", fightingStyle, source.ClassSource, "Chosen during character creation.");
+        }
+
+        foreach (var skillName in selectedClassFeatureExpertiseSkills)
+        {
+            yield return BuildClassFeatureGrantedEffect(characterId, source, "SkillExpertise", skillName, "Expertise", "Chosen during character creation.");
+        }
+
+        foreach (var skillName in selectedClassFeatureSkillProficiencies)
+        {
+            yield return BuildClassFeatureGrantedEffect(characterId, source, "SkillProficiency", skillName, "Proficient", "Chosen during character creation.");
+        }
+
+        foreach (var toolName in selectedClassFeatureToolProficiencies)
+        {
+            yield return BuildClassFeatureGrantedEffect(characterId, source, "ToolProficiency", toolName, "Proficient", "Chosen during character creation.");
+        }
+
+        foreach (var languageName in selectedClassFeatureLanguageProficiencies)
+        {
+            yield return BuildClassFeatureGrantedEffect(characterId, source, "LanguageProficiency", languageName, "Proficient", "Chosen during character creation.");
+        }
+
+        if (ClassFeatureGrantsHalfProficiency)
+        {
+            yield return BuildClassFeatureGrantedEffect(characterId, source, "SkillHalfProficiency", "AllSkills", "Half", "Chosen during character creation.");
+        }
+    }
+
+    private ClassFeatureEffectSource? GetClassFeatureEffectSource()
+    {
+        var sourceClass = newClasses
+            .OrderByDescending(characterClass => characterClass.Level)
+            .FirstOrDefault(characterClass => characterClass.ClassDefinitionId > 0);
+        return sourceClass is null
+            ? null
+            : new ClassFeatureEffectSource(sourceClass.ClassDefinitionId, sourceClass.Level, sourceClass.ClassSource);
+    }
+
+    private static CharacterGrantedEffect BuildClassFeatureGrantedEffect(
+        int characterId,
+        ClassFeatureEffectSource source,
+        string effectType,
+        string targetKey,
+        string value,
+        string label)
+    {
+        return new CharacterGrantedEffect
+        {
+            CharacterId = characterId,
+            SourceType = "Class",
+            SourceDefinitionId = source.ClassDefinitionId,
+            SourceLevel = source.SourceLevel,
+            EffectType = effectType,
+            TargetKey = targetKey,
+            Value = value,
+            Label = label
+        };
     }
 
     private string BuildProficiencySectionSummary(string section)
@@ -1871,7 +2239,7 @@
             TemporaryHitPoints = 0,
             ConditionsJson = "[]",
             Classes = newClasses.ToList(),
-            Feats = newFeats.ToList(),
+            Feats = BuildStoredFeats(),
             SavingThrows = BuildStoredSavingThrows(),
             Skills = BuildStoredSkills(),
             ToolProficiencies = BuildStoredToolProficiencies(),
@@ -1892,6 +2260,20 @@
                 RollMode = savingThrow.RollMode,
                 Notes = savingThrow.Notes
             })
+            .ToList();
+    }
+
+    private List<CharacterFeat> BuildStoredFeats()
+    {
+        return newFeats
+            .Concat(SelectedClassFeatureFeatDefinitions.Select(feat => new CharacterFeat
+            {
+                FeatDefinitionId = feat.Id,
+                FeatName = feat.Name,
+                FeatSource = feat.Source
+            }))
+            .GroupBy(feat => feat.FeatDefinitionId)
+            .Select(group => group.First())
             .ToList();
     }
 
@@ -2169,7 +2551,7 @@
 
     private IEnumerable<CharacterDefenseChoiceRequirement> BuildFeatDefenseChoiceRequirements()
     {
-        foreach (var characterFeat in newFeats)
+        foreach (var characterFeat in BuildStoredFeats())
         {
             var feat = featDefinitions.FirstOrDefault(definition => definition.Id == characterFeat.FeatDefinitionId);
             if (feat is null)
@@ -2218,7 +2600,7 @@
 
     private IEnumerable<CharacterAbilityChoiceRequirement> BuildFeatAbilityChoiceRequirements()
     {
-        foreach (var characterFeat in newFeats)
+        foreach (var characterFeat in BuildStoredFeats())
         {
             var feat = featDefinitions.FirstOrDefault(definition => definition.Id == characterFeat.FeatDefinitionId);
             if (feat is null)
@@ -2252,6 +2634,34 @@
         foreach (var key in selectedAbilityChoices.Keys.Where(key => !validKeys.Contains(key)).ToList())
         {
             selectedAbilityChoices.Remove(key);
+        }
+    }
+
+    private void PruneClassFeatureChoices()
+    {
+        var featChoiceKeys = ClassFeatureFeatChoiceRows.Select(row => row.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in selectedClassFeatureFeatIds.Keys.Where(key => !featChoiceKeys.Contains(key)).ToList())
+        {
+            selectedClassFeatureFeatIds.Remove(key);
+        }
+
+        TrimChoiceSet(selectedClassFeatureFightingStyles, ClassFeatureFightingStyleChoiceCount);
+        TrimChoiceSet(selectedClassFeatureExpertiseSkills, ClassFeatureExpertiseChoiceCount);
+        TrimChoiceSet(selectedClassFeatureSkillProficiencies, ClassFeatureSkillProficiencyChoiceCount);
+        TrimChoiceSet(selectedClassFeatureToolProficiencies, ClassFeatureToolProficiencyChoiceCount);
+        TrimChoiceSet(selectedClassFeatureLanguageProficiencies, ClassFeatureLanguageProficiencyChoiceCount);
+    }
+
+    private static void TrimChoiceSet(HashSet<string> selected, int limit)
+    {
+        if (selected.Count <= limit)
+        {
+            return;
+        }
+
+        foreach (var value in selected.Skip(limit).ToList())
+        {
+            selected.Remove(value);
         }
     }
 
@@ -2310,6 +2720,55 @@
             BuildSections(feat.RawJson).ToList(),
             [],
             []);
+    }
+
+    private IEnumerable<CreationFeatureLevel> BuildCreationFeatureLevels()
+    {
+        foreach (var characterClass in newClasses.Where(characterClass => characterClass.ClassDefinitionId > 0))
+        {
+            var classDefinition = classDefinitions.FirstOrDefault(definition => definition.Id == characterClass.ClassDefinitionId);
+            if (classDefinition is null)
+            {
+                continue;
+            }
+
+            var featureLevels = BuildFeatureLevelGroups(classDefinition.RawJson, "classFeatures")
+                .Where(level => level.Level <= characterClass.Level)
+                .ToList();
+
+            var subclassDefinition = characterClass.SubclassDefinitionId is null
+                ? null
+                : addedSubclassDefinitions.GetValueOrDefault(characterClass.SubclassDefinitionId.Value);
+            if (subclassDefinition is null && !string.IsNullOrWhiteSpace(characterClass.SubclassName))
+            {
+                subclassDefinition = subclassDefinitions.FirstOrDefault(definition =>
+                    string.Equals(definition.Name, characterClass.SubclassName, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(definition.Source, characterClass.SubclassSource, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (subclassDefinition is not null)
+            {
+                var subclassLevels = BuildMappedSubclassFeatureLevels(classDefinition.RawJson, subclassDefinition.RawJson)
+                    .Where(level => level.Level <= characterClass.Level)
+                    .ToList();
+                featureLevels = MergeFeatureLevels(featureLevels, subclassLevels);
+            }
+
+            foreach (var level in featureLevels)
+            {
+                yield return new CreationFeatureLevel(
+                    characterClass.ClassDefinitionId,
+                    characterClass.ClassName,
+                    level.Level,
+                    level.Features.Select(feature => new CreationFeature(
+                        $"{characterClass.ClassDefinitionId}:{level.Level}:{feature.Key}",
+                        characterClass.ClassDefinitionId,
+                        characterClass.ClassName,
+                        level.Level,
+                        feature.Name,
+                        feature.Paragraphs)).ToList());
+            }
+        }
     }
 
     private static OptionDetail BuildClassDetail(ClassDefinition classDefinition, SubclassDefinition? subclassDefinition)
@@ -2420,6 +2879,21 @@
                     .OrderBy(feature => feature.Name)
                     .ToList()))
             .ToList();
+    }
+
+    private static bool IsFeatChoiceFeature(string featureName)
+    {
+        return featureName.Contains("Ability Score Improvement", StringComparison.OrdinalIgnoreCase)
+            || featureName.Contains("Epic Boon", StringComparison.OrdinalIgnoreCase)
+            || featureName
+                .Split([' ', '-', ':', ';', ',', '.', '(', ')', '[', ']'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Any(part => string.Equals(part, "Feat", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool SkillCanGainExpertise(CharacterSkill skill)
+    {
+        return skill.ProficiencyLevel != "Expertise"
+            && (skill.IsProficient || skill.ProficiencyLevel == "Proficient");
     }
 
     private static IEnumerable<int> BuildSubclassGrantLevels(string classRawJson)
@@ -2965,4 +3439,9 @@
     private sealed record OptionDetailProgressionRow(IReadOnlyList<string> Values);
     private sealed record CreationStep(string Key, string Label, string Number);
     private sealed record AbilityCode(string Code, string Label);
+    private sealed record CreationFeatureLevel(int ClassDefinitionId, string ClassName, int Level, IReadOnlyList<CreationFeature> Features);
+    private sealed record CreationFeature(string Key, int ClassDefinitionId, string ClassName, int Level, string Name, IReadOnlyList<string> Paragraphs);
+    private sealed record ClassFeatureFeatChoiceRow(string Key, int ClassDefinitionId, string ClassName, int SourceLevel, string FeatureName);
+    private sealed record MappedClassFeatureChoiceRow(string Key, int ClassDefinitionId, string ClassName, int SourceLevel, string FeatureName, MappedRuleChoice Choice);
+    private sealed record ClassFeatureEffectSource(int ClassDefinitionId, int SourceLevel, string ClassSource);
 }
