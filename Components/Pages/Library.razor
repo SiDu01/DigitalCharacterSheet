@@ -1,6 +1,9 @@
 @page "/library"
+@page "/library/{EntryId:int}"
 @using System.Text.Json
 @inject AppDatabase Database
+@inject NavigationManager Navigation
+@inject RecentActivityService RecentActivity
 
 <PageTitle>Library</PageTitle>
 
@@ -96,6 +99,11 @@
                                     }
                                 </div>
                             </div>
+                            <button class="icon-button bookmark-button @(IsSelectedEntryBookmarked ? "active" : "")"
+                                    title="Toggle bookmark"
+                                    @onclick="ToggleSelectedBookmark">
+                                @(IsSelectedEntryBookmarked ? "★" : "☆")
+                            </button>
                         </header>
 
                         @if (selectedGroup?.Versions.Count > 1)
@@ -112,39 +120,62 @@
                             </div>
                         }
 
-                        @if (RelatedEntries.Count > 0)
+                        @if (RelatedGroups.Count > 0)
                         {
                             <section class="detail-section">
                                 <h2>@RelatedTitle</h2>
                                 <div class="source-switcher">
-                                    @foreach (var related in RelatedEntries)
+                                    @foreach (var related in RelatedGroups)
                                     {
                                         <button type="button"
-                                                class="source-version @(activeRelatedEntryIds.Contains(related.Id) ? "active" : "")"
-                                                @onclick="() => ToggleRelatedEntry(related)">
-                                            @BuildRelatedLabel(related)
+                                                class="source-version @(activeRelatedLabels.Contains(related.Label) ? "active" : "")"
+                                                @onclick="() => ToggleRelatedGroup(related)">
+                                            @related.Label
                                         </button>
                                     }
                                 </div>
+                                @foreach (var group in ActiveRelatedGroups.Where(group => group.Versions.Count > 1))
+                                {
+                                    <div class="source-switcher">
+                                        <span class="source-badge">@group.Label</span>
+                                        @foreach (var version in group.Versions)
+                                        {
+                                            <button type="button"
+                                                    class="source-version @(version.Id == ResolveRelatedEntry(group).Id ? "active" : "")"
+                                                    @onclick="() => SelectRelatedVersion(group, version)">
+                                                @version.Source
+                                            </button>
+                                        }
+                                    </div>
+                                }
                             </section>
                         }
 
                         @if (IsClassEntry(selectedEntry))
                         {
-                            @ClassFeatureSections(selectedEntry, "Class Features")
-                            @foreach (var related in ActiveRelatedEntries)
-                            {
-                                @ClassFeatureSections(related, BuildRelatedLabel(related))
-                            }
+                            @ClassFeatureSections(selectedEntry, ActiveRelatedEntries)
                         }
                         else
                         {
                             @EntryParagraphs(selectedEntry)
-                            @foreach (var related in ActiveRelatedEntries)
+                            @foreach (var group in ActiveRelatedGroups)
                             {
                                 <section class="detail-section">
-                                    <h2>@BuildRelatedLabel(related)</h2>
-                                    @EntryParagraphs(related)
+                                    <h2>@group.Label</h2>
+                                    @if (group.Versions.Count > 1)
+                                    {
+                                        <div class="source-switcher">
+                                            @foreach (var version in group.Versions)
+                                            {
+                                                <button type="button"
+                                                        class="source-version @(version.Id == ResolveRelatedEntry(group).Id ? "active" : "")"
+                                                        @onclick="() => SelectRelatedVersion(group, version)">
+                                                    @version.Source
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                    @EntryParagraphs(ResolveRelatedEntry(group))
                                 </section>
                             }
                         }
@@ -152,10 +183,37 @@
                 }
             </aside>
         </section>
+
+        <section class="home-recent-grid library-activity-grid">
+            <section class="home-panel">
+                <header class="settings-panel-header">
+                    <div>
+                        <p class="eyebrow">Bookmarks</p>
+                        <h2>@selectedCategory</h2>
+                    </div>
+                </header>
+                @ActivityList(CategoryBookmarks, true)
+            </section>
+            <section class="home-panel">
+                <header class="settings-panel-header">
+                    <div>
+                        <p class="eyebrow">Recently Viewed</p>
+                        <h2>@selectedCategory</h2>
+                    </div>
+                    @if (CategoryRecentEntries.Count > 0)
+                    {
+                        <button type="button" class="text-button no-margin" @onclick="ClearCategoryRecentEntries">Clear</button>
+                    }
+                </header>
+                @ActivityList(CategoryRecentEntries, false)
+            </section>
+        </section>
     }
 </section>
 
 @code {
+    [Parameter] public int? EntryId { get; set; }
+
     private List<WikiEntry> entries = [];
     private WikiEntryGroup? selectedGroup;
     private WikiEntry? selectedEntry;
@@ -163,7 +221,9 @@
     private string loadError = "";
     private string searchText = "";
     private string selectedCategory = "";
-    private HashSet<int> activeRelatedEntryIds = [];
+    private int? appliedEntryId;
+    private HashSet<string> activeRelatedLabels = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, int> selectedRelatedEntryIds = new(StringComparer.OrdinalIgnoreCase);
 
     private string VisibleCountText => string.IsNullOrWhiteSpace(selectedCategory)
         ? $"{CategoryTiles.Count} categories"
@@ -178,17 +238,34 @@
 
     private IReadOnlyList<WikiEntryGroup> FilteredGroups => GroupEntries(entries.Where(MatchesFilter).Where(IsPrimaryListEntry)).ToList();
 
-    private IReadOnlyList<WikiEntry> RelatedEntries => selectedEntry is null
+    private IReadOnlyList<RelatedEntryGroup> RelatedGroups => selectedEntry is null
         ? []
         : entries
             .Where(entry => IsRelatedEntryFor(selectedEntry, entry))
-            .OrderBy(entry => entry.Name)
-            .ThenBy(entry => entry.Source)
+            .GroupBy(BuildRelatedLabel, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new RelatedEntryGroup(
+                group.Key,
+                group.OrderBy(entry => entry.Source).ThenBy(entry => entry.Name).ToList()))
+            .OrderBy(group => group.Label)
             .ToList();
 
-    private IReadOnlyList<WikiEntry> ActiveRelatedEntries => RelatedEntries
-        .Where(entry => activeRelatedEntryIds.Contains(entry.Id))
+    private IReadOnlyList<RelatedEntryGroup> ActiveRelatedGroups => RelatedGroups
+        .Where(group => activeRelatedLabels.Contains(group.Label))
         .ToList();
+
+    private IReadOnlyList<WikiEntry> ActiveRelatedEntries => ActiveRelatedGroups
+        .Select(ResolveRelatedEntry)
+        .ToList();
+
+    private bool IsSelectedEntryBookmarked => selectedEntry is not null && RecentActivity.IsBookmarked(BuildActivityType(selectedEntry.Category), selectedEntry.Id);
+
+    private IReadOnlyList<RecentActivityEntry> CategoryBookmarks => string.IsNullOrWhiteSpace(selectedCategory)
+        ? []
+        : RecentActivity.GetBookmarks(BuildActivityType(selectedCategory), 8);
+
+    private IReadOnlyList<RecentActivityEntry> CategoryRecentEntries => string.IsNullOrWhiteSpace(selectedCategory)
+        ? []
+        : RecentActivity.GetRecentEntries(BuildActivityType(selectedCategory), 8);
 
     private string RelatedTitle => selectedEntry?.Category switch
     {
@@ -202,6 +279,7 @@
         try
         {
             entries = (await Database.GetWikiEntriesAsync()).ToList();
+            SelectInitialEntry();
         }
         catch (Exception ex)
         {
@@ -213,12 +291,22 @@
         }
     }
 
+    protected override void OnParametersSet()
+    {
+        if (!isLoading && EntryId != appliedEntryId)
+        {
+            SelectInitialEntry();
+        }
+    }
+
     private void ShowCategories()
     {
         selectedCategory = "";
         selectedGroup = null;
         selectedEntry = null;
-        activeRelatedEntryIds.Clear();
+        activeRelatedLabels.Clear();
+        selectedRelatedEntryIds.Clear();
+        Navigation.NavigateTo("library");
     }
 
     private void OpenCategory(string category)
@@ -227,7 +315,9 @@
         searchText = "";
         selectedGroup = FilteredGroups.FirstOrDefault();
         selectedEntry = selectedGroup?.Primary;
-        activeRelatedEntryIds.Clear();
+        activeRelatedLabels.Clear();
+        selectedRelatedEntryIds.Clear();
+        TrackSelectedEntry();
     }
 
     private bool MatchesFilter(WikiEntry entry)
@@ -271,21 +361,117 @@
     {
         selectedGroup = group;
         selectedEntry = group.ResolveVersion(selectedEntry);
-        activeRelatedEntryIds.RemoveWhere(id => RelatedEntries.All(entry => entry.Id != id));
+        activeRelatedLabels.RemoveWhere(label => RelatedGroups.All(group => !string.Equals(group.Label, label, StringComparison.OrdinalIgnoreCase)));
+        selectedRelatedEntryIds = selectedRelatedEntryIds
+            .Where(pair => RelatedGroups.Any(group => string.Equals(group.Label, pair.Key, StringComparison.OrdinalIgnoreCase)
+                && group.Versions.Any(entry => entry.Id == pair.Value)))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+        TrackSelectedEntry();
+        Navigation.NavigateTo($"library/{selectedEntry.Id}", replace: true);
     }
 
     private void SelectVersion(WikiEntry entry)
     {
         selectedEntry = entry;
-        activeRelatedEntryIds.Clear();
+        activeRelatedLabels.Clear();
+        selectedRelatedEntryIds.Clear();
+        TrackSelectedEntry();
+        Navigation.NavigateTo($"library/{entry.Id}", replace: true);
     }
 
-    private void ToggleRelatedEntry(WikiEntry entry)
+    private void ToggleRelatedGroup(RelatedEntryGroup group)
     {
-        if (!activeRelatedEntryIds.Add(entry.Id))
+        if (!activeRelatedLabels.Add(group.Label))
         {
-            activeRelatedEntryIds.Remove(entry.Id);
+            activeRelatedLabels.Remove(group.Label);
+            selectedRelatedEntryIds.Remove(group.Label);
+            return;
         }
+
+        selectedRelatedEntryIds[group.Label] = group.Primary.Id;
+    }
+
+    private void SelectRelatedVersion(RelatedEntryGroup group, WikiEntry entry)
+    {
+        selectedRelatedEntryIds[group.Label] = entry.Id;
+    }
+
+    private WikiEntry ResolveRelatedEntry(RelatedEntryGroup group)
+    {
+        return selectedRelatedEntryIds.TryGetValue(group.Label, out var entryId)
+            ? group.Versions.FirstOrDefault(entry => entry.Id == entryId) ?? group.Primary
+            : group.Primary;
+    }
+
+    private void SelectInitialEntry()
+    {
+        if (EntryId is null)
+        {
+            return;
+        }
+
+        var entry = entries.FirstOrDefault(entry => entry.Id == EntryId.Value);
+        if (entry is null)
+        {
+            return;
+        }
+
+        appliedEntryId = EntryId;
+        selectedCategory = entry.Category;
+        selectedGroup = GroupEntries(entries.Where(candidate => string.Equals(candidate.Category, entry.Category, StringComparison.OrdinalIgnoreCase)
+            && IsPrimaryListEntry(candidate))).FirstOrDefault(group => group.Versions.Any(version => version.Id == entry.Id));
+        selectedEntry = entry;
+        TrackSelectedEntry();
+    }
+
+    private void TrackSelectedEntry()
+    {
+        if (selectedEntry is null)
+        {
+            return;
+        }
+
+        RecentActivity.Track(
+            BuildActivityType(selectedEntry.Category),
+            selectedEntry.Id,
+            selectedEntry.Name,
+            $"{selectedEntry.Type} - {selectedEntry.Source}",
+            $"library/{selectedEntry.Id}");
+    }
+
+    private void ToggleSelectedBookmark()
+    {
+        if (selectedEntry is null)
+        {
+            return;
+        }
+
+        RecentActivity.ToggleBookmark(
+            BuildActivityType(selectedEntry.Category),
+            selectedEntry.Id,
+            selectedEntry.Name,
+            $"{selectedEntry.Type} - {selectedEntry.Source}",
+            $"library/{selectedEntry.Id}");
+    }
+
+    private void ToggleActivityBookmark(RecentActivityEntry entry)
+    {
+        RecentActivity.ToggleBookmark(entry.EntryType, entry.EntityId, entry.Title, entry.Subtitle, entry.Route);
+    }
+
+    private void OpenActivityEntry(RecentActivityEntry entry)
+    {
+        Navigation.NavigateTo(entry.Route);
+    }
+
+    private void ClearCategoryRecentEntries()
+    {
+        RecentActivity.ClearRecentEntries(BuildActivityType(selectedCategory));
+    }
+
+    private static string BuildActivityType(string category)
+    {
+        return $"Wiki:{category}";
     }
 
     private static bool IsRelatedEntryFor(WikiEntry parent, WikiEntry candidate)
@@ -331,32 +517,179 @@
 
     private static IReadOnlyList<FeatureLevel> BuildFeatureLevels(WikiEntry entry)
     {
+        return BuildFeatureLevels(entry, "classFeatures");
+    }
+
+    private static IReadOnlyList<FeatureLevel> BuildMergedClassFeatureLevels(WikiEntry classEntry, IReadOnlyList<WikiEntry> subclassEntries)
+    {
+        var classFeatures = BuildFeatureLevels(classEntry, "classFeatures");
+        var subclassFeatures = subclassEntries.SelectMany(subclass => BuildMappedSubclassFeatureLevels(classEntry.RawJson, subclass)).ToList();
+
+        return classFeatures.Concat(subclassFeatures)
+            .GroupBy(level => level.Level)
+            .OrderBy(group => group.Key)
+            .Select(group => new FeatureLevel(
+                group.Key,
+                group.SelectMany(level => level.Features)
+                    .GroupBy(feature => feature.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .OrderBy(feature => feature.Name)
+                    .ToList()))
+            .ToList();
+    }
+
+    private static IReadOnlyList<FeatureLevel> BuildMappedSubclassFeatureLevels(string classRawJson, WikiEntry subclassEntry)
+    {
+        var subclassLevels = BuildFeatureLevels(subclassEntry, "subclassFeatures", BuildRelatedLabel(subclassEntry));
+        var classSubclassLevels = BuildSubclassGrantLevels(classRawJson).ToList();
+        if (subclassLevels.Count == 0 || classSubclassLevels.Count == 0)
+        {
+            return subclassLevels;
+        }
+
+        return subclassLevels
+            .Select((level, index) => new FeatureLevel(
+                index < classSubclassLevels.Count ? classSubclassLevels[index] : level.Level,
+                level.Features))
+            .GroupBy(level => level.Level)
+            .OrderBy(group => group.Key)
+            .Select(group => new FeatureLevel(
+                group.Key,
+                group.SelectMany(level => level.Features)
+                    .GroupBy(feature => feature.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .OrderBy(feature => feature.Name)
+                    .ToList()))
+            .ToList();
+    }
+
+    private static IEnumerable<int> BuildSubclassGrantLevels(string classRawJson)
+    {
+        if (string.IsNullOrWhiteSpace(classRawJson))
+        {
+            yield break;
+        }
+
+        using var document = JsonDocument.Parse(classRawJson);
+        if (!document.RootElement.TryGetProperty("classFeatures", out var features) || features.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var feature in features.EnumerateArray())
+        {
+            if (feature.ValueKind != JsonValueKind.Object
+                || !feature.TryGetProperty("gainSubclassFeature", out var gainSubclassFeature)
+                || gainSubclassFeature.ValueKind != JsonValueKind.True
+                || !feature.TryGetProperty("classFeature", out var classFeature))
+            {
+                continue;
+            }
+
+            var level = ParseFeatureReferenceLevel(classFeature.GetString());
+            if (level is >= 1 and <= 20)
+            {
+                yield return level;
+            }
+        }
+    }
+
+    private static int ParseFeatureReferenceLevel(string? reference)
+    {
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return 0;
+        }
+
+        return reference
+            .Split('|', StringSplitOptions.None)
+            .Select(part => int.TryParse(part, out var parsed) ? parsed : 0)
+            .LastOrDefault(parsed => parsed is >= 1 and <= 20);
+    }
+
+    private static IReadOnlyList<FeatureLevel> BuildFeatureLevels(WikiEntry entry, string propertyName, string sourceLabel = "")
+    {
         if (string.IsNullOrWhiteSpace(entry.RawJson))
         {
             return [];
         }
 
         using var document = JsonDocument.Parse(entry.RawJson);
-        if (document.RootElement.TryGetProperty("_featureDetails", out var featureDetails)
-            && featureDetails.ValueKind == JsonValueKind.Array)
+        if (!document.RootElement.TryGetProperty(propertyName, out var features)
+            || features.ValueKind != JsonValueKind.Array)
         {
-            return featureDetails
-                .EnumerateArray()
-                .Select(ParseFeatureDetail)
-                .Where(feature => feature is not null)
-                .Select(feature => feature!)
-                .GroupBy(feature => feature.Level)
-                .OrderBy(group => group.Key)
-                .Select(group => new FeatureLevel(
-                    group.Key,
-                    group.OrderBy(feature => feature.Name).ToList()))
-                .ToList();
+            return [];
         }
 
-        return [];
+        var details = BuildFeatureDetailLookup(document.RootElement, sourceLabel);
+        return features
+            .EnumerateArray()
+            .Select(feature => ParseFeatureReference(feature, details, sourceLabel))
+            .Where(feature => feature is not null)
+            .Select(feature => feature!)
+            .GroupBy(feature => feature.Level)
+            .OrderBy(group => group.Key)
+            .Select(group => new FeatureLevel(
+                group.Key,
+                group
+                    .GroupBy(feature => feature.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .OrderBy(feature => feature.Name)
+                    .ToList()))
+            .ToList();
     }
 
-    private static FeatureEntry? ParseFeatureDetail(JsonElement element)
+    private static Dictionary<string, FeatureEntry> BuildFeatureDetailLookup(JsonElement root, string sourceLabel)
+    {
+        var details = new Dictionary<string, FeatureEntry>(StringComparer.OrdinalIgnoreCase);
+        if (!root.TryGetProperty("_featureDetails", out var featureDetails)
+            || featureDetails.ValueKind != JsonValueKind.Array)
+        {
+            return details;
+        }
+
+        foreach (var featureDetail in featureDetails.EnumerateArray())
+        {
+            var feature = ParseFeatureDetail(featureDetail, sourceLabel);
+            if (feature is not null)
+            {
+                details[feature.Key] = feature;
+            }
+        }
+
+        return details;
+    }
+
+    private static FeatureEntry? ParseFeatureReference(JsonElement element, IReadOnlyDictionary<string, FeatureEntry> details, string sourceLabel)
+    {
+        var reference = element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Object when element.TryGetProperty("classFeature", out var classFeature) => classFeature.GetString(),
+            JsonValueKind.Object when element.TryGetProperty("subclassFeature", out var subclassFeature) => subclassFeature.GetString(),
+            _ => null
+        };
+
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return null;
+        }
+
+        var parts = reference.Split('|', StringSplitOptions.None);
+        var level = ParseFeatureReferenceLevel(reference);
+        if (level == 0)
+        {
+            return null;
+        }
+
+        var name = CleanMarkup(parts[0]);
+        var key = BuildFeatureKey(name, level, sourceLabel);
+        return details.TryGetValue(key, out var detail)
+            ? detail
+            : new FeatureEntry(name, level, key, sourceLabel, []);
+    }
+
+    private static FeatureEntry? ParseFeatureDetail(JsonElement element, string sourceLabel)
     {
         var name = ReadJsonString(element, "name");
         if (string.IsNullOrWhiteSpace(name))
@@ -374,7 +707,20 @@
             ? ExtractParagraphs(entries).ToList()
             : [];
 
-        return new FeatureEntry(name, level, paragraphs);
+        return new FeatureEntry(name, level, BuildFeatureKey(name, level, sourceLabel), sourceLabel, paragraphs);
+    }
+
+    private static string BuildFeatureKey(string name, int level, string sourceLabel)
+    {
+        return $"{CleanMarkup(name).Trim()}|{level}|{sourceLabel}";
+    }
+
+    private static string CleanMarkup(string value)
+    {
+        return value
+            .Replace("{@i ", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("{@b ", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("}", "", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IEnumerable<string> ExtractParagraphs(JsonElement element)
@@ -448,8 +794,13 @@
     }
 
     private sealed record CategoryTile(string Category, int Count, string Description);
+    private sealed record RelatedEntryGroup(string Label, IReadOnlyList<WikiEntry> Versions)
+    {
+        public WikiEntry Primary => Versions.First();
+    }
+
     private sealed record FeatureLevel(int Level, IReadOnlyList<FeatureEntry> Features);
-    private sealed record FeatureEntry(string Name, int Level, IReadOnlyList<string> Paragraphs);
+    private sealed record FeatureEntry(string Name, int Level, string Key, string SourceLabel, IReadOnlyList<string> Paragraphs);
 }
 
 @code {
@@ -467,10 +818,39 @@
         }
     </section>;
 
-    private RenderFragment ClassFeatureSections(WikiEntry entry, string title) => @<section class="detail-section class-feature-section">
-        <h2>@title</h2>
+    private RenderFragment ActivityList(IReadOnlyList<RecentActivityEntry> activityEntries, bool bookmarks) => @<section class="home-recent-list">
+        @if (activityEntries.Count == 0)
+        {
+            <section class="home-empty-state">
+                <p class="eyebrow">Empty</p>
+                <h3>@(bookmarks ? "No bookmarks yet." : "No entries viewed yet.")</h3>
+            </section>
+        }
+        else
+        {
+            @foreach (var entry in activityEntries)
+            {
+                <article class="home-recent-row">
+                    <button type="button" class="home-recent-content" @onclick="() => OpenActivityEntry(entry)">
+                        <span class="source-code">@entry.EntryType.Replace("Wiki:", "", StringComparison.OrdinalIgnoreCase)</span>
+                        <strong>@entry.Title</strong>
+                        <small>@entry.Subtitle</small>
+                    </button>
+                    <button type="button"
+                            class="icon-button bookmark-button @(RecentActivity.IsBookmarked(entry.EntryType, entry.EntityId) ? "active" : "")"
+                            title="Toggle bookmark"
+                            @onclick="() => ToggleActivityBookmark(entry)">
+                        @(RecentActivity.IsBookmarked(entry.EntryType, entry.EntityId) ? "★" : "☆")
+                    </button>
+                </article>
+            }
+        }
+    </section>;
+
+    private RenderFragment ClassFeatureSections(WikiEntry entry, IReadOnlyList<WikiEntry> activeRelatedEntries) => @<section class="detail-section class-feature-section">
+        <h2>Class Features</h2>
         @{
-            var levels = BuildFeatureLevels(entry);
+            var levels = BuildMergedClassFeatureLevels(entry, activeRelatedEntries);
         }
         @if (levels.Count == 0)
         {
@@ -487,7 +867,13 @@
                             @foreach (var feature in level.Features)
                             {
                                 <details class="feature-detail-toggle">
-                                    <summary class="feature-pill">@feature.Name</summary>
+                                    <summary class="feature-pill">
+                                        @if (!string.IsNullOrWhiteSpace(feature.SourceLabel))
+                                        {
+                                            <span class="source-badge">@feature.SourceLabel</span>
+                                        }
+                                        @feature.Name
+                                    </summary>
                                     <div class="feature-detail-body">
                                         @foreach (var paragraph in feature.Paragraphs)
                                         {
