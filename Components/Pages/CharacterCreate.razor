@@ -96,24 +96,6 @@
                     </label>
                 }
 
-                @if (subraceDefinitions.Count > 0)
-                {
-                    <label class="stacked-field">
-                        <span>Race version</span>
-                        <select @bind="selectedSubraceDefinitionId" @bind:after="SelectSubrace">
-                            <option value="" disabled="@IsSubraceRequired">@(IsSubraceRequired ? "Select race version" : "No version")</option>
-                            @foreach (var subraceDefinition in subraceDefinitions)
-                            {
-                                <option value="@subraceDefinition.Id">@subraceDefinition.DisplayName</option>
-                            }
-                        </select>
-                    </label>
-                    @if (IsSubraceRequired && SelectedSubrace is null)
-                    {
-                        <p class="validation-message compact-hint">Choose a race version to apply its traits and ability bonuses.</p>
-                    }
-                }
-
             </section>
 
             <section class="creator-step-screen @(IsStep("Background") ? "" : "hidden")">
@@ -592,6 +574,24 @@
                             </button>
                         }
                     </div>
+
+                    @if (subraceDefinitions.Count > 0)
+                    {
+                        <label class="stacked-field detail-choice-field">
+                            <span>Race version</span>
+                            <select @bind="selectedSubraceDefinitionId" @bind:after="SelectSubrace">
+                                <option value="" disabled="@IsSubraceRequired">@(IsSubraceRequired ? "Select race version" : "No version")</option>
+                                @foreach (var subraceDefinition in subraceDefinitions)
+                                {
+                                    <option value="@subraceDefinition.Id">@subraceDefinition.DisplayName</option>
+                                }
+                            </select>
+                        </label>
+                        @if (IsSubraceRequired && SelectedSubrace is null)
+                        {
+                            <p class="validation-message compact-hint">Choose a race version to apply its traits and ability bonuses.</p>
+                        }
+                    }
                 }
                 else if (detailKind == "Background" && selectedBackgroundGroup is not null)
                 {

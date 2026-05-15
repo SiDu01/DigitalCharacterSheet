@@ -818,6 +818,19 @@ main {
     margin: -.35rem 0 .75rem;
 }
 
+.detail-choice-field {
+    margin: -.25rem 0 .75rem;
+}
+
+.detail-choice-field select {
+    width: 100%;
+    min-height: 2.35rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: .45rem .6rem;
+    background: #fff;
+}
+
 .creator-inline-source-panel {
     display: grid;
     gap: .35rem;
@@ -4365,6 +4378,7 @@ button.source-badge {
 [data-theme="leather"] .level-up-choice select,
 [data-theme="leather"] .proficiency-row input,
 [data-theme="leather"] .proficiency-row select,
+[data-theme="leather"] .detail-choice-field select,
 [data-theme="leather"] .class-picker input,
 [data-theme="leather"] .class-picker select,
 [data-theme="leather"] .class-source-row select {
