@@ -151,125 +151,23 @@
                     <p class="muted compact-hint">@string.Join("; ", optionEffectMessages)</p>
                 }
 
-                @if (HasClassFeatureChoices)
+                @if (ClassFeatureFightingStyleChoiceCount > 0)
                 {
                     <section class="level-up-choice creator-class-feature-choice">
                         <p class="eyebrow">Class Feature Choices</p>
-
-                        @if (ClassFeatureFeatChoiceRows.Count > 0)
-                        {
-                            @foreach (var row in ClassFeatureFeatChoiceRows)
+                        <p class="muted compact-hint">Select @ClassFeatureFightingStyleChoiceCount fighting style(s).</p>
+                        <div class="level-up-choice-grid">
+                            @foreach (var fightingStyle in FightingStyleOptions)
                             {
-                                <label class="stacked-field">
-                                    <span>@row.ClassName level @row.SourceLevel: @row.FeatureName</span>
-                                    <select value="@GetClassFeatureFeatChoice(row.Key)" @onchange="args => SetClassFeatureFeatChoice(row.Key, args.Value?.ToString())">
-                                        <option value="">Select feat</option>
-                                        @foreach (var featDefinition in AvailableClassFeatureFeatDefinitions(row.Key))
-                                        {
-                                            <option value="@featDefinition.Id">@featDefinition.DisplayName</option>
-                                        }
-                                    </select>
+                                <label class="toggle">
+                                    <input type="checkbox"
+                                           checked="@selectedClassFeatureFightingStyles.Contains(fightingStyle)"
+                                           disabled="@(!selectedClassFeatureFightingStyles.Contains(fightingStyle) && selectedClassFeatureFightingStyles.Count >= ClassFeatureFightingStyleChoiceCount)"
+                                           @onchange="args => ToggleClassFeatureChoice(selectedClassFeatureFightingStyles, fightingStyle, ClassFeatureFightingStyleChoiceCount, args)" />
+                                    @fightingStyle
                                 </label>
                             }
-                        }
-
-                        @if (ClassFeatureAbilityChoiceRequirements.Count > 0)
-                        {
-                            <AbilityChoiceList Requirements="ClassFeatureAbilityChoiceRequirements"
-                                               SelectedChoices="selectedAbilityChoices"
-                                               OnChange="SetAbilityChoice"
-                                               OnModeChange="SetAbilityChoiceMode" />
-                        }
-
-                        @if (ClassFeatureFightingStyleChoiceCount > 0)
-                        {
-                            <p class="muted compact-hint">Select @ClassFeatureFightingStyleChoiceCount fighting style(s).</p>
-                            <div class="level-up-choice-grid">
-                                @foreach (var fightingStyle in FightingStyleOptions)
-                                {
-                                    <label class="toggle">
-                                        <input type="checkbox"
-                                               checked="@selectedClassFeatureFightingStyles.Contains(fightingStyle)"
-                                               disabled="@(!selectedClassFeatureFightingStyles.Contains(fightingStyle) && selectedClassFeatureFightingStyles.Count >= ClassFeatureFightingStyleChoiceCount)"
-                                               @onchange="args => ToggleClassFeatureChoice(selectedClassFeatureFightingStyles, fightingStyle, ClassFeatureFightingStyleChoiceCount, args)" />
-                                        @fightingStyle
-                                    </label>
-                                }
-                            </div>
-                        }
-
-                        @if (ClassFeatureExpertiseChoiceCount > 0)
-                        {
-                            <p class="muted compact-hint">Select @ClassFeatureExpertiseChoiceCount proficient skill(s) for Expertise.</p>
-                            <div class="level-up-choice-grid">
-                                @foreach (var skill in EligibleClassFeatureExpertiseSkills)
-                                {
-                                    <label class="toggle">
-                                        <input type="checkbox"
-                                               checked="@selectedClassFeatureExpertiseSkills.Contains(skill.Name)"
-                                               disabled="@(!selectedClassFeatureExpertiseSkills.Contains(skill.Name) && selectedClassFeatureExpertiseSkills.Count >= ClassFeatureExpertiseChoiceCount)"
-                                               @onchange="args => ToggleClassFeatureChoice(selectedClassFeatureExpertiseSkills, skill.Name, ClassFeatureExpertiseChoiceCount, args)" />
-                                        @skill.Name
-                                    </label>
-                                }
-                            </div>
-                        }
-
-                        @if (ClassFeatureSkillProficiencyChoiceCount > 0)
-                        {
-                            <p class="muted compact-hint">Select @ClassFeatureSkillProficiencyChoiceCount skill proficiency/proficiencies.</p>
-                            <div class="level-up-choice-grid">
-                                @foreach (var skill in EligibleClassFeatureSkillProficiencyChoices)
-                                {
-                                    <label class="toggle">
-                                        <input type="checkbox"
-                                               checked="@selectedClassFeatureSkillProficiencies.Contains(skill.Name)"
-                                               disabled="@(!selectedClassFeatureSkillProficiencies.Contains(skill.Name) && selectedClassFeatureSkillProficiencies.Count >= ClassFeatureSkillProficiencyChoiceCount)"
-                                               @onchange="args => ToggleClassFeatureChoice(selectedClassFeatureSkillProficiencies, skill.Name, ClassFeatureSkillProficiencyChoiceCount, args)" />
-                                        @skill.Name
-                                    </label>
-                                }
-                            </div>
-                        }
-
-                        @if (ClassFeatureToolProficiencyChoiceCount > 0)
-                        {
-                            <p class="muted compact-hint">Select @ClassFeatureToolProficiencyChoiceCount tool proficiency/proficiencies.</p>
-                            <div class="level-up-choice-grid">
-                                @foreach (var tool in EligibleClassFeatureToolProficiencyChoices)
-                                {
-                                    <label class="toggle">
-                                        <input type="checkbox"
-                                               checked="@selectedClassFeatureToolProficiencies.Contains(tool.Name)"
-                                               disabled="@(!selectedClassFeatureToolProficiencies.Contains(tool.Name) && selectedClassFeatureToolProficiencies.Count >= ClassFeatureToolProficiencyChoiceCount)"
-                                               @onchange="args => ToggleClassFeatureChoice(selectedClassFeatureToolProficiencies, tool.Name, ClassFeatureToolProficiencyChoiceCount, args)" />
-                                        @tool.Name
-                                    </label>
-                                }
-                            </div>
-                        }
-
-                        @if (ClassFeatureLanguageProficiencyChoiceCount > 0)
-                        {
-                            <p class="muted compact-hint">Select @ClassFeatureLanguageProficiencyChoiceCount language(s).</p>
-                            <div class="level-up-choice-grid">
-                                @foreach (var language in EligibleClassFeatureLanguageProficiencyChoices)
-                                {
-                                    <label class="toggle">
-                                        <input type="checkbox"
-                                               checked="@selectedClassFeatureLanguageProficiencies.Contains(language.Name)"
-                                               disabled="@(!selectedClassFeatureLanguageProficiencies.Contains(language.Name) && selectedClassFeatureLanguageProficiencies.Count >= ClassFeatureLanguageProficiencyChoiceCount)"
-                                               @onchange="args => ToggleClassFeatureChoice(selectedClassFeatureLanguageProficiencies, language.Name, ClassFeatureLanguageProficiencyChoiceCount, args)" />
-                                        @language.Name
-                                    </label>
-                                }
-                            </div>
-                        }
-
-                        @if (ClassFeatureGrantsHalfProficiency)
-                        {
-                            <p class="muted compact-hint">Half-Proficiency will be applied to skills without proficiency or expertise.</p>
-                        }
+                        </div>
                     </section>
                 }
             </section>
@@ -324,6 +222,26 @@
                                 <button type="button" class="text-link-button" @onclick="() => ShowFeatDetails(feat)">@feat.DisplayName</button>
                                 <button type="button" class="icon-button" title="Remove feat" @onclick="() => RemoveFeat(feat)">-</button>
                             </div>
+                        }
+                    </section>
+                }
+
+                @if (ClassFeatureFeatChoiceRows.Count > 0)
+                {
+                    <section class="level-up-choice creator-class-feature-choice">
+                        <p class="eyebrow">Class Feature Feats</p>
+                        @foreach (var row in ClassFeatureFeatChoiceRows)
+                        {
+                            <label class="stacked-field">
+                                <span>@row.ClassName level @row.SourceLevel: @row.FeatureName</span>
+                                <select value="@GetClassFeatureFeatChoice(row.Key)" @onchange="args => SetClassFeatureFeatChoice(row.Key, args.Value?.ToString())">
+                                    <option value="">Select feat</option>
+                                    @foreach (var featDefinition in AvailableClassFeatureFeatDefinitions(row.Key))
+                                    {
+                                        <option value="@featDefinition.Id">@featDefinition.DisplayName</option>
+                                    }
+                                </select>
+                            </label>
                         }
                     </section>
                 }
@@ -519,10 +437,46 @@
                         <ChoiceHintList Hints="@ChoiceHintsFor("Skills")" />
                         @if (SkillChoiceLimit > 0)
                         {
-                            <div class="choice-counter @(ManualSkillChoiceCount > SkillChoiceLimit ? "invalid" : "")">
+                            <div class="choice-counter @(!ManualSkillToolChoicesAreValid ? "invalid" : "")">
                                 <span>Skill/tool choices used</span>
                                 <strong>@ManualSkillChoiceCount / @SkillChoiceLimit</strong>
                             </div>
+                        }
+                        @if (ClassFeatureExpertiseChoiceCount > 0)
+                        {
+                            <p class="muted compact-hint">Select @ClassFeatureExpertiseChoiceCount proficient skill(s) for Expertise.</p>
+                            <div class="level-up-choice-grid">
+                                @foreach (var skill in EligibleClassFeatureExpertiseSkills)
+                                {
+                                    <label class="toggle">
+                                        <input type="checkbox"
+                                               checked="@selectedClassFeatureExpertiseSkills.Contains(skill.Name)"
+                                               disabled="@(!selectedClassFeatureExpertiseSkills.Contains(skill.Name) && selectedClassFeatureExpertiseSkills.Count >= ClassFeatureExpertiseChoiceCount)"
+                                               @onchange="args => ToggleClassFeatureChoice(selectedClassFeatureExpertiseSkills, skill.Name, ClassFeatureExpertiseChoiceCount, args)" />
+                                        @skill.Name
+                                    </label>
+                                }
+                            </div>
+                        }
+                        @if (ClassFeatureSkillProficiencyChoiceCount > 0)
+                        {
+                            <p class="muted compact-hint">Select @ClassFeatureSkillProficiencyChoiceCount class feature skill proficiency/proficiencies.</p>
+                            <div class="level-up-choice-grid">
+                                @foreach (var skill in EligibleClassFeatureSkillProficiencyChoices)
+                                {
+                                    <label class="toggle">
+                                        <input type="checkbox"
+                                               checked="@selectedClassFeatureSkillProficiencies.Contains(skill.Name)"
+                                               disabled="@(!selectedClassFeatureSkillProficiencies.Contains(skill.Name) && selectedClassFeatureSkillProficiencies.Count >= ClassFeatureSkillProficiencyChoiceCount)"
+                                               @onchange="args => ToggleClassFeatureChoice(selectedClassFeatureSkillProficiencies, skill.Name, ClassFeatureSkillProficiencyChoiceCount, args)" />
+                                        @skill.Name
+                                    </label>
+                                }
+                            </div>
+                        }
+                        @if (ClassFeatureGrantsHalfProficiency)
+                        {
+                            <p class="muted compact-hint">Half-Proficiency will be applied to skills without proficiency or expertise.</p>
                         }
                         <div class="proficiency-list detail-proficiency-list">
                             @foreach (var skill in skills)
@@ -554,9 +508,25 @@
                         <ChoiceHintList Hints="@ChoiceHintsFor("Tools")" />
                         @if (ToolChoiceLimit > 0)
                         {
-                            <div class="choice-counter @(ManualToolChoiceCount > ToolChoiceLimit ? "invalid" : "")">
+                            <div class="choice-counter @(!ManualSkillToolChoicesAreValid ? "invalid" : "")">
                                 <span>Tool choices used</span>
                                 <strong>@ManualToolChoiceCount / @ToolChoiceLimit</strong>
+                            </div>
+                        }
+                        @if (ClassFeatureToolProficiencyChoiceCount > 0)
+                        {
+                            <p class="muted compact-hint">Select @ClassFeatureToolProficiencyChoiceCount class feature tool proficiency/proficiencies.</p>
+                            <div class="level-up-choice-grid">
+                                @foreach (var tool in EligibleClassFeatureToolProficiencyChoices)
+                                {
+                                    <label class="toggle">
+                                        <input type="checkbox"
+                                               checked="@selectedClassFeatureToolProficiencies.Contains(tool.Name)"
+                                               disabled="@(!selectedClassFeatureToolProficiencies.Contains(tool.Name) && selectedClassFeatureToolProficiencies.Count >= ClassFeatureToolProficiencyChoiceCount)"
+                                               @onchange="args => ToggleClassFeatureChoice(selectedClassFeatureToolProficiencies, tool.Name, ClassFeatureToolProficiencyChoiceCount, args)" />
+                                        @tool.Name
+                                    </label>
+                                }
                             </div>
                         }
                         <div class="proficiency-list detail-proficiency-list">
@@ -586,6 +556,22 @@
                             <div class="choice-counter @(ManualLanguageChoiceCount > LanguageChoiceLimit ? "invalid" : "")">
                                 <span>Language choices used</span>
                                 <strong>@ManualLanguageChoiceCount / @LanguageChoiceLimit</strong>
+                            </div>
+                        }
+                        @if (ClassFeatureLanguageProficiencyChoiceCount > 0)
+                        {
+                            <p class="muted compact-hint">Select @ClassFeatureLanguageProficiencyChoiceCount class feature language(s).</p>
+                            <div class="level-up-choice-grid">
+                                @foreach (var language in EligibleClassFeatureLanguageProficiencyChoices)
+                                {
+                                    <label class="toggle">
+                                        <input type="checkbox"
+                                               checked="@selectedClassFeatureLanguageProficiencies.Contains(language.Name)"
+                                               disabled="@(!selectedClassFeatureLanguageProficiencies.Contains(language.Name) && selectedClassFeatureLanguageProficiencies.Count >= ClassFeatureLanguageProficiencyChoiceCount)"
+                                               @onchange="args => ToggleClassFeatureChoice(selectedClassFeatureLanguageProficiencies, language.Name, ClassFeatureLanguageProficiencyChoiceCount, args)" />
+                                        @language.Name
+                                    </label>
+                                }
                             </div>
                         }
                         <div class="proficiency-list detail-proficiency-list">
@@ -621,7 +607,7 @@
                         <div><dt>Ancestry</dt><dd>@(SelectedRace?.Name ?? "Not selected")</dd></div>
                         <div><dt>Background</dt><dd>@(SelectedBackground?.Name ?? "Not selected")</dd></div>
                         <div><dt>Classes</dt><dd>@(newClasses.Count == 0 ? "Not selected" : string.Join(" / ", newClasses.Select(characterClass => characterClass.DisplayName)))</dd></div>
-                        <div><dt>Feats</dt><dd>@(newFeats.Count == 0 ? "None" : string.Join(", ", newFeats.Select(feat => feat.DisplayName)))</dd></div>
+                        <div><dt>Feats</dt><dd>@(BuildStoredFeats().Count == 0 ? "None" : string.Join(", ", BuildStoredFeats().Select(feat => feat.DisplayName)))</dd></div>
                         <div><dt>Abilities</dt><dd>STR @strength, DEX @dexterity, CON @constitution, INT @intelligence, WIS @wisdom, CHA @charisma</dd></div>
                         <div><dt>Saving Throws</dt><dd>@FormatSavingThrowSummary()</dd></div>
                         <div><dt>Skills</dt><dd>@FormatSkillSummary()</dd></div>
@@ -1041,17 +1027,20 @@
     private int SkillToolChoiceLimit => optionChoiceHints
         .Where(choice => string.Equals(choice.Category, "SkillTools", StringComparison.OrdinalIgnoreCase))
         .Sum(choice => choice.Count);
-    private int SkillChoiceLimit => optionChoiceHints
+    private int SeparateSkillChoiceLimit => optionChoiceHints
         .Where(choice => string.Equals(choice.Category, "Skills", StringComparison.OrdinalIgnoreCase))
-        .Sum(choice => choice.Count) + SkillToolChoiceLimit;
-    private int ToolChoiceLimit => optionChoiceHints
+        .Sum(choice => choice.Count);
+    private int SeparateToolChoiceLimit => optionChoiceHints
         .Where(choice => string.Equals(choice.Category, "Tools", StringComparison.OrdinalIgnoreCase))
-        .Sum(choice => choice.Count) + SkillToolChoiceLimit;
+        .Sum(choice => choice.Count);
+    private int SkillChoiceLimit => SeparateSkillChoiceLimit + SkillToolChoiceLimit;
+    private int ToolChoiceLimit => SeparateToolChoiceLimit + SkillToolChoiceLimit;
     private int LanguageChoiceLimit => optionChoiceHints
         .Where(choice => string.Equals(choice.Category, "Languages", StringComparison.OrdinalIgnoreCase))
         .Sum(choice => choice.Count);
-    private int ManualSkillChoiceCount => selectedManualSkillChoices.Count + selectedManualToolChoices.Count;
-    private int ManualToolChoiceCount => selectedManualToolChoices.Count + selectedManualSkillChoices.Count;
+    private int ManualSkillChoiceCount => selectedManualSkillChoices.Count;
+    private int ManualToolChoiceCount => selectedManualToolChoices.Count;
+    private bool ManualSkillToolChoicesAreValid => SkillToolSelectionIsValid(ManualSkillChoiceCount, ManualToolChoiceCount);
     private int ManualLanguageChoiceCount => selectedManualLanguageChoices.Count;
     private int PointBuySpent => AbilityCodes.Sum(ability => PointBuyCost(GetAbilityBaseValue(ability.Code)));
     private int PointBuyRemaining => 27 - PointBuySpent;
@@ -1657,7 +1646,7 @@
 
         if (HasClassFeatureChoices && !ClassFeatureChoicesAreComplete)
         {
-            currentStep = "Classes";
+            currentStep = GetFirstIncompleteClassFeatureStep();
             detailKind = "Class";
             errorMessage = "Please complete the class feature choices for the selected starting levels.";
             return;
@@ -1780,6 +1769,26 @@
             && values.Where(value => requirement.Options.Contains(value, StringComparer.OrdinalIgnoreCase)).Take(requirement.Count).Count() == requirement.Count);
     }
 
+    private string GetFirstIncompleteClassFeatureStep()
+    {
+        if (ClassFeatureFightingStyleChoiceCount > 0 && selectedClassFeatureFightingStyles.Count != ClassFeatureFightingStyleChoiceCount)
+        {
+            return "Classes";
+        }
+
+        if (ClassFeatureFeatChoiceRows.Any(row => !selectedClassFeatureFeatIds.ContainsKey(row.Key)))
+        {
+            return "Feats";
+        }
+
+        if (!AbilityChoicesAreComplete(ClassFeatureAbilityChoiceRequirements))
+        {
+            return "Abilities";
+        }
+
+        return "Proficiencies";
+    }
+
     private IEnumerable<CharacterGrantedEffect> BuildClassFeatureGrantedEffects(int characterId)
     {
         var source = GetClassFeatureEffectSource();
@@ -1857,12 +1866,18 @@
             "Saving Throws" => $"{savingThrows.Count(savingThrow => savingThrow.IsProficient)} proficient",
             "Skills" => SkillChoiceLimit > 0
                 ? $"{ManualSkillChoiceCount} / {SkillChoiceLimit} choices"
+                : ClassFeatureExpertiseChoiceCount + ClassFeatureSkillProficiencyChoiceCount > 0
+                    ? $"{selectedClassFeatureExpertiseSkills.Count + selectedClassFeatureSkillProficiencies.Count} / {ClassFeatureExpertiseChoiceCount + ClassFeatureSkillProficiencyChoiceCount} class choices"
                 : $"{skills.Count(skill => skill.IsProficient)} proficient",
             "Tools" => ToolChoiceLimit > 0
                 ? $"{ManualToolChoiceCount} / {ToolChoiceLimit} choices"
+                : ClassFeatureToolProficiencyChoiceCount > 0
+                    ? $"{selectedClassFeatureToolProficiencies.Count} / {ClassFeatureToolProficiencyChoiceCount} class choices"
                 : $"{toolProficiencies.Count(tool => tool.IsProficient)} proficient",
             "Languages" => LanguageChoiceLimit > 0
                 ? $"{ManualLanguageChoiceCount} / {LanguageChoiceLimit} choices"
+                : ClassFeatureLanguageProficiencyChoiceCount > 0
+                    ? $"{selectedClassFeatureLanguageProficiencies.Count} / {ClassFeatureLanguageProficiencyChoiceCount} class choices"
                 : $"{languageProficiencies.Count(language => language.IsProficient)} known",
             _ => ""
         };
@@ -2049,14 +2064,7 @@
             selectedManualSkillChoices.RemoveWhere(skillName => automaticSkillProficiencies.Contains(skillName));
             selectedManualToolChoices.RemoveWhere(toolName => automaticToolProficiencies.Contains(toolName));
             selectedManualLanguageChoices.RemoveWhere(languageName => automaticLanguageProficiencies.Contains(languageName));
-            if (selectedManualSkillChoices.Count > SkillChoiceLimit)
-            {
-                selectedManualSkillChoices = selectedManualSkillChoices.Take(SkillChoiceLimit).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            }
-            if (selectedManualToolChoices.Count > ToolChoiceLimit)
-            {
-                selectedManualToolChoices = selectedManualToolChoices.Take(ToolChoiceLimit).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            }
+            TrimManualSkillToolChoices();
             if (selectedManualLanguageChoices.Count > LanguageChoiceLimit)
             {
                 selectedManualLanguageChoices = selectedManualLanguageChoices.Take(LanguageChoiceLimit).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -2118,7 +2126,7 @@
             return true;
         }
 
-        return !skill.IsProficient && SkillChoiceLimit > 0 && ManualSkillChoiceCount >= SkillChoiceLimit;
+        return !skill.IsProficient && SkillChoiceLimit > 0 && !SkillToolSelectionIsValid(ManualSkillChoiceCount + 1, ManualToolChoiceCount);
     }
 
     private bool IsToolChoiceDisabled(CharacterToolProficiency tool)
@@ -2128,7 +2136,7 @@
             return true;
         }
 
-        return !tool.IsProficient && ToolChoiceLimit > 0 && ManualToolChoiceCount >= ToolChoiceLimit;
+        return !tool.IsProficient && ToolChoiceLimit > 0 && !SkillToolSelectionIsValid(ManualSkillChoiceCount, ManualToolChoiceCount + 1);
     }
 
     private bool IsLanguageChoiceDisabled(CharacterLanguageProficiency language)
@@ -2141,6 +2149,39 @@
         return !language.IsProficient && LanguageChoiceLimit > 0 && ManualLanguageChoiceCount >= LanguageChoiceLimit;
     }
 
+    private bool SkillToolSelectionIsValid(int skillCount, int toolCount)
+    {
+        if (SkillChoiceLimit == 0 && ToolChoiceLimit == 0)
+        {
+            return true;
+        }
+
+        if (skillCount > SkillChoiceLimit || toolCount > ToolChoiceLimit)
+        {
+            return false;
+        }
+
+        var combinedUsed = Math.Max(0, skillCount - SeparateSkillChoiceLimit)
+            + Math.Max(0, toolCount - SeparateToolChoiceLimit);
+        return combinedUsed <= SkillToolChoiceLimit;
+    }
+
+    private void TrimManualSkillToolChoices()
+    {
+        while (!SkillToolSelectionIsValid(ManualSkillChoiceCount, ManualToolChoiceCount))
+        {
+            if (ManualToolChoiceCount > ToolChoiceLimit
+                || Math.Max(0, ManualToolChoiceCount - SeparateToolChoiceLimit) >= Math.Max(0, ManualSkillChoiceCount - SeparateSkillChoiceLimit))
+            {
+                selectedManualToolChoices.Remove(selectedManualToolChoices.Last());
+            }
+            else
+            {
+                selectedManualSkillChoices.Remove(selectedManualSkillChoices.Last());
+            }
+        }
+    }
+
     private void ToggleSkillProficiency(CharacterSkill skill, bool isChecked)
     {
         if (automaticSkillProficiencies.Contains(skill.Name))
@@ -2151,7 +2192,7 @@
 
         if (isChecked)
         {
-            if (SkillChoiceLimit == 0 || ManualSkillChoiceCount < SkillChoiceLimit)
+            if (SkillChoiceLimit == 0 || SkillToolSelectionIsValid(ManualSkillChoiceCount + 1, ManualToolChoiceCount))
             {
                 selectedManualSkillChoices.Add(skill.Name);
                 skill.IsProficient = true;
@@ -2174,7 +2215,7 @@
 
         if (isChecked)
         {
-            if (ToolChoiceLimit == 0 || ManualToolChoiceCount < ToolChoiceLimit)
+            if (ToolChoiceLimit == 0 || SkillToolSelectionIsValid(ManualSkillChoiceCount, ManualToolChoiceCount + 1))
             {
                 selectedManualToolChoices.Add(tool.Name);
                 tool.IsProficient = true;
