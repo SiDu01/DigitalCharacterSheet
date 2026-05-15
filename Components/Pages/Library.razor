@@ -184,30 +184,6 @@
             </aside>
         </section>
 
-        <section class="home-recent-grid library-activity-grid">
-            <section class="home-panel">
-                <header class="settings-panel-header">
-                    <div>
-                        <p class="eyebrow">Bookmarks</p>
-                        <h2>@selectedCategory</h2>
-                    </div>
-                </header>
-                @ActivityList(CategoryBookmarks, true)
-            </section>
-            <section class="home-panel">
-                <header class="settings-panel-header">
-                    <div>
-                        <p class="eyebrow">Recently Viewed</p>
-                        <h2>@selectedCategory</h2>
-                    </div>
-                    @if (CategoryRecentEntries.Count > 0)
-                    {
-                        <button type="button" class="text-button no-margin" @onclick="ClearCategoryRecentEntries">Clear</button>
-                    }
-                </header>
-                @ActivityList(CategoryRecentEntries, false)
-            </section>
-        </section>
     }
 </section>
 
@@ -258,14 +234,6 @@
         .ToList();
 
     private bool IsSelectedEntryBookmarked => selectedEntry is not null && RecentActivity.IsBookmarked(BuildActivityType(selectedEntry.Category), selectedEntry.Id);
-
-    private IReadOnlyList<RecentActivityEntry> CategoryBookmarks => string.IsNullOrWhiteSpace(selectedCategory)
-        ? []
-        : RecentActivity.GetBookmarks(BuildActivityType(selectedCategory), 8);
-
-    private IReadOnlyList<RecentActivityEntry> CategoryRecentEntries => string.IsNullOrWhiteSpace(selectedCategory)
-        ? []
-        : RecentActivity.GetRecentEntries(BuildActivityType(selectedCategory), 8);
 
     private string RelatedTitle => selectedEntry?.Category switch
     {
@@ -452,21 +420,6 @@
             selectedEntry.Name,
             $"{selectedEntry.Type} - {selectedEntry.Source}",
             $"library/{selectedEntry.Id}");
-    }
-
-    private void ToggleActivityBookmark(RecentActivityEntry entry)
-    {
-        RecentActivity.ToggleBookmark(entry.EntryType, entry.EntityId, entry.Title, entry.Subtitle, entry.Route);
-    }
-
-    private void OpenActivityEntry(RecentActivityEntry entry)
-    {
-        Navigation.NavigateTo(entry.Route);
-    }
-
-    private void ClearCategoryRecentEntries()
-    {
-        RecentActivity.ClearRecentEntries(BuildActivityType(selectedCategory));
     }
 
     private static string BuildActivityType(string category)
@@ -814,35 +767,6 @@
             @foreach (var paragraph in entry.Paragraphs)
             {
                 <p><MarkupText Text="@paragraph" /></p>
-            }
-        }
-    </section>;
-
-    private RenderFragment ActivityList(IReadOnlyList<RecentActivityEntry> activityEntries, bool bookmarks) => @<section class="home-recent-list">
-        @if (activityEntries.Count == 0)
-        {
-            <section class="home-empty-state">
-                <p class="eyebrow">Empty</p>
-                <h3>@(bookmarks ? "No bookmarks yet." : "No entries viewed yet.")</h3>
-            </section>
-        }
-        else
-        {
-            @foreach (var entry in activityEntries)
-            {
-                <article class="home-recent-row">
-                    <button type="button" class="home-recent-content" @onclick="() => OpenActivityEntry(entry)">
-                        <span class="source-code">@entry.EntryType.Replace("Wiki:", "", StringComparison.OrdinalIgnoreCase)</span>
-                        <strong>@entry.Title</strong>
-                        <small>@entry.Subtitle</small>
-                    </button>
-                    <button type="button"
-                            class="icon-button bookmark-button @(RecentActivity.IsBookmarked(entry.EntryType, entry.EntityId) ? "active" : "")"
-                            title="Toggle bookmark"
-                            @onclick="() => ToggleActivityBookmark(entry)">
-                        @(RecentActivity.IsBookmarked(entry.EntryType, entry.EntityId) ? "★" : "☆")
-                    </button>
-                </article>
             }
         }
     </section>;
