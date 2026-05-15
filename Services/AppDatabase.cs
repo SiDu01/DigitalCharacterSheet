@@ -12,7 +12,7 @@ public sealed partial class AppDatabase
     private const int SchemaVersion = 1;
     private const string ImportVersion = "spells-v1";
     private const string ClassImportVersion = "classes-v5";
-    private const string CharacterOptionImportVersion = "character-options-v1";
+    private const string CharacterOptionImportVersion = "character-options-v2";
     private const string SpellAccessImportVersion = "class-spell-access-v2";
     private const string ItemImportVersion = "items-v1";
     private const string SeedDatabaseVersion = "seed-v1";

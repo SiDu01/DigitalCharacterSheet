@@ -479,6 +479,7 @@ public sealed partial class AppDatabase
 
         await ImportRaceDefinitionsAsync();
         await ImportSubraceDefinitionsAsync();
+        await ImportRaceVersionDefinitionsAsync();
         await ImportBackgroundDefinitionsAsync();
         await ImportFeatDefinitionsAsync();
 
@@ -736,6 +737,91 @@ public sealed partial class AppDatabase
         return $"{NormalizeSlugPart(raceName)}|{NormalizeSlugPart(raceSource)}|{NormalizeSlugPart(name)}|{NormalizeSlugPart(source)}";
     }
 
+    private static string ExtractRaceVersionName(string raceName, string versionName)
+    {
+        if (string.IsNullOrWhiteSpace(versionName))
+        {
+            return "";
+        }
+
+        var prefix = $"{raceName};";
+        return versionName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            ? versionName[prefix.Length..].Trim()
+            : "";
+    }
+
+    private static string BuildRaceVersionRawJson(
+        JsonElement raceElement,
+        JsonElement versionElement,
+        string raceName,
+        string raceSource,
+        string subraceName,
+        string versionSource)
+    {
+        var raw = new JsonObject
+        {
+            ["name"] = subraceName,
+            ["source"] = versionSource,
+            ["raceName"] = raceName,
+            ["raceSource"] = raceSource
+        };
+
+        var page = ReadInt(raceElement, "page");
+        if (page is not null)
+        {
+            raw["page"] = page.Value;
+        }
+
+        if (TryBuildRaceVersionEntries(versionElement, out var entries))
+        {
+            raw["entries"] = entries;
+        }
+
+        return raw.ToJsonString();
+    }
+
+    private static bool TryBuildRaceVersionEntries(JsonElement versionElement, out JsonArray entries)
+    {
+        entries = [];
+        if (!versionElement.TryGetProperty("_mod", out var mod)
+            || mod.ValueKind != JsonValueKind.Object
+            || !mod.TryGetProperty("entries", out var entriesMod))
+        {
+            return false;
+        }
+
+        foreach (var replacement in EnumerateEntryReplacements(entriesMod))
+        {
+            if (replacement.TryGetProperty("items", out var items))
+            {
+                entries.Add(JsonNode.Parse(items.GetRawText()));
+            }
+        }
+
+        return entries.Count > 0;
+    }
+
+    private static IEnumerable<JsonElement> EnumerateEntryReplacements(JsonElement entriesMod)
+    {
+        if (entriesMod.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in entriesMod.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.Object)
+                {
+                    yield return item;
+                }
+            }
+
+            yield break;
+        }
+
+        if (entriesMod.ValueKind == JsonValueKind.Object)
+        {
+            yield return entriesMod;
+        }
+    }
+
     private static string NormalizeSlugPart(string value)
     {
         return value.Trim().ToLowerInvariant().Replace(" ", "-");
@@ -798,6 +884,72 @@ public sealed partial class AppDatabase
                 }
 
                 // Ability choices are represented as explicit selectable requirements in the character UI.
+            }
+        }
+    }
+
+    private async Task ImportRaceVersionDefinitionsAsync()
+    {
+        await using var stream = await OpenAssetAsync("races.json");
+        using var document = await JsonDocument.ParseAsync(stream);
+
+        if (!document.RootElement.TryGetProperty("race", out var races))
+        {
+            return;
+        }
+
+        var raceDefinitions = await _database.Table<RaceDefinitionEntity>().ToListAsync();
+        var existingSubraces = await _database.Table<SubraceDefinitionEntity>().ToListAsync();
+
+        foreach (var raceElement in races.EnumerateArray())
+        {
+            if (!raceElement.TryGetProperty("_versions", out var versions) || versions.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            var raceName = ReadString(raceElement, "name");
+            var raceSource = ReadString(raceElement, "source");
+            if (string.IsNullOrWhiteSpace(raceName) || string.IsNullOrWhiteSpace(raceSource))
+            {
+                continue;
+            }
+
+            var raceDefinition = raceDefinitions.FirstOrDefault(definition =>
+                string.Equals(definition.Name, raceName, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(definition.Source, raceSource, StringComparison.OrdinalIgnoreCase));
+
+            foreach (var versionElement in versions.EnumerateArray())
+            {
+                var versionName = ReadString(versionElement, "name");
+                var versionSource = ReadString(versionElement, "source");
+                var subraceName = ExtractRaceVersionName(raceName, versionName);
+                if (string.IsNullOrWhiteSpace(subraceName) || string.IsNullOrWhiteSpace(versionSource))
+                {
+                    continue;
+                }
+
+                if (existingSubraces.Any(subrace =>
+                    string.Equals(subrace.RaceName, raceName, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(subrace.RaceSource, raceSource, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(subrace.Name, subraceName, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(subrace.Source, versionSource, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+
+                var rawJson = BuildRaceVersionRawJson(raceElement, versionElement, raceName, raceSource, subraceName, versionSource);
+                await _database.InsertAsync(new SubraceDefinitionEntity
+                {
+                    RaceDefinitionId = raceDefinition?.Id,
+                    RaceName = raceName,
+                    RaceSource = raceSource,
+                    Name = subraceName,
+                    Source = versionSource,
+                    Slug = BuildSubraceSlug(raceName, raceSource, subraceName, versionSource),
+                    Page = ReadInt(raceElement, "page"),
+                    RawJson = rawJson
+                });
             }
         }
     }
