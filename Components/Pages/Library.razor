@@ -1,4 +1,5 @@
 @page "/library"
+@using System.Text.Json
 @inject AppDatabase Database
 
 <PageTitle>Library</PageTitle>
@@ -7,10 +8,14 @@
     <header class="page-header">
         <div>
             <p class="eyebrow">Compendium</p>
-            <h1>Library</h1>
+            <h1>@(string.IsNullOrWhiteSpace(selectedCategory) ? "Library" : selectedCategory)</h1>
         </div>
         <div class="header-actions">
-            <div class="spell-count">@FilteredGroups.Count entries</div>
+            @if (!string.IsNullOrWhiteSpace(selectedCategory))
+            {
+                <button type="button" class="text-button no-margin" @onclick="ShowCategories">Categories</button>
+            }
+            <div class="spell-count">@VisibleCountText</div>
         </div>
     </header>
 
@@ -25,42 +30,44 @@
     {
         <p class="muted">Preparing library...</p>
     }
+    else if (string.IsNullOrWhiteSpace(selectedCategory))
+    {
+        <section class="item-category-grid">
+            @foreach (var tile in CategoryTiles)
+            {
+                <button type="button" class="item-category-tile" @onclick="() => OpenCategory(tile.Category)">
+                    <span class="item-category-count">@tile.Count</span>
+                    <strong>@tile.Category</strong>
+                    <small>@tile.Description</small>
+                </button>
+            }
+        </section>
+    }
     else
     {
         <section class="spell-toolbar">
-            <input class="search-input" placeholder="Search the library" @bind="searchText" @bind:event="oninput" />
-            <select class="library-category-select" @bind="selectedCategory">
-                <option value="">All categories</option>
-                @foreach (var category in Categories)
-                {
-                    <option value="@category">@category</option>
-                }
-            </select>
+            <input class="search-input" placeholder="@($"Search {selectedCategory}")" @bind="searchText" @bind:event="oninput" />
         </section>
 
         <section class="spell-master-detail">
             <section class="spell-list spell-list-pane">
-                @foreach (var categoryGroup in FilteredGroups.GroupBy(group => group.Category))
+                @foreach (var group in FilteredGroups)
                 {
-                    <div class="spell-level-separator">@categoryGroup.Key</div>
-                    @foreach (var group in categoryGroup)
-                    {
-                        var entry = group.ResolveVersion(selectedEntry);
-                        <article class="spell-row @(selectedGroup?.Name == group.Name ? "selected" : "")" @onclick="() => OpenEntry(group)">
-                            <div class="spell-main">
-                                <div class="spell-title">
-                                    <h2>@group.Name</h2>
-                                    <span class="source-badge">@entry.Type</span>
-                                </div>
-                                <div class="spell-meta">
-                                    @foreach (var source in group.Versions.Select(version => version.Source).Distinct())
-                                    {
-                                        <span class="source-badge">@source</span>
-                                    }
-                                </div>
+                    var entry = group.ResolveVersion(selectedEntry);
+                    <article class="spell-row @(selectedGroup?.Name == group.Name ? "selected" : "")" @onclick="() => OpenEntry(group)">
+                        <div class="spell-main">
+                            <div class="spell-title">
+                                <h2>@group.Name</h2>
+                                <span class="source-badge">@entry.Type</span>
                             </div>
-                        </article>
-                    }
+                            <div class="spell-meta">
+                                @foreach (var source in group.Versions.Select(version => version.Source).Distinct())
+                                {
+                                    <span class="source-badge">@source</span>
+                                }
+                            </div>
+                        </div>
+                    </article>
                 }
             </section>
 
@@ -68,7 +75,7 @@
                 @if (selectedEntry is null)
                 {
                     <div class="empty-detail">
-                        <p class="eyebrow">Library</p>
+                        <p class="eyebrow">@selectedCategory</p>
                         <h2>Select an entry</h2>
                         <p class="muted">Library entries are lookup-only and do not change characters.</p>
                     </div>
@@ -105,19 +112,42 @@
                             </div>
                         }
 
-                        <section class="detail-section">
-                            @if (selectedEntry.Paragraphs.Count == 0)
+                        @if (RelatedEntries.Count > 0)
+                        {
+                            <section class="detail-section">
+                                <h2>@RelatedTitle</h2>
+                                <div class="source-switcher">
+                                    @foreach (var related in RelatedEntries)
+                                    {
+                                        <button type="button"
+                                                class="source-version @(activeRelatedEntryIds.Contains(related.Id) ? "active" : "")"
+                                                @onclick="() => ToggleRelatedEntry(related)">
+                                            @BuildRelatedLabel(related)
+                                        </button>
+                                    }
+                                </div>
+                            </section>
+                        }
+
+                        @if (IsClassEntry(selectedEntry))
+                        {
+                            @ClassFeatureSections(selectedEntry, "Class Features")
+                            @foreach (var related in ActiveRelatedEntries)
                             {
-                                <p class="muted">No detail text found.</p>
+                                @ClassFeatureSections(related, BuildRelatedLabel(related))
                             }
-                            else
+                        }
+                        else
+                        {
+                            @EntryParagraphs(selectedEntry)
+                            @foreach (var related in ActiveRelatedEntries)
                             {
-                                @foreach (var paragraph in selectedEntry.Paragraphs)
-                                {
-                                    <p><MarkupText Text="@paragraph" /></p>
-                                }
+                                <section class="detail-section">
+                                    <h2>@BuildRelatedLabel(related)</h2>
+                                    @EntryParagraphs(related)
+                                </section>
                             }
-                        </section>
+                        }
                     </section>
                 }
             </aside>
@@ -133,22 +163,45 @@
     private string loadError = "";
     private string searchText = "";
     private string selectedCategory = "";
+    private HashSet<int> activeRelatedEntryIds = [];
 
-    private IReadOnlyList<string> Categories => entries
+    private string VisibleCountText => string.IsNullOrWhiteSpace(selectedCategory)
+        ? $"{CategoryTiles.Count} categories"
+        : $"{FilteredGroups.Count} entries";
+
+    private IReadOnlyList<CategoryTile> CategoryTiles => entries
         .Select(entry => entry.Category)
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .OrderBy(value => value)
+        .Select(category => new CategoryTile(category, CountPrimaryEntries(category), DescribeCategory(category)))
         .ToList();
 
-    private IReadOnlyList<WikiEntryGroup> FilteredGroups => GroupEntries(entries.Where(MatchesFilter)).ToList();
+    private IReadOnlyList<WikiEntryGroup> FilteredGroups => GroupEntries(entries.Where(MatchesFilter).Where(IsPrimaryListEntry)).ToList();
+
+    private IReadOnlyList<WikiEntry> RelatedEntries => selectedEntry is null
+        ? []
+        : entries
+            .Where(entry => IsRelatedEntryFor(selectedEntry, entry))
+            .OrderBy(entry => entry.Name)
+            .ThenBy(entry => entry.Source)
+            .ToList();
+
+    private IReadOnlyList<WikiEntry> ActiveRelatedEntries => RelatedEntries
+        .Where(entry => activeRelatedEntryIds.Contains(entry.Id))
+        .ToList();
+
+    private string RelatedTitle => selectedEntry?.Category switch
+    {
+        "Classes" => "Subclasses",
+        "Races" => "Race Versions",
+        _ => "Related"
+    };
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             entries = (await Database.GetWikiEntriesAsync()).ToList();
-            selectedGroup = FilteredGroups.FirstOrDefault();
-            selectedEntry = selectedGroup?.Primary;
         }
         catch (Exception ex)
         {
@@ -160,10 +213,26 @@
         }
     }
 
+    private void ShowCategories()
+    {
+        selectedCategory = "";
+        selectedGroup = null;
+        selectedEntry = null;
+        activeRelatedEntryIds.Clear();
+    }
+
+    private void OpenCategory(string category)
+    {
+        selectedCategory = category;
+        searchText = "";
+        selectedGroup = FilteredGroups.FirstOrDefault();
+        selectedEntry = selectedGroup?.Primary;
+        activeRelatedEntryIds.Clear();
+    }
+
     private bool MatchesFilter(WikiEntry entry)
     {
-        if (!string.IsNullOrWhiteSpace(selectedCategory)
-            && !string.Equals(entry.Category, selectedCategory, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(entry.Category, selectedCategory, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -179,23 +248,258 @@
             || entry.Summary.Contains(searchText, StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsPrimaryListEntry(WikiEntry entry)
+    {
+        return entry.Type is not "Subclass" and not "Race Version";
+    }
+
+    private int CountPrimaryEntries(string category)
+    {
+        return entries.Count(entry => string.Equals(entry.Category, category, StringComparison.OrdinalIgnoreCase)
+            && IsPrimaryListEntry(entry));
+    }
+
     private static IEnumerable<WikiEntryGroup> GroupEntries(IEnumerable<WikiEntry> source)
     {
         return source
             .GroupBy(entry => $"{entry.Category}|{entry.Name}", StringComparer.OrdinalIgnoreCase)
             .Select(group => new WikiEntryGroup(group))
-            .OrderBy(group => group.Category)
-            .ThenBy(group => group.Name);
+            .OrderBy(group => group.Name);
     }
 
     private void OpenEntry(WikiEntryGroup group)
     {
         selectedGroup = group;
         selectedEntry = group.ResolveVersion(selectedEntry);
+        activeRelatedEntryIds.RemoveWhere(id => RelatedEntries.All(entry => entry.Id != id));
     }
 
     private void SelectVersion(WikiEntry entry)
     {
         selectedEntry = entry;
+        activeRelatedEntryIds.Clear();
     }
+
+    private void ToggleRelatedEntry(WikiEntry entry)
+    {
+        if (!activeRelatedEntryIds.Add(entry.Id))
+        {
+            activeRelatedEntryIds.Remove(entry.Id);
+        }
+    }
+
+    private static bool IsRelatedEntryFor(WikiEntry parent, WikiEntry candidate)
+    {
+        if (parent.Type == "Class" && candidate.Type == "Subclass")
+        {
+            return candidate.Name.StartsWith($"{parent.Name}:", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (parent.Type == "Race" && candidate.Type == "Race Version")
+        {
+            return candidate.Name.StartsWith($"{parent.Name}:", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
+    }
+
+    private static bool IsClassEntry(WikiEntry entry)
+    {
+        return entry.Type is "Class" or "Subclass";
+    }
+
+    private static string BuildRelatedLabel(WikiEntry entry)
+    {
+        var separatorIndex = entry.Name.IndexOf(':', StringComparison.Ordinal);
+        return separatorIndex >= 0 && separatorIndex + 1 < entry.Name.Length
+            ? entry.Name[(separatorIndex + 1)..].Trim()
+            : entry.Name;
+    }
+
+    private static string DescribeCategory(string category)
+    {
+        return category switch
+        {
+            "Classes" => "Class features and subclass references",
+            "Feats" => "Feat descriptions and prerequisites",
+            "Races" => "Races and race version details",
+            "Conditions" => "Conditions and diseases",
+            "Rules" => "Actions and variant rules",
+            _ => "Compendium entries"
+        };
+    }
+
+    private static IReadOnlyList<FeatureLevel> BuildFeatureLevels(WikiEntry entry)
+    {
+        if (string.IsNullOrWhiteSpace(entry.RawJson))
+        {
+            return [];
+        }
+
+        using var document = JsonDocument.Parse(entry.RawJson);
+        if (document.RootElement.TryGetProperty("_featureDetails", out var featureDetails)
+            && featureDetails.ValueKind == JsonValueKind.Array)
+        {
+            return featureDetails
+                .EnumerateArray()
+                .Select(ParseFeatureDetail)
+                .Where(feature => feature is not null)
+                .Select(feature => feature!)
+                .GroupBy(feature => feature.Level)
+                .OrderBy(group => group.Key)
+                .Select(group => new FeatureLevel(
+                    group.Key,
+                    group.OrderBy(feature => feature.Name).ToList()))
+                .ToList();
+        }
+
+        return [];
+    }
+
+    private static FeatureEntry? ParseFeatureDetail(JsonElement element)
+    {
+        var name = ReadJsonString(element, "name");
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        var level = element.TryGetProperty("level", out var levelElement)
+            && levelElement.ValueKind == JsonValueKind.Number
+            && levelElement.TryGetInt32(out var parsedLevel)
+            ? parsedLevel
+            : 0;
+
+        var paragraphs = element.TryGetProperty("entries", out var entries)
+            ? ExtractParagraphs(entries).ToList()
+            : [];
+
+        return new FeatureEntry(name, level, paragraphs);
+    }
+
+    private static IEnumerable<string> ExtractParagraphs(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.String)
+        {
+            yield return element.GetString() ?? "";
+            yield break;
+        }
+
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("entry", out var entry))
+            {
+                foreach (var value in ExtractParagraphs(entry))
+                {
+                    yield return value;
+                }
+            }
+
+            if (element.TryGetProperty("entries", out var entries))
+            {
+                foreach (var value in ExtractParagraphs(entries))
+                {
+                    yield return value;
+                }
+            }
+
+            if (element.TryGetProperty("items", out var items))
+            {
+                foreach (var value in ExtractParagraphs(items))
+                {
+                    yield return value;
+                }
+            }
+
+            yield break;
+        }
+
+        if (element.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var item in element.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.Object && item.TryGetProperty("name", out var name))
+            {
+                var text = string.Join(" ", ExtractParagraphs(item));
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    yield return $"{name.GetString()}: {text}";
+                }
+                continue;
+            }
+
+            foreach (var value in ExtractParagraphs(item))
+            {
+                yield return value;
+            }
+        }
+    }
+
+    private static string ReadJsonString(JsonElement element, string propertyName)
+    {
+        return element.ValueKind == JsonValueKind.Object
+            && element.TryGetProperty(propertyName, out var property)
+            && property.ValueKind == JsonValueKind.String
+            ? property.GetString() ?? ""
+            : "";
+    }
+
+    private sealed record CategoryTile(string Category, int Count, string Description);
+    private sealed record FeatureLevel(int Level, IReadOnlyList<FeatureEntry> Features);
+    private sealed record FeatureEntry(string Name, int Level, IReadOnlyList<string> Paragraphs);
+}
+
+@code {
+    private RenderFragment EntryParagraphs(WikiEntry entry) => @<section class="detail-section">
+        @if (entry.Paragraphs.Count == 0)
+        {
+            <p class="muted">No detail text found.</p>
+        }
+        else
+        {
+            @foreach (var paragraph in entry.Paragraphs)
+            {
+                <p><MarkupText Text="@paragraph" /></p>
+            }
+        }
+    </section>;
+
+    private RenderFragment ClassFeatureSections(WikiEntry entry, string title) => @<section class="detail-section class-feature-section">
+        <h2>@title</h2>
+        @{
+            var levels = BuildFeatureLevels(entry);
+        }
+        @if (levels.Count == 0)
+        {
+            @EntryParagraphs(entry)
+        }
+        else
+        {
+            <div class="feature-level-list">
+                @foreach (var level in levels)
+                {
+                    <article class="feature-level-row">
+                        <span class="feature-level-badge">Lvl @level.Level</span>
+                        <div>
+                            @foreach (var feature in level.Features)
+                            {
+                                <details class="feature-detail-toggle">
+                                    <summary class="feature-pill">@feature.Name</summary>
+                                    <div class="feature-detail-body">
+                                        @foreach (var paragraph in feature.Paragraphs)
+                                        {
+                                            <p><MarkupText Text="@paragraph" /></p>
+                                        }
+                                    </div>
+                                </details>
+                            }
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    </section>;
 }
