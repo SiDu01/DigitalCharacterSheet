@@ -123,13 +123,19 @@ public sealed partial class AppDatabase
             await AddGrantedFeatEffectsAsync(effects, background?.FeatsJson, character.BackgroundChoicesJson, background?.Name ?? "Background");
         }
 
+        var featOccurrences = new Dictionary<int, int>();
         foreach (var feat in character.Feats.Where(feat => feat.FeatDefinitionId > 0))
         {
             var featDefinition = await _database.Table<FeatDefinitionEntity>()
                 .Where(row => row.Id == feat.FeatDefinitionId)
                 .FirstOrDefaultAsync();
             AddOptionEffects(effects, featDefinition?.RawJson, string.IsNullOrWhiteSpace(featDefinition?.Name) ? "Feat" : $"Feat {featDefinition.Name}");
-            AddSelectedAbilityChoiceEffects(effects, featDefinition?.RawJson, $"Feat:{featDefinition?.Id ?? 0}", featDefinition is null ? "Feat" : $"Feat: {featDefinition.Name}", character.FeatChoicesJson);
+            var occurrence = featOccurrences.GetValueOrDefault(feat.FeatDefinitionId);
+            featOccurrences[feat.FeatDefinitionId] = occurrence + 1;
+            var sourceKey = occurrence == 0
+                ? $"Feat:{featDefinition?.Id ?? 0}"
+                : $"Feat:{featDefinition?.Id ?? 0}:repeat:{occurrence}";
+            AddSelectedAbilityChoiceEffects(effects, featDefinition?.RawJson, sourceKey, featDefinition is null ? "Feat" : $"Feat: {featDefinition.Name}", character.FeatChoicesJson);
         }
 
         var primaryClassDefinitionId = character.PrimaryClassDefinitionId

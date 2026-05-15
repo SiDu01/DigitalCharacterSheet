@@ -67,7 +67,7 @@
 
             </section>
 
-            <section class="creator-step-screen @(IsStep("Background") ? "" : "hidden")">
+            <section class="creator-step-screen creator-list-step @(IsStep("Background") ? "" : "hidden")">
                 <div class="creator-step-heading">
                     <p class="eyebrow">Background</p>
                     <div class="creator-step-controls">
@@ -438,7 +438,7 @@
                         @if (SkillChoiceLimit > 0)
                         {
                             <div class="choice-counter @(!ManualSkillToolChoicesAreValid ? "invalid" : "")">
-                                <span>Skill/tool choices used</span>
+                                <span>Skill choices used</span>
                                 <strong>@ManualSkillChoiceCount / @SkillChoiceLimit</strong>
                             </div>
                         }
@@ -968,15 +968,14 @@
         .Select(row => row.Choice)
         .Where(choice => choice.Count > 0)
         .ToList();
-    private IReadOnlyList<FeatDefinition> SelectedClassFeatureFeatDefinitions => selectedClassFeatureFeatIds.Values
-        .Distinct()
+    private IReadOnlyList<FeatDefinition> SelectedClassFeatureFeatDefinitions => selectedClassFeatureFeatIds
+        .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+        .Select(pair => pair.Value)
         .Select(id => featDefinitions.FirstOrDefault(definition => definition.Id == id))
         .Where(definition => definition is not null)
         .Select(definition => definition!)
         .ToList();
-    private IReadOnlyList<CharacterAbilityChoiceRequirement> ClassFeatureAbilityChoiceRequirements => SelectedClassFeatureFeatDefinitions
-        .SelectMany(feat => CharacterAbilityChoiceService.BuildRequirements(feat.RawJson, $"Feat:{feat.Id}", $"Feat: {feat.Name}"))
-        .ToList();
+    private IReadOnlyList<CharacterAbilityChoiceRequirement> ClassFeatureAbilityChoiceRequirements => FeatAbilityChoiceRequirements;
     private bool HasClassFeatureChoices => ClassFeatureFeatChoiceRows.Count > 0
         || ClassFeatureFightingStyleChoiceCount > 0
         || ClassFeatureExpertiseChoiceCount > 0
@@ -1334,6 +1333,10 @@
         subraceDefinitions = raceDefinition is null
             ? []
             : (await GetSubraceDefinitionsForRaceVersionAsync(raceDefinition)).ToList();
+        if (subraceDefinitions.Count > 0)
+        {
+            selectedSubraceDefinitionId = subraceDefinitions[0].Id;
+        }
         var sizes = RaceSizeOptions;
         if (sizes.Count == 1)
         {
@@ -1597,7 +1600,8 @@
             return;
         }
 
-        if (newFeats.Any(feat => feat.FeatDefinitionId == featDefinition.Id))
+        if (!IsRepeatableFeat(featDefinition)
+            && newFeats.Any(feat => feat.FeatDefinitionId == featDefinition.Id))
         {
             errorMessage = "This feat is already added.";
             return;
@@ -1741,6 +1745,7 @@
 
         return featDefinitions
             .Where(definition => string.Equals(definition.Name, "Ability Score Improvement", StringComparison.OrdinalIgnoreCase)
+                || IsRepeatableFeat(definition)
                 || !selectedElsewhere.Contains(definition.Id))
             .OrderBy(definition => definition.Name)
             .ThenBy(definition => definition.Source)
@@ -2038,6 +2043,18 @@
         return string.Equals(feat.Category, "O", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsRepeatableFeat(FeatDefinition feat)
+    {
+        if (string.IsNullOrWhiteSpace(feat.RawJson))
+        {
+            return false;
+        }
+
+        using var document = JsonDocument.Parse(feat.RawJson);
+        return document.RootElement.TryGetProperty("repeatable", out var repeatable)
+            && repeatable.ValueKind == JsonValueKind.True;
+    }
+
     private async Task RecomputeOptionEffectsAsync()
     {
         errorMessage = "";
@@ -2313,8 +2330,6 @@
                 FeatName = feat.Name,
                 FeatSource = feat.Source
             }))
-            .GroupBy(feat => feat.FeatDefinitionId)
-            .Select(group => group.First())
             .ToList();
     }
 
@@ -2592,15 +2607,9 @@
 
     private IEnumerable<CharacterDefenseChoiceRequirement> BuildFeatDefenseChoiceRequirements()
     {
-        foreach (var characterFeat in BuildStoredFeats())
+        foreach (var source in BuildFeatChoiceSources())
         {
-            var feat = featDefinitions.FirstOrDefault(definition => definition.Id == characterFeat.FeatDefinitionId);
-            if (feat is null)
-            {
-                continue;
-            }
-
-            foreach (var requirement in CharacterDefenseChoiceService.BuildRequirements(feat.RawJson, $"Feat:{feat.Id}", $"Feat: {feat.Name}"))
+            foreach (var requirement in CharacterDefenseChoiceService.BuildRequirements(source.Feat.RawJson, source.SourceKey, $"Feat: {source.Feat.Name}"))
             {
                 yield return requirement;
             }
@@ -2641,6 +2650,18 @@
 
     private IEnumerable<CharacterAbilityChoiceRequirement> BuildFeatAbilityChoiceRequirements()
     {
+        foreach (var source in BuildFeatChoiceSources())
+        {
+            foreach (var requirement in CharacterAbilityChoiceService.BuildRequirements(source.Feat.RawJson, source.SourceKey, $"Feat: {source.Feat.Name}"))
+            {
+                yield return requirement;
+            }
+        }
+    }
+
+    private IEnumerable<FeatChoiceSource> BuildFeatChoiceSources()
+    {
+        var occurrenceByFeatId = new Dictionary<int, int>();
         foreach (var characterFeat in BuildStoredFeats())
         {
             var feat = featDefinitions.FirstOrDefault(definition => definition.Id == characterFeat.FeatDefinitionId);
@@ -2649,10 +2670,9 @@
                 continue;
             }
 
-            foreach (var requirement in CharacterAbilityChoiceService.BuildRequirements(feat.RawJson, $"Feat:{feat.Id}", $"Feat: {feat.Name}"))
-            {
-                yield return requirement;
-            }
+            var occurrence = occurrenceByFeatId.GetValueOrDefault(feat.Id);
+            occurrenceByFeatId[feat.Id] = occurrence + 1;
+            yield return new FeatChoiceSource(feat, occurrence == 0 ? $"Feat:{feat.Id}" : $"Feat:{feat.Id}:repeat:{occurrence}");
         }
     }
 
@@ -3485,4 +3505,5 @@
     private sealed record ClassFeatureFeatChoiceRow(string Key, int ClassDefinitionId, string ClassName, int SourceLevel, string FeatureName);
     private sealed record MappedClassFeatureChoiceRow(string Key, int ClassDefinitionId, string ClassName, int SourceLevel, string FeatureName, MappedRuleChoice Choice);
     private sealed record ClassFeatureEffectSource(int ClassDefinitionId, int SourceLevel, string ClassSource);
+    private sealed record FeatChoiceSource(FeatDefinition Feat, string SourceKey);
 }

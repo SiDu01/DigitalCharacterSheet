@@ -40,7 +40,11 @@ public static class CharacterAbilityChoiceService
         }
 
         var requirements = modes.SelectMany(mode => mode).ToList();
-        AddStandardPlusTwoPlusOneMode(requirements, sourceKey, sourceName);
+        if (sourceKey.StartsWith("Background:", StringComparison.OrdinalIgnoreCase))
+        {
+            AddStandardPlusTwoPlusOneMode(requirements, sourceKey, sourceName);
+        }
+
         return requirements;
     }
 
