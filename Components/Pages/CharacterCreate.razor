@@ -65,6 +65,24 @@
                     }
                 </section>
 
+                @if (selectedRaceGroup is not null && selectedRaceGroup.Versions.Count > 1)
+                {
+                    <section class="creator-inline-source-panel">
+                        <span>Source</span>
+                        <div class="source-switcher">
+                            @foreach (var version in selectedRaceGroup.Versions)
+                            {
+                                var subraceCount = GetRaceVersionSubraceCount(version);
+                                <button type="button"
+                                        class="source-version @(version.Id == selectedRaceDefinitionId ? "active" : "")"
+                                        @onclick="async () => await SelectRaceVersion(version)">
+                                    @version.Source@(subraceCount == 0 ? "" : $" · {subraceCount} versions")
+                                </button>
+                            }
+                        </div>
+                    </section>
+                }
+
                 @if (RaceSizeOptions.Count > 1)
                 {
                     <label class="stacked-field">
@@ -83,13 +101,17 @@
                     <label class="stacked-field">
                         <span>Race version</span>
                         <select @bind="selectedSubraceDefinitionId" @bind:after="SelectSubrace">
-                            <option value="">No version</option>
+                            <option value="" disabled="@IsSubraceRequired">@(IsSubraceRequired ? "Select race version" : "No version")</option>
                             @foreach (var subraceDefinition in subraceDefinitions)
                             {
                                 <option value="@subraceDefinition.Id">@subraceDefinition.DisplayName</option>
                             }
                         </select>
                     </label>
+                    @if (IsSubraceRequired && SelectedSubrace is null)
+                    {
+                        <p class="validation-message compact-hint">Choose a race version to apply its traits and ability bonuses.</p>
+                    }
                 }
 
             </section>
@@ -785,6 +807,7 @@
     private RaceGroup? selectedRaceGroup;
     private BackgroundGroup? selectedBackgroundGroup;
     private FeatGroup? selectedFeatGroup;
+    private Dictionary<int, List<SubraceDefinition>> subraceDefinitionsByRaceVersion = [];
     private static readonly IReadOnlyList<CreationStep> CreationSteps =
     [
         new("Identity", "Identity", "1"),
@@ -839,6 +862,7 @@
     private bool IsFirstStep => CurrentStepIndex == 0;
     private bool IsLastStep => CurrentStepIndex >= CreationSteps.Count - 1;
     private string CurrentStepLabel => CreationSteps[CurrentStepIndex].Label;
+    private bool IsSubraceRequired => subraceDefinitions.Count > 0;
     private OptionDetail? SelectedDetail => detailKind switch
     {
         "Race" when SelectedRace is not null => BuildRaceDetail(SelectedRace, SelectedSubrace),
@@ -1106,14 +1130,14 @@
     private async Task SelectRaceGroup()
     {
         selectedRaceGroup = raceGroups.FirstOrDefault(group => group.Name == selectedRaceName);
-        await SelectRaceVersion(selectedRaceGroup?.Primary);
+        await SelectRaceVersion(await ResolvePreferredRaceVersionAsync(selectedRaceGroup));
     }
 
     private async Task SelectRaceGroup(RaceGroup raceGroup)
     {
         selectedRaceName = raceGroup.Name;
         selectedRaceGroup = raceGroup;
-        await SelectRaceVersion(raceGroup.Primary);
+        await SelectRaceVersion(await ResolvePreferredRaceVersionAsync(raceGroup));
     }
 
     private async Task SelectRaceVersion(RaceDefinition? raceDefinition)
@@ -1123,7 +1147,7 @@
         selectedRaceSize = "";
         subraceDefinitions = raceDefinition is null
             ? []
-            : (await Database.GetSubraceDefinitionsAsync(raceDefinition.Id)).ToList();
+            : (await GetSubraceDefinitionsForRaceVersionAsync(raceDefinition)).ToList();
         var sizes = RaceSizeOptions;
         if (sizes.Count == 1)
         {
@@ -1134,6 +1158,49 @@
         PruneAbilityChoices();
         detailKind = "Race";
         await RecomputeOptionEffectsAsync();
+    }
+
+    private async Task<RaceDefinition?> ResolvePreferredRaceVersionAsync(RaceGroup? raceGroup)
+    {
+        if (raceGroup is null)
+        {
+            return null;
+        }
+
+        await LoadSubraceCountsForRaceGroupAsync(raceGroup);
+        var versionsWithSubraces = raceGroup.Versions
+            .Where(version => GetRaceVersionSubraceCount(version) > 0)
+            .ToList();
+
+        return versionsWithSubraces.Count == 1 && GetRaceVersionSubraceCount(raceGroup.Primary) == 0
+            ? versionsWithSubraces[0]
+            : raceGroup.Primary;
+    }
+
+    private async Task LoadSubraceCountsForRaceGroupAsync(RaceGroup raceGroup)
+    {
+        foreach (var version in raceGroup.Versions)
+        {
+            await GetSubraceDefinitionsForRaceVersionAsync(version);
+        }
+    }
+
+    private async Task<IReadOnlyList<SubraceDefinition>> GetSubraceDefinitionsForRaceVersionAsync(RaceDefinition raceDefinition)
+    {
+        if (!subraceDefinitionsByRaceVersion.TryGetValue(raceDefinition.Id, out var cached))
+        {
+            cached = (await Database.GetSubraceDefinitionsAsync(raceDefinition.Id)).ToList();
+            subraceDefinitionsByRaceVersion[raceDefinition.Id] = cached;
+        }
+
+        return cached;
+    }
+
+    private int GetRaceVersionSubraceCount(RaceDefinition raceDefinition)
+    {
+        return subraceDefinitionsByRaceVersion.TryGetValue(raceDefinition.Id, out var cached)
+            ? cached.Count
+            : 0;
     }
 
     private async Task SelectSubrace()
@@ -1369,6 +1436,14 @@
         if (string.IsNullOrWhiteSpace(newName))
         {
             errorMessage = "Please enter a character name.";
+            return;
+        }
+
+        if (IsSubraceRequired && SelectedSubrace is null)
+        {
+            currentStep = "Ancestry";
+            detailKind = "Race";
+            errorMessage = "Please select a race version.";
             return;
         }
 
