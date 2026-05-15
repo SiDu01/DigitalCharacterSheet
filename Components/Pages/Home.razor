@@ -143,6 +143,7 @@
     private int characterCount;
     private int spellCount;
     private int itemCount;
+    private int wikiCount;
     private List<RecentActivityEntry> bookmarks = [];
     private List<RecentActivityEntry> recentEntries = [];
     private string selectedBookmarkType = "";
@@ -155,6 +156,7 @@
         new("Characters", "Manage, create, and play characters", characterCount.ToString(), "characters"),
         new("Spells", "Spellbook, filters, and detail view", spellCount.ToString(), "spells"),
         new("Items", "Equipment, magic items, and inventory", itemCount.ToString(), "items"),
+        new("Library", "Conditions, actions, and rules", wikiCount.ToString(), "library"),
         new("Settings", "Theme, sources, import, and export", "", "settings")
     ];
 
@@ -164,6 +166,7 @@
         characterCount = characters.Count;
         spellCount = (await Database.GetSpellSummariesAsync()).Count;
         itemCount = (await Database.GetItemDefinitionsAsync()).Count;
+        wikiCount = (await Database.GetWikiEntriesAsync()).Count;
         RefreshActivityLists();
         isLoading = false;
     }

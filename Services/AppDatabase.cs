@@ -15,6 +15,7 @@ public sealed partial class AppDatabase
     private const string CharacterOptionImportVersion = "character-options-v2";
     private const string SpellAccessImportVersion = "class-spell-access-v2";
     private const string ItemImportVersion = "items-v1";
+    private const string WikiImportVersion = "wiki-v1";
     private const string SeedDatabaseVersion = "seed-v1";
     private const string DatabaseFileName = "digital-character-sheet.db3";
     private const string SeedDatabaseAssetName = "seed/digital-character-sheet.db3";
@@ -141,6 +142,7 @@ public sealed partial class AppDatabase
                 await CreateTableAsync<MagicItemVariantEntity>("MagicItemVariants");
                 await CreateTableAsync<ItemFluffEntity>("ItemFluff");
                 await CreateTableAsync<CharacterInventoryItemEntity>("CharacterInventoryItems");
+                await CreateTableAsync<WikiEntryEntity>("WikiEntries");
 
                 initializationStep = "applying database migrations";
                 await EnsureDatabaseVersionAsync();
@@ -157,6 +159,11 @@ public sealed partial class AppDatabase
 #if SEED_BUILDER
                 initializationStep = "importing items";
                 await EnsureItemDataImportedAsync();
+                initializationStep = "importing wiki";
+                await EnsureWikiDataImportedAsync();
+#else
+                initializationStep = "checking wiki";
+                await EnsureWikiDataImportedAsync();
 #endif
                 initializationStep = "checking source settings";
                 await EnsureSourceSettingsAsync();

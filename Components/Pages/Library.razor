@@ -1,0 +1,201 @@
+@page "/library"
+@inject AppDatabase Database
+
+<PageTitle>Library</PageTitle>
+
+<section class="spell-page library-page">
+    <header class="page-header">
+        <div>
+            <p class="eyebrow">Compendium</p>
+            <h1>Library</h1>
+        </div>
+        <div class="header-actions">
+            <div class="spell-count">@FilteredGroups.Count entries</div>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(loadError))
+    {
+        <section class="sheet-panel">
+            <p class="eyebrow">Database error</p>
+            <pre class="error-details">@loadError</pre>
+        </section>
+    }
+    else if (isLoading)
+    {
+        <p class="muted">Preparing library...</p>
+    }
+    else
+    {
+        <section class="spell-toolbar">
+            <input class="search-input" placeholder="Search conditions and rules" @bind="searchText" @bind:event="oninput" />
+            <select class="library-category-select" @bind="selectedCategory">
+                <option value="">All categories</option>
+                @foreach (var category in Categories)
+                {
+                    <option value="@category">@category</option>
+                }
+            </select>
+        </section>
+
+        <section class="spell-master-detail">
+            <section class="spell-list spell-list-pane">
+                @foreach (var categoryGroup in FilteredGroups.GroupBy(group => group.Category))
+                {
+                    <div class="spell-level-separator">@categoryGroup.Key</div>
+                    @foreach (var group in categoryGroup)
+                    {
+                        var entry = group.ResolveVersion(selectedEntry);
+                        <article class="spell-row @(selectedGroup?.Name == group.Name ? "selected" : "")" @onclick="() => OpenEntry(group)">
+                            <div class="spell-main">
+                                <div class="spell-title">
+                                    <h2>@group.Name</h2>
+                                    <span class="source-badge">@entry.Type</span>
+                                </div>
+                                <div class="spell-meta">
+                                    @foreach (var source in group.Versions.Select(version => version.Source).Distinct())
+                                    {
+                                        <span class="source-badge">@source</span>
+                                    }
+                                </div>
+                            </div>
+                        </article>
+                    }
+                }
+            </section>
+
+            <aside class="spell-detail-pane">
+                @if (selectedEntry is null)
+                {
+                    <div class="empty-detail">
+                        <p class="eyebrow">Library</p>
+                        <h2>Select an entry</h2>
+                        <p class="muted">Conditions, actions, and rules are lookup-only and do not change characters.</p>
+                    </div>
+                }
+                else
+                {
+                    <section class="sheet-panel spell-detail-card">
+                        <header class="detail-header compact-detail-header">
+                            <div>
+                                <p class="eyebrow">@selectedEntry.Category</p>
+                                <h2>@selectedEntry.Name</h2>
+                                <div class="spell-meta">
+                                    <span>@selectedEntry.Type</span>
+                                    <span>@selectedEntry.Source</span>
+                                    @if (selectedEntry.Page is not null)
+                                    {
+                                        <span>p. @selectedEntry.Page</span>
+                                    }
+                                </div>
+                            </div>
+                        </header>
+
+                        @if (selectedGroup?.Versions.Count > 1)
+                        {
+                            <div class="source-switcher">
+                                @foreach (var version in selectedGroup.Versions)
+                                {
+                                    <button type="button"
+                                            class="source-version @(version.Id == selectedEntry.Id ? "active" : "")"
+                                            @onclick="() => SelectVersion(version)">
+                                        @version.Source
+                                    </button>
+                                }
+                            </div>
+                        }
+
+                        <section class="detail-section">
+                            @if (selectedEntry.Paragraphs.Count == 0)
+                            {
+                                <p class="muted">No detail text found.</p>
+                            }
+                            else
+                            {
+                                @foreach (var paragraph in selectedEntry.Paragraphs)
+                                {
+                                    <p><MarkupText Text="@paragraph" /></p>
+                                }
+                            }
+                        </section>
+                    </section>
+                }
+            </aside>
+        </section>
+    }
+</section>
+
+@code {
+    private List<WikiEntry> entries = [];
+    private WikiEntryGroup? selectedGroup;
+    private WikiEntry? selectedEntry;
+    private bool isLoading = true;
+    private string loadError = "";
+    private string searchText = "";
+    private string selectedCategory = "";
+
+    private IReadOnlyList<string> Categories => entries
+        .Select(entry => entry.Category)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(value => value)
+        .ToList();
+
+    private IReadOnlyList<WikiEntryGroup> FilteredGroups => GroupEntries(entries.Where(MatchesFilter)).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            entries = (await Database.GetWikiEntriesAsync()).ToList();
+            selectedGroup = FilteredGroups.FirstOrDefault();
+            selectedEntry = selectedGroup?.Primary;
+        }
+        catch (Exception ex)
+        {
+            loadError = ex.ToString();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private bool MatchesFilter(WikiEntry entry)
+    {
+        if (!string.IsNullOrWhiteSpace(selectedCategory)
+            && !string.Equals(entry.Category, selectedCategory, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            return true;
+        }
+
+        return entry.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || entry.Type.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || entry.Source.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || entry.Summary.Contains(searchText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IEnumerable<WikiEntryGroup> GroupEntries(IEnumerable<WikiEntry> source)
+    {
+        return source
+            .GroupBy(entry => $"{entry.Category}|{entry.Name}", StringComparer.OrdinalIgnoreCase)
+            .Select(group => new WikiEntryGroup(group))
+            .OrderBy(group => group.Category)
+            .ThenBy(group => group.Name);
+    }
+
+    private void OpenEntry(WikiEntryGroup group)
+    {
+        selectedGroup = group;
+        selectedEntry = group.ResolveVersion(selectedEntry);
+    }
+
+    private void SelectVersion(WikiEntry entry)
+    {
+        selectedEntry = entry;
+    }
+}
