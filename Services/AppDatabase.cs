@@ -15,7 +15,7 @@ public sealed partial class AppDatabase
     private const string CharacterOptionImportVersion = "character-options-v2";
     private const string SpellAccessImportVersion = "class-spell-access-v2";
     private const string ItemImportVersion = "items-v1";
-    private const string WikiImportVersion = "wiki-v1";
+    private const string WikiImportVersion = "wiki-v2";
     private const string SeedDatabaseVersion = "seed-v1";
     private const string DatabaseFileName = "digital-character-sheet.db3";
     private const string SeedDatabaseAssetName = "seed/digital-character-sheet.db3";

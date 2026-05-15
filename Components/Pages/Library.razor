@@ -28,7 +28,7 @@
     else
     {
         <section class="spell-toolbar">
-            <input class="search-input" placeholder="Search conditions and rules" @bind="searchText" @bind:event="oninput" />
+            <input class="search-input" placeholder="Search the library" @bind="searchText" @bind:event="oninput" />
             <select class="library-category-select" @bind="selectedCategory">
                 <option value="">All categories</option>
                 @foreach (var category in Categories)
@@ -70,7 +70,7 @@
                     <div class="empty-detail">
                         <p class="eyebrow">Library</p>
                         <h2>Select an entry</h2>
-                        <p class="muted">Conditions, actions, and rules are lookup-only and do not change characters.</p>
+                        <p class="muted">Library entries are lookup-only and do not change characters.</p>
                     </div>
                 }
                 else

@@ -40,6 +40,7 @@ public sealed partial class AppDatabase
         await ImportWikiFileAsync("conditionsdiseases.json", "disease", "Conditions", "Disease");
         await ImportWikiFileAsync("actions.json", "action", "Rules", "Action");
         await ImportWikiFileAsync("variantrules.json", "variantrule", "Rules", "Variant Rule");
+        await ImportWikiDefinitionEntriesAsync();
         await _database.InsertOrReplaceAsync(new DatabaseMetadata { Key = "WikiImportVersion", Value = WikiImportVersion });
 #else
         await Task.CompletedTask;
@@ -125,7 +126,148 @@ public sealed partial class AppDatabase
             });
         }
     }
+
+    private async Task ImportWikiDefinitionEntriesAsync()
+    {
+        foreach (var feat in await _database.Table<FeatDefinitionEntity>().ToListAsync())
+        {
+            await InsertWikiEntryAsync(
+                "Feats",
+                "Feat",
+                feat.Name,
+                feat.Source,
+                feat.Slug,
+                feat.Page,
+                ReadWikiEntriesJson(feat.RawJson),
+                feat.RawJson);
+        }
+
+        foreach (var race in await _database.Table<RaceDefinitionEntity>().ToListAsync())
+        {
+            await InsertWikiEntryAsync(
+                "Races",
+                "Race",
+                race.Name,
+                race.Source,
+                race.Slug,
+                race.Page,
+                ReadWikiEntriesJson(race.RawJson),
+                race.RawJson);
+        }
+
+        foreach (var subrace in await _database.Table<SubraceDefinitionEntity>().ToListAsync())
+        {
+            var name = string.IsNullOrWhiteSpace(subrace.RaceName)
+                ? subrace.Name
+                : $"{subrace.RaceName}: {subrace.Name}";
+            await InsertWikiEntryAsync(
+                "Races",
+                "Race Version",
+                name,
+                subrace.Source,
+                subrace.Slug,
+                subrace.Page,
+                ReadWikiEntriesJson(subrace.RawJson),
+                subrace.RawJson);
+        }
+
+        foreach (var classDefinition in await _database.Table<ClassDefinitionEntity>().ToListAsync())
+        {
+            await InsertWikiEntryAsync(
+                "Classes",
+                "Class",
+                classDefinition.Name,
+                classDefinition.Source,
+                classDefinition.Slug,
+                null,
+                ReadWikiEntriesJson(classDefinition.RawJson),
+                classDefinition.RawJson);
+        }
+
+        var classLookup = (await _database.Table<ClassDefinitionEntity>().ToListAsync())
+            .ToDictionary(definition => definition.Id);
+        foreach (var subclass in await _database.Table<SubclassDefinitionEntity>().ToListAsync())
+        {
+            classLookup.TryGetValue(subclass.ClassDefinitionId, out var classDefinition);
+            var name = classDefinition is null
+                ? subclass.Name
+                : $"{classDefinition.Name}: {subclass.Name}";
+            await InsertWikiEntryAsync(
+                "Classes",
+                "Subclass",
+                name,
+                subclass.Source,
+                subclass.Slug,
+                null,
+                ReadWikiEntriesJson(subclass.RawJson),
+                subclass.RawJson);
+        }
+    }
+
+    private async Task InsertWikiEntryAsync(
+        string category,
+        string type,
+        string name,
+        string source,
+        string sourceSlug,
+        int? page,
+        string entriesJson,
+        string rawJson)
+    {
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(source))
+        {
+            return;
+        }
+
+        await _database.InsertAsync(new WikiEntryEntity
+        {
+            Category = category,
+            Name = name,
+            Source = source,
+            Slug = $"{NormalizeSlugPart(category)}|{NormalizeSlugPart(type)}|{sourceSlug}",
+            Page = page,
+            Type = type,
+            Summary = BuildWikiSummary(entriesJson),
+            EntriesJson = entriesJson,
+            RawJson = rawJson
+        });
+    }
 #endif
+
+    private static string ReadWikiEntriesJson(string rawJson)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            return "";
+        }
+
+        using var document = JsonDocument.Parse(rawJson);
+        if (document.RootElement.TryGetProperty("entries", out var entries)
+            && entries.ValueKind == JsonValueKind.Array)
+        {
+            return entries.GetRawText();
+        }
+
+        if (document.RootElement.TryGetProperty("_featureDetails", out var featureDetails)
+            && featureDetails.ValueKind == JsonValueKind.Array)
+        {
+            return featureDetails.GetRawText();
+        }
+
+        if (document.RootElement.TryGetProperty("classFeatures", out var classFeatures)
+            && classFeatures.ValueKind == JsonValueKind.Array)
+        {
+            return classFeatures.GetRawText();
+        }
+
+        if (document.RootElement.TryGetProperty("subclassFeatures", out var subclassFeatures)
+            && subclassFeatures.ValueKind == JsonValueKind.Array)
+        {
+            return subclassFeatures.GetRawText();
+        }
+
+        return "";
+    }
 
     private static string BuildWikiSummary(string entriesJson)
     {
