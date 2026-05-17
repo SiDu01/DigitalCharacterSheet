@@ -134,7 +134,10 @@ internal static partial class DataQualityReportGenerator
     {
         if (string.IsNullOrWhiteSpace(name))
         {
-            context.AddCase(new UnhandledCase(category, name, source, path, "missing-name", "error", null, "Entity has no name.", null, null));
+            if (!IsUnnamedRaceOverlay(category, source, element))
+            {
+                context.AddCase(new UnhandledCase(category, name, source, path, "missing-name", "error", null, "Entity has no name.", null, null));
+            }
         }
 
         if (string.IsNullOrWhiteSpace(source))
@@ -146,6 +149,14 @@ internal static partial class DataQualityReportGenerator
         {
             var raceName = ReadString(element, "raceName");
             var raceSource = ReadString(element, "raceSource");
+            if ((string.IsNullOrWhiteSpace(raceName) || string.IsNullOrWhiteSpace(raceSource))
+                && element.TryGetProperty("_copy", out var copy)
+                && copy.ValueKind == JsonValueKind.Object)
+            {
+                raceName = ReadString(copy, "raceName");
+                raceSource = ReadString(copy, "raceSource");
+            }
+
             if (string.IsNullOrWhiteSpace(raceName) || string.IsNullOrWhiteSpace(raceSource))
             {
                 context.AddCase(new UnhandledCase(category, name, source, path, "missing-parent-link", "warning", null, "Race version is missing raceName or raceSource.", null, "RaceVersionParentParser"));
@@ -170,8 +181,20 @@ internal static partial class DataQualityReportGenerator
 
     private static void AnalyzeClassSubclassGrantLevels(DataQualityContext context, string category, string name, string source, string path, JsonElement element)
     {
+        if (ReadBool(element, "isSidekick"))
+        {
+            return;
+        }
+
         if (!element.TryGetProperty("classFeatures", out var features) || features.ValueKind != JsonValueKind.Array)
         {
+            if (element.TryGetProperty("advancement", out var advancement)
+                && advancement.ValueKind == JsonValueKind.Array
+                && path.Contains("foundry.json", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
             context.AddCase(new UnhandledCase(category, name, source, path, "missing-class-features", "warning", null, "Class has no classFeatures array.", null, "ClassFeatureParser"));
             return;
         }
@@ -245,17 +268,29 @@ internal static partial class DataQualityReportGenerator
                 continue;
             }
 
+            var caseInfo = detector.ToCaseInfo();
+            if (detector.CaseType == "choice-candidate")
+            {
+                var choiceCase = ClassifyChoiceText(text);
+                if (choiceCase is null)
+                {
+                    continue;
+                }
+
+                caseInfo = choiceCase;
+            }
+
             context.AddCase(new UnhandledCase(
                 category,
                 name,
                 source,
                 path,
-                detector.CaseType,
-                detector.Severity,
-                detector.Confidence,
-                detector.Reason,
+                caseInfo.CaseType,
+                caseInfo.Severity,
+                caseInfo.Confidence,
+                caseInfo.Reason,
                 Preview(text),
-                detector.SuggestedParser));
+                caseInfo.SuggestedParser));
         }
     }
 
@@ -518,6 +553,21 @@ internal static partial class DataQualityReportGenerator
             : "";
     }
 
+    private static bool ReadBool(JsonElement element, string propertyName)
+    {
+        return element.ValueKind == JsonValueKind.Object
+            && element.TryGetProperty(propertyName, out var property)
+            && property.ValueKind == JsonValueKind.True;
+    }
+
+    private static bool IsUnnamedRaceOverlay(string category, string source, JsonElement element)
+    {
+        return category is "race-version"
+            && !string.IsNullOrWhiteSpace(ReadString(element, "raceName"))
+            && !string.IsNullOrWhiteSpace(ReadString(element, "raceSource"))
+            && string.Equals(source, ReadString(element, "raceSource"), StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool IsEntryLikePath(string path)
     {
         return path.Contains(".entries", StringComparison.OrdinalIgnoreCase)
@@ -552,8 +602,79 @@ internal static partial class DataQualityReportGenerator
         return string.IsNullOrWhiteSpace(value) ? fallback : value;
     }
 
+    private static TextCaseInfo? ClassifyChoiceText(string text)
+    {
+        var cleaned = text.Trim();
+        if (FlavorChoiceRegex().IsMatch(cleaned))
+        {
+            return null;
+        }
+
+        if (EquipmentChoiceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "equipment-choice-candidate",
+                "candidate",
+                0.82,
+                "Text appears to describe a starting equipment choice.",
+                "StartingEquipmentChoiceParser");
+        }
+
+        if (ToolChoiceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "tool-choice-candidate",
+                "candidate",
+                0.85,
+                "Text appears to require choosing a tool or tool type.",
+                "ToolChoiceTextParser");
+        }
+
+        if (LanguageChoiceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "language-choice-candidate",
+                "candidate",
+                0.85,
+                "Text appears to require choosing one or more languages.",
+                "LanguageChoiceTextParser");
+        }
+
+        if (SkillChoiceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "skill-choice-candidate",
+                "candidate",
+                0.85,
+                "Text appears to require choosing one or more skills.",
+                "SkillChoiceTextParser");
+        }
+
+        return new TextCaseInfo(
+            "choice-candidate",
+            "candidate",
+            0.75,
+            "Text appears to require a user choice.",
+            "ChoiceTextParser");
+    }
+
     [GeneratedRegex(@"\b(choose|select|pick)\s+(one|two|three|a|an|any|from|\d+)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ChoiceTextRegex();
+
+    [GeneratedRegex(@"\b(?:roll|choose from|pick\s+(?:a|an|your)?\s*(?:favorite|goal|ideal|bond|flaw|event|routine|scam|origin|homeland|territory|districts?|secret|quirk|personality|characteristic)|choose\s+(?:one\s+of\s+(?:the\s+)?(?:\w+\s+){0,3})?(?:a|an|your)?\s*(?:favorite|goal|ideal|bond|flaw|event|routine|scam|origin|homeland|territory|districts?|secret|quirk|personality|characteristic))\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex FlavorChoiceRegex();
+
+    [GeneratedRegex(@"\bChoose A or B\b|\{@item\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex EquipmentChoiceRegex();
+
+    [GeneratedRegex(@"\bchoose\s+(?:one|two|three|four|a|an|\d+).*(?:tool|tools|artisan's tools|gaming set|musical instrument|instrument|supplies|kit)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ToolChoiceRegex();
+
+    [GeneratedRegex(@"\bchoose\s+(?:one|two|three|four|a|an|\d+).*(?:language|languages|celestial|draconic|goblin|minotaur|common)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex LanguageChoiceRegex();
+
+    [GeneratedRegex(@"\bchoose\s+(?:one|two|three|four|a|an|\d+).*(?:skill|skills)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SkillChoiceRegex();
 
     [GeneratedRegex(@"\b(proficiency|proficiencies|expertise)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ProficiencyTextRegex();
@@ -636,6 +757,19 @@ internal static partial class DataQualityReportGenerator
 
     private sealed record TextDetector(
         Regex Pattern,
+        string CaseType,
+        string Severity,
+        double Confidence,
+        string Reason,
+        string SuggestedParser)
+    {
+        public TextCaseInfo ToCaseInfo()
+        {
+            return new TextCaseInfo(CaseType, Severity, Confidence, Reason, SuggestedParser);
+        }
+    }
+
+    private sealed record TextCaseInfo(
         string CaseType,
         string Severity,
         double Confidence,
