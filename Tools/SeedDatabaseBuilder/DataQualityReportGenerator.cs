@@ -543,8 +543,10 @@ internal static partial class DataQualityReportGenerator
             "damage-type-choice-candidate" => 79,
             "target-choice-candidate" => 67,
             "mixed-defense-candidate" => 66,
+            "object-defense-candidate" => 66,
             "damage-resistance-candidate" => 65,
             "defense-reference-candidate" => 65,
+            "defense-bypass-candidate" => 65,
             "damage-immunity-candidate" => 64,
             "defense-choice-candidate" => 64,
             "condition-save-effect-candidate" => 64,
@@ -629,36 +631,38 @@ internal static partial class DataQualityReportGenerator
             "proficiency-candidate" => 20,
             "target-choice-candidate" => 21,
             "mixed-defense-candidate" => 22,
-            "damage-resistance-candidate" => 23,
-            "defense-reference-candidate" => 24,
-            "damage-immunity-candidate" => 25,
-            "defense-choice-candidate" => 26,
-            "condition-save-effect-candidate" => 27,
-            "effect-immunity-candidate" => 28,
-            "condition-immunity-candidate" => 29,
-            "damage-vulnerability-candidate" => 30,
-            "defense-candidate" => 31,
-            "innate-spell-grant-candidate" => 30,
-            "spellcasting-ability-candidate" => 31,
-            "spell-list-access-candidate" => 32,
-            "spellcasting-prerequisite-candidate" => 33,
-            "spell-reference-list-candidate" => 34,
-            "spell-modifier-candidate" => 35,
-            "spellcasting-focus-candidate" => 36,
-            "spell-slot-rule-candidate" => 37,
-            "spellbook-candidate" => 38,
-            "item-spell-activation-candidate" => 39,
-            "proficiency-uses-scaling-candidate" => 40,
-            "proficiency-dc-scaling-candidate" => 41,
-            "proficiency-damage-scaling-candidate" => 42,
-            "proficiency-healing-scaling-candidate" => 43,
-            "proficiency-movement-scaling-candidate" => 44,
-            "proficiency-roll-scaling-candidate" => 45,
-            "spell-effect-reference-candidate" => 46,
-            "spell-rule-candidate" => 47,
-            "no-subclass-grant-levels" => 48,
-            "duplicate-source-version" => 49,
-            _ => 40
+            "object-defense-candidate" => 23,
+            "damage-resistance-candidate" => 24,
+            "defense-reference-candidate" => 25,
+            "defense-bypass-candidate" => 26,
+            "damage-immunity-candidate" => 27,
+            "defense-choice-candidate" => 28,
+            "condition-save-effect-candidate" => 29,
+            "effect-immunity-candidate" => 30,
+            "condition-immunity-candidate" => 31,
+            "damage-vulnerability-candidate" => 32,
+            "defense-candidate" => 33,
+            "innate-spell-grant-candidate" => 34,
+            "spellcasting-ability-candidate" => 35,
+            "spell-list-access-candidate" => 36,
+            "spellcasting-prerequisite-candidate" => 37,
+            "spell-reference-list-candidate" => 38,
+            "spell-modifier-candidate" => 39,
+            "spellcasting-focus-candidate" => 40,
+            "spell-slot-rule-candidate" => 41,
+            "spellbook-candidate" => 42,
+            "item-spell-activation-candidate" => 43,
+            "proficiency-uses-scaling-candidate" => 44,
+            "proficiency-dc-scaling-candidate" => 45,
+            "proficiency-damage-scaling-candidate" => 46,
+            "proficiency-healing-scaling-candidate" => 47,
+            "proficiency-movement-scaling-candidate" => 48,
+            "proficiency-roll-scaling-candidate" => 49,
+            "spell-effect-reference-candidate" => 50,
+            "spell-rule-candidate" => 51,
+            "no-subclass-grant-levels" => 52,
+            "duplicate-source-version" => 53,
+            _ => 60
         };
     }
 
@@ -967,6 +971,26 @@ internal static partial class DataQualityReportGenerator
                 0.82,
                 "Text appears to reference a shared resistance or defensive item entry.",
                 "DefenseReferenceParser");
+        }
+
+        if (ObjectDefenseRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "object-defense-candidate",
+                "candidate",
+                0.82,
+                "Text appears to define AC, HP, immunity, or resistance for an object or summoned object.",
+                "ObjectDefenseTextParser");
+        }
+
+        if (DefenseBypassRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "defense-bypass-candidate",
+                "candidate",
+                0.8,
+                "Text appears to bypass or ignore resistance or immunity rather than grant it.",
+                "DefenseBypassTextParser");
         }
 
         var hasResistance = DamageResistanceRegex().IsMatch(cleaned);
@@ -1399,6 +1423,12 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"^\s*(?:\{#itemEntry\s+(?:Potion|Ring) of Resistance(?:\|[^}]*)?}|Armor of (?:Acid|Cold|Fire|Force|Lightning|Necrotic|Poison|Psychic|Radiant|Thunder) Resistance(?:\|[^}]*)?)\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DefenseReferenceRegex();
 
+    [GeneratedRegex(@"\b(?:object|painting|tower|door|walls?|roof|device|orb|copy|figurine|construct|has AC|AC \d+|hit points|HP \d+)\b.*\b(?:immunity|immune|resistance|resistant|vulnerability|vulnerable)\b|\b(?:immunity|immune|resistance|resistant)\b.*\b(?:object|painting|tower|door|walls?|roof|device|orb|copy|figurine|construct|hit points|HP \d+)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ObjectDefenseRegex();
+
+    [GeneratedRegex(@"\b(?:overcoming|overcome|ignores?|ignore|bypass(?:es)?)\b.*\b(?:resistance|immunity|resistant|immune|nonmagical attacks|nonmagical damage)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex DefenseBypassRegex();
+
     [GeneratedRegex(@"\b(?:resistance|resistant)\b.*\b(?:acid|bludgeoning|cold|fire|force|lightning|necrotic|piercing|poison|psychic|radiant|slashing|thunder|all damage|damage type|\{\{damageType\}\}|damage)\b|\b(?:acid|bludgeoning|cold|fire|force|lightning|necrotic|piercing|poison|psychic|radiant|slashing|thunder)\s+damage\b.*\bresistance\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DamageResistanceRegex();
 
@@ -1462,7 +1492,7 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"\b(?:when you cast|whenever you cast|spell you cast|spells you cast|spell attacks?|spell attack rolls?|spell save DC|spell damage|spell components?|requires no spell components?|concentration on (?:it|a spell)|maintain .* concentration|ignore resistance|reroll .* spell|restore .* with a spell|triggering spell|chosen spell list|replace one of the spells)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellModifierRegex();
 
-    [GeneratedRegex(@"\b(?:charges?|expend|while holding|while wearing|while attuned|as an action|bonus action|command word|study .* at the end of a long rest|cast .* from the item|use .* to cast|use .* and cast|allows you to cast|cast \{@spell|gain the effect of the \{@spell|from the .* and cast|pressing .* you cast)\b.*\b(?:spell|cantrip|spell slot|{@spell)\b|^\s*cast\s+\{@spell\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(?:charges?|expend|while holding|while wearing|while attuned|as an action|bonus action|command word|study .* at the end of a long rest|cast .* from the item|use .* to cast|use .* and cast|allows you to cast|granted the ability to cast|gain the ability to cast|cast \{@spell|casts? \{@spell|gain the effect of the \{@spell|from the .* and cast|pressing .* you cast|summoned as if you had cast)\b.*\b(?:spell|cantrip|spell slot|{@spell)\b|^\s*cast\s+\{@spell\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ItemSpellActivationRegex();
 
     [GeneratedRegex(@"\b(?:attack or a spell|attack or spell|spell or effect|targeted by the spell|target of the .* spell|affected by the spell|benefit from several spells|cast on you|when .* casts? a spell|whenever .* casts? a spell|spell attack|spell save|spell damage|somatic components of a spell|concentrating on a spell|spell ends|spell takes effect|only .* spell can|spell or similar|as if affected by|provides no defense against|targeted by a spell that ends a curse|spells and other magical effects|spell can end|spell is sufficient|per the \{@spell|as per the \{@spell)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
