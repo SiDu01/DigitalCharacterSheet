@@ -544,8 +544,10 @@ internal static partial class DataQualityReportGenerator
             "target-choice-candidate" => 67,
             "mixed-defense-candidate" => 66,
             "damage-resistance-candidate" => 65,
+            "defense-reference-candidate" => 65,
             "damage-immunity-candidate" => 64,
             "defense-choice-candidate" => 64,
+            "condition-save-effect-candidate" => 64,
             "effect-immunity-candidate" => 63,
             "condition-immunity-candidate" => 63,
             "damage-vulnerability-candidate" => 63,
@@ -559,6 +561,12 @@ internal static partial class DataQualityReportGenerator
             "spell-slot-rule-candidate" => 57,
             "spellbook-candidate" => 57,
             "item-spell-activation-candidate" => 56,
+            "proficiency-uses-scaling-candidate" => 55,
+            "proficiency-dc-scaling-candidate" => 54,
+            "proficiency-damage-scaling-candidate" => 54,
+            "proficiency-healing-scaling-candidate" => 54,
+            "proficiency-movement-scaling-candidate" => 53,
+            "proficiency-roll-scaling-candidate" => 53,
             "spell-effect-reference-candidate" => 44,
             "mixed-proficiency-candidate" => 76,
             "expertise-candidate" => 75,
@@ -622,12 +630,14 @@ internal static partial class DataQualityReportGenerator
             "target-choice-candidate" => 21,
             "mixed-defense-candidate" => 22,
             "damage-resistance-candidate" => 23,
-            "damage-immunity-candidate" => 24,
-            "defense-choice-candidate" => 25,
-            "effect-immunity-candidate" => 26,
-            "condition-immunity-candidate" => 27,
-            "damage-vulnerability-candidate" => 28,
-            "defense-candidate" => 29,
+            "defense-reference-candidate" => 24,
+            "damage-immunity-candidate" => 25,
+            "defense-choice-candidate" => 26,
+            "condition-save-effect-candidate" => 27,
+            "effect-immunity-candidate" => 28,
+            "condition-immunity-candidate" => 29,
+            "damage-vulnerability-candidate" => 30,
+            "defense-candidate" => 31,
             "innate-spell-grant-candidate" => 30,
             "spellcasting-ability-candidate" => 31,
             "spell-list-access-candidate" => 32,
@@ -638,10 +648,16 @@ internal static partial class DataQualityReportGenerator
             "spell-slot-rule-candidate" => 37,
             "spellbook-candidate" => 38,
             "item-spell-activation-candidate" => 39,
-            "spell-effect-reference-candidate" => 40,
-            "spell-rule-candidate" => 41,
-            "no-subclass-grant-levels" => 42,
-            "duplicate-source-version" => 43,
+            "proficiency-uses-scaling-candidate" => 40,
+            "proficiency-dc-scaling-candidate" => 41,
+            "proficiency-damage-scaling-candidate" => 42,
+            "proficiency-healing-scaling-candidate" => 43,
+            "proficiency-movement-scaling-candidate" => 44,
+            "proficiency-roll-scaling-candidate" => 45,
+            "spell-effect-reference-candidate" => 46,
+            "spell-rule-candidate" => 47,
+            "no-subclass-grant-levels" => 48,
+            "duplicate-source-version" => 49,
             _ => 40
         };
     }
@@ -854,12 +870,7 @@ internal static partial class DataQualityReportGenerator
 
         if (ProficiencyBonusScalingRegex().IsMatch(cleaned))
         {
-            return new TextCaseInfo(
-                "proficiency-bonus-scaling-candidate",
-                "candidate",
-                0.8,
-                "Text appears to scale uses, rolls, or effects by proficiency bonus.",
-                "ProficiencyBonusScalingParser");
+            return ClassifyProficiencyBonusScalingText(cleaned);
         }
 
         if (categoryCount > 1 || MixedProficiencyRegex().IsMatch(cleaned))
@@ -948,13 +959,24 @@ internal static partial class DataQualityReportGenerator
             return null;
         }
 
+        if (DefenseReferenceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "defense-reference-candidate",
+                "candidate",
+                0.82,
+                "Text appears to reference a shared resistance or defensive item entry.",
+                "DefenseReferenceParser");
+        }
+
         var hasResistance = DamageResistanceRegex().IsMatch(cleaned);
         var hasDamageImmunity = DamageImmunityRegex().IsMatch(cleaned);
         var hasConditionImmunity = ConditionImmunityRegex().IsMatch(cleaned);
         var hasVulnerability = DamageVulnerabilityRegex().IsMatch(cleaned);
         var hasDefenseChoice = DefenseChoiceRegex().IsMatch(cleaned);
         var hasEffectImmunity = EffectImmunityRegex().IsMatch(cleaned);
-        var categoryCount = CountTrue(hasResistance, hasDamageImmunity, hasConditionImmunity, hasVulnerability, hasDefenseChoice, hasEffectImmunity);
+        var hasConditionSaveEffect = ConditionSaveEffectRegex().IsMatch(cleaned);
+        var categoryCount = CountTrue(hasResistance, hasDamageImmunity, hasConditionImmunity, hasVulnerability, hasDefenseChoice, hasEffectImmunity, hasConditionSaveEffect);
 
         if (categoryCount > 1)
         {
@@ -996,6 +1018,16 @@ internal static partial class DataQualityReportGenerator
                 "DefenseChoiceTextParser");
         }
 
+        if (hasConditionSaveEffect)
+        {
+            return new TextCaseInfo(
+                "condition-save-effect-candidate",
+                "candidate",
+                0.78,
+                "Text appears to impose or move a condition through a save or effect rather than grant a defensive trait.",
+                "ConditionSaveEffectParser");
+        }
+
         if (hasEffectImmunity)
         {
             return new TextCaseInfo(
@@ -1032,6 +1064,76 @@ internal static partial class DataQualityReportGenerator
             0.64,
             "Text references resistance, immunity, or vulnerability, but the defensive trait is not clear enough to classify.",
             "DefenseTextParser");
+    }
+
+    private static TextCaseInfo ClassifyProficiencyBonusScalingText(string text)
+    {
+        if (ProficiencyUsesScalingRegex().IsMatch(text))
+        {
+            return new TextCaseInfo(
+                "proficiency-uses-scaling-candidate",
+                "candidate",
+                0.84,
+                "Text appears to scale trait uses by proficiency bonus.",
+                "ProficiencyUsesScalingParser");
+        }
+
+        if (ProficiencyDcScalingRegex().IsMatch(text))
+        {
+            return new TextCaseInfo(
+                "proficiency-dc-scaling-candidate",
+                "candidate",
+                0.82,
+                "Text appears to define a save DC or escape DC using proficiency bonus.",
+                "ProficiencyDcScalingParser");
+        }
+
+        if (ProficiencyDamageScalingRegex().IsMatch(text))
+        {
+            return new TextCaseInfo(
+                "proficiency-damage-scaling-candidate",
+                "candidate",
+                0.82,
+                "Text appears to scale damage by proficiency bonus.",
+                "ProficiencyDamageScalingParser");
+        }
+
+        if (ProficiencyHealingScalingRegex().IsMatch(text))
+        {
+            return new TextCaseInfo(
+                "proficiency-healing-scaling-candidate",
+                "candidate",
+                0.82,
+                "Text appears to scale healing or temporary hit points by proficiency bonus.",
+                "ProficiencyHealingScalingParser");
+        }
+
+        if (ProficiencyMovementScalingRegex().IsMatch(text))
+        {
+            return new TextCaseInfo(
+                "proficiency-movement-scaling-candidate",
+                "candidate",
+                0.8,
+                "Text appears to scale movement or distance by proficiency bonus.",
+                "ProficiencyMovementScalingParser");
+        }
+
+        if (ProficiencyRollScalingRegex().IsMatch(text))
+        {
+            return new TextCaseInfo(
+                "proficiency-roll-scaling-candidate",
+                "candidate",
+                0.78,
+                "Text appears to add proficiency bonus to a roll or check.",
+                "ProficiencyRollScalingParser");
+        }
+
+        return new TextCaseInfo(
+            "proficiency-bonus-scaling-candidate",
+            "candidate",
+            0.8,
+            "Text appears to scale uses, rolls, or effects by proficiency bonus.",
+            "ProficiencyBonusScalingParser");
     }
 
     private static TextCaseInfo? ClassifySpellText(string category, string text)
@@ -1249,6 +1351,24 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"\b(?:equal to your (?:{@variantrule\s+)?proficiency|proficiency bonus|number of times equal to your|PB)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ProficiencyBonusScalingRegex();
 
+    [GeneratedRegex(@"\b(?:number of times equal to your|number of .* equal to your .*Proficiency Bonus|use this trait a number of times|use this .* a number of times|regain all expended uses|PB uses)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ProficiencyUsesScalingRegex();
+
+    [GeneratedRegex(@"\b(?:DC equals|DC for this|escape \{@dc|save DC|DC .*Proficiency Bonus|8 \+ your proficiency bonus|8 plus your proficiency bonus)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ProficiencyDcScalingRegex();
+
+    [GeneratedRegex(@"\b(?:damage equal to|extra damage equals|extra damage .*Proficiency Bonus|add your .*Proficiency Bonus.*damage|add your proficiency bonus.*damage|takes .* plus your proficiency bonus|damage .* proficiency bonus|damage .*Proficiency Bonus)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ProficiencyDamageScalingRegex();
+
+    [GeneratedRegex(@"\b(?:hit points equal to|temporary hit points equal to|Hit Points.*equal to.*Proficiency Bonus|regains .* plus your|healing .* proficiency bonus|restore .* plus your proficiency bonus)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ProficiencyHealingScalingRegex();
+
+    [GeneratedRegex(@"\b(?:feet equal to|five times your proficiency bonus|five times your .*Proficiency Bonus|distance .* proficiency bonus|jump .* proficiency bonus)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ProficiencyMovementScalingRegex();
+
+    [GeneratedRegex(@"\b(?:add your proficiency bonus to|add your .*Proficiency Bonus.* to|bonus to the roll equal to|roll .* plus your proficiency bonus|initiative rolls|Initiative.*Proficiency Bonus|ability check .* proficiency bonus)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ProficiencyRollScalingRegex();
+
     [GeneratedRegex(@"\b(?:skill|skills|{@skill\b|acrobatics|animal handling|arcana|athletics|deception|history|insight|intimidation|investigation|medicine|nature|perception|performance|persuasion|religion|sleight of hand|stealth|survival)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SkillProficiencyRegex();
 
@@ -1276,6 +1396,9 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"^\s*(?:damage|draconic)\s+resistance\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DefenseHeadingRegex();
 
+    [GeneratedRegex(@"^\s*(?:\{#itemEntry\s+(?:Potion|Ring) of Resistance(?:\|[^}]*)?}|Armor of (?:Acid|Cold|Fire|Force|Lightning|Necrotic|Poison|Psychic|Radiant|Thunder) Resistance(?:\|[^}]*)?)\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex DefenseReferenceRegex();
+
     [GeneratedRegex(@"\b(?:resistance|resistant)\b.*\b(?:acid|bludgeoning|cold|fire|force|lightning|necrotic|piercing|poison|psychic|radiant|slashing|thunder|all damage|damage type|\{\{damageType\}\}|damage)\b|\b(?:acid|bludgeoning|cold|fire|force|lightning|necrotic|piercing|poison|psychic|radiant|slashing|thunder)\s+damage\b.*\bresistance\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DamageResistanceRegex();
 
@@ -1287,6 +1410,9 @@ internal static partial class DataQualityReportGenerator
 
     [GeneratedRegex(@"\b(?:immune|immunity)\b.*\b(?:curse|curses|spell|spells|effect|effects|magic|magical|read your thoughts|lying|telepathically|airless environment|gas|inhaled|disease)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex EffectImmunityRegex();
+
+    [GeneratedRegex(@"\b(?:must succeed on|make a .* saving throw|failed save|on a failed save|move one of the following conditions|be \{@condition|become \{@condition)\b.*\b(?:\{@condition|condition|poisoned|frightened|blinded|deafened|charmed|paralyzed|stunned)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ConditionSaveEffectRegex();
 
     [GeneratedRegex(@"\b(?:immune|immunity|can't be|cannot be)\b.*\b(?:disease|exhaustion|poisoned|charmed|frightened|paralyzed|petrified|stunned|blinded|deafened|grappled|incapacitated|invisible|prone|restrained|unconscious|\{@condition\b)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ConditionImmunityRegex();
@@ -1336,10 +1462,10 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"\b(?:when you cast|whenever you cast|spell you cast|spells you cast|spell attacks?|spell attack rolls?|spell save DC|spell damage|spell components?|requires no spell components?|concentration on (?:it|a spell)|maintain .* concentration|ignore resistance|reroll .* spell|restore .* with a spell|triggering spell|chosen spell list|replace one of the spells)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellModifierRegex();
 
-    [GeneratedRegex(@"\b(?:charges?|expend|while holding|while wearing|while attuned|as an action|bonus action|command word|study .* at the end of a long rest|cast .* from the item|use .* to cast|allows you to cast|cast \{@spell|gain the effect of the \{@spell|from the .* and cast)\b.*\b(?:spell|cantrip|spell slot|{@spell)\b|^\s*cast\s+\{@spell\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(?:charges?|expend|while holding|while wearing|while attuned|as an action|bonus action|command word|study .* at the end of a long rest|cast .* from the item|use .* to cast|use .* and cast|allows you to cast|cast \{@spell|gain the effect of the \{@spell|from the .* and cast|pressing .* you cast)\b.*\b(?:spell|cantrip|spell slot|{@spell)\b|^\s*cast\s+\{@spell\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ItemSpellActivationRegex();
 
-    [GeneratedRegex(@"\b(?:attack or a spell|attack or spell|spell or effect|targeted by the spell|affected by the spell|cast on you|when .* casts? a spell|whenever .* casts? a spell|spell attack|spell save|spell damage|concentrating on a spell|spell ends|spell takes effect|only .* spell can|spell or similar|as if affected by|provides no defense against|targeted by a spell that ends a curse)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(?:attack or a spell|attack or spell|spell or effect|targeted by the spell|target of the .* spell|affected by the spell|benefit from several spells|cast on you|when .* casts? a spell|whenever .* casts? a spell|spell attack|spell save|spell damage|somatic components of a spell|concentrating on a spell|spell ends|spell takes effect|only .* spell can|spell or similar|as if affected by|provides no defense against|targeted by a spell that ends a curse|spells and other magical effects|spell can end|spell is sufficient|per the \{@spell|as per the \{@spell)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellEffectReferenceRegex();
 
     [GeneratedRegex(@"\s+", RegexOptions.CultureInvariant)]
