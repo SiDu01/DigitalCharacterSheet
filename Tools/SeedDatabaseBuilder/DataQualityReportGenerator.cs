@@ -279,10 +279,12 @@ internal static partial class DataQualityReportGenerator
         AppendGroupedCounts(builder, "Severity", context.Cases.GroupBy(item => item.Severity));
         AppendGroupedCounts(builder, "Case Type", context.Cases.GroupBy(item => item.CaseType));
         AppendGroupedCounts(builder, "Category", context.Cases.GroupBy(item => item.Category));
+        AppendParserBacklog(builder, context.Cases);
+        AppendCaseTypeDetails(builder, context.Cases);
         builder.AppendLine();
-        builder.AppendLine("## Top Cases");
+        builder.AppendLine("## Highest Priority Cases");
         builder.AppendLine();
-        foreach (var item in context.Cases.Take(100))
+        foreach (var item in SortCasesForReview(context.Cases).Take(100))
         {
             AppendCase(builder, item);
         }
@@ -303,11 +305,12 @@ internal static partial class DataQualityReportGenerator
         builder.AppendLine();
         builder.AppendLine($"Generated: {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
         builder.AppendLine();
-        foreach (var group in cases.GroupBy(item => item.CaseType).OrderByDescending(group => group.Count()).ThenBy(group => group.Key))
+        foreach (var group in cases.GroupBy(item => item.CaseType).OrderByDescending(group => CalculateParserPriority(group)).ThenBy(group => group.Key))
         {
             builder.AppendLine($"## {group.Key} ({group.Count()})");
             builder.AppendLine();
-            foreach (var item in group.Take(100))
+            AppendGroupedCounts(builder, "Categories", group.GroupBy(item => item.Category));
+            foreach (var item in SortCasesForReview(group).Take(100))
             {
                 AppendCase(builder, item);
             }
@@ -320,6 +323,72 @@ internal static partial class DataQualityReportGenerator
         }
 
         return builder.ToString();
+    }
+
+    private static void AppendParserBacklog(StringBuilder builder, IReadOnlyList<UnhandledCase> cases)
+    {
+        builder.AppendLine("## Suggested Parser Backlog");
+        builder.AppendLine();
+        builder.AppendLine("This is a coarse priority view. High-priority small groups are often good first parser targets; very large groups may need tighter detectors before implementation.");
+        builder.AppendLine();
+        builder.AppendLine("| Priority | Suggested parser | Cases | Main case types | Main categories |");
+        builder.AppendLine("| ---: | --- | ---: | --- | --- |");
+
+        foreach (var group in cases
+            .Where(item => !string.IsNullOrWhiteSpace(item.SuggestedParser))
+            .GroupBy(item => item.SuggestedParser!)
+            .OrderByDescending(CalculateParserPriority)
+            .ThenBy(group => group.Key))
+        {
+            var caseTypes = string.Join(", ", group
+                .GroupBy(item => item.CaseType)
+                .OrderByDescending(item => item.Count())
+                .ThenBy(item => item.Key)
+                .Take(3)
+                .Select(item => $"{item.Key} ({item.Count()})"));
+            var categories = string.Join(", ", group
+                .GroupBy(item => item.Category)
+                .OrderByDescending(item => item.Count())
+                .ThenBy(item => item.Key)
+                .Take(4)
+                .Select(item => $"{item.Key} ({item.Count()})"));
+
+            builder.AppendLine($"| {CalculateParserPriority(group):0.##} | `{group.Key}` | {group.Count()} | {caseTypes} | {categories} |");
+        }
+
+        builder.AppendLine();
+    }
+
+    private static void AppendCaseTypeDetails(StringBuilder builder, IReadOnlyList<UnhandledCase> cases)
+    {
+        builder.AppendLine("## Case Type Details");
+        builder.AppendLine();
+        foreach (var group in cases
+            .GroupBy(item => item.CaseType)
+            .OrderByDescending(group => CalculateParserPriority(group))
+            .ThenBy(group => group.Key))
+        {
+            builder.AppendLine($"### {group.Key} ({group.Count()})");
+            builder.AppendLine();
+            builder.AppendLine("Top categories:");
+            foreach (var category in group
+                .GroupBy(item => item.Category)
+                .OrderByDescending(item => item.Count())
+                .ThenBy(item => item.Key)
+                .Take(6))
+            {
+                builder.AppendLine($"- {category.Key}: {category.Count()}");
+            }
+
+            builder.AppendLine();
+            builder.AppendLine("Representative examples:");
+            foreach (var item in PickRepresentativeCases(group, 5))
+            {
+                builder.AppendLine($"- `{item.Category}` {Fallback(item.Name, "(unnamed)")} ({Fallback(item.Source, "no source")}): `{item.Path}`");
+            }
+
+            builder.AppendLine();
+        }
     }
 
     private static void AppendGroupedCounts(StringBuilder builder, string title, IEnumerable<IGrouping<string, UnhandledCase>> groups)
@@ -355,6 +424,88 @@ internal static partial class DataQualityReportGenerator
             builder.AppendLine("> " + item.TextPreview.ReplaceLineEndings(" "));
         }
         builder.AppendLine();
+    }
+
+    private static IEnumerable<UnhandledCase> PickRepresentativeCases(IEnumerable<UnhandledCase> cases, int count)
+    {
+        return SortCasesForReview(cases)
+            .GroupBy(item => $"{item.Category}|{item.Name}|{item.Source}", StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .Take(count);
+    }
+
+    private static IEnumerable<UnhandledCase> SortCasesForReview(IEnumerable<UnhandledCase> cases)
+    {
+        return cases
+            .OrderBy(item => SeverityRank(item.Severity))
+            .ThenBy(item => CaseTypeRank(item.CaseType))
+            .ThenBy(item => item.Category)
+            .ThenBy(item => item.Name)
+            .ThenBy(item => item.Source)
+            .ThenBy(item => item.Path);
+    }
+
+    private static double CalculateParserPriority(IEnumerable<UnhandledCase> cases)
+    {
+        var items = cases.ToList();
+        var severityScore = items.Max(item => item.Severity switch
+        {
+            "error" => 12,
+            "warning" => 5,
+            "unhandled" => 4,
+            "candidate" => 2,
+            _ => 1
+        });
+        var caseTypeScore = items.Max(item => item.CaseType switch
+        {
+            "missing-name" => 95,
+            "missing-parent-link" => 90,
+            "repeatable-feat" => 88,
+            "ability-score-candidate" => 84,
+            "missing-class-features" => 82,
+            "choice-candidate" => 80,
+            "proficiency-candidate" => 72,
+            "defense-candidate" => 62,
+            "no-subclass-grant-levels" => 58,
+            "duplicate-source-version" => 48,
+            "spell-rule-candidate" => 30,
+            _ => 2
+        });
+        var countScore = Math.Log10(items.Count + 1) * 5;
+
+        return Math.Round(caseTypeScore + severityScore + countScore, 2);
+    }
+
+    private static int SeverityRank(string severity)
+    {
+        return severity switch
+        {
+            "error" => 0,
+            "warning" => 1,
+            "unhandled" => 2,
+            "candidate" => 3,
+            "wiki-only" => 4,
+            _ => 5
+        };
+    }
+
+    private static int CaseTypeRank(string caseType)
+    {
+        return caseType switch
+        {
+            "missing-name" => 0,
+            "missing-parent-link" => 1,
+            "missing-class-features" => 2,
+            "repeatable-feat" => 3,
+            "ability-score-candidate" => 4,
+            "choice-candidate" => 5,
+            "proficiency-candidate" => 6,
+            "defense-candidate" => 7,
+            "no-subclass-grant-levels" => 8,
+            "duplicate-source-version" => 9,
+            "spell-rule-candidate" => 10,
+            _ => 20
+        };
     }
 
     private static string ReadString(JsonElement element, string propertyName)
