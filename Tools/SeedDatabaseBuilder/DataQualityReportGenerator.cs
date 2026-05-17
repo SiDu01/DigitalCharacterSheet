@@ -256,6 +256,7 @@ internal static partial class DataQualityReportGenerator
             return;
         }
 
+        var emittedSemanticKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var detector in TextDetectors)
         {
             if (!detector.Pattern.IsMatch(text))
@@ -278,6 +279,21 @@ internal static partial class DataQualityReportGenerator
                 }
 
                 caseInfo = choiceCase;
+            }
+            else if (detector.CaseType == "proficiency-candidate")
+            {
+                var proficiencyCase = ClassifyProficiencyText(text);
+                if (proficiencyCase is null)
+                {
+                    continue;
+                }
+
+                caseInfo = proficiencyCase;
+            }
+
+            if (!emittedSemanticKeys.Add(GetSemanticKey(caseInfo.CaseType)))
+            {
+                continue;
             }
 
             context.AddCase(new UnhandledCase(
@@ -500,7 +516,16 @@ internal static partial class DataQualityReportGenerator
             "ability-score-candidate" => 84,
             "missing-class-features" => 82,
             "choice-candidate" => 80,
-            "proficiency-candidate" => 72,
+            "mixed-proficiency-candidate" => 76,
+            "expertise-candidate" => 75,
+            "skill-proficiency-candidate" => 74,
+            "tool-proficiency-candidate" => 73,
+            "language-proficiency-candidate" => 72,
+            "weapon-proficiency-candidate" => 72,
+            "armor-proficiency-candidate" => 72,
+            "saving-throw-proficiency-candidate" => 72,
+            "proficiency-bonus-scaling-candidate" => 71,
+            "proficiency-candidate" => 70,
             "defense-candidate" => 62,
             "no-subclass-grant-levels" => 58,
             "duplicate-source-version" => 48,
@@ -535,11 +560,20 @@ internal static partial class DataQualityReportGenerator
             "repeatable-feat" => 3,
             "ability-score-candidate" => 4,
             "choice-candidate" => 5,
-            "proficiency-candidate" => 6,
-            "defense-candidate" => 7,
-            "no-subclass-grant-levels" => 8,
-            "duplicate-source-version" => 9,
-            "spell-rule-candidate" => 10,
+            "mixed-proficiency-candidate" => 6,
+            "expertise-candidate" => 7,
+            "skill-proficiency-candidate" => 8,
+            "tool-proficiency-candidate" => 9,
+            "language-proficiency-candidate" => 10,
+            "weapon-proficiency-candidate" => 11,
+            "armor-proficiency-candidate" => 12,
+            "saving-throw-proficiency-candidate" => 13,
+            "proficiency-bonus-scaling-candidate" => 14,
+            "proficiency-candidate" => 15,
+            "defense-candidate" => 16,
+            "no-subclass-grant-levels" => 17,
+            "duplicate-source-version" => 18,
+            "spell-rule-candidate" => 19,
             _ => 20
         };
     }
@@ -658,6 +692,137 @@ internal static partial class DataQualityReportGenerator
             "ChoiceTextParser");
     }
 
+    private static TextCaseInfo? ClassifyProficiencyText(string text)
+    {
+        var cleaned = text.Trim();
+        if (ProficiencyHeadingRegex().IsMatch(cleaned))
+        {
+            return null;
+        }
+
+        var hasExpertise = ExpertiseRegex().IsMatch(cleaned);
+        var hasSkill = SkillProficiencyRegex().IsMatch(cleaned);
+        var hasTool = ToolProficiencyRegex().IsMatch(cleaned);
+        var hasLanguage = LanguageProficiencyRegex().IsMatch(cleaned);
+        var hasWeapon = WeaponProficiencyRegex().IsMatch(cleaned);
+        var hasArmor = ArmorProficiencyRegex().IsMatch(cleaned);
+        var hasSavingThrow = SavingThrowProficiencyRegex().IsMatch(cleaned);
+        var categoryCount = CountTrue(hasSkill, hasTool, hasLanguage, hasWeapon, hasArmor, hasSavingThrow);
+
+        if (hasExpertise)
+        {
+            return new TextCaseInfo(
+                "expertise-candidate",
+                "candidate",
+                0.86,
+                "Text appears to grant expertise or double a proficiency bonus.",
+                "ExpertiseTextParser");
+        }
+
+        if (ProficiencyBonusScalingRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "proficiency-bonus-scaling-candidate",
+                "candidate",
+                0.8,
+                "Text appears to scale uses, rolls, or effects by proficiency bonus.",
+                "ProficiencyBonusScalingParser");
+        }
+
+        if (categoryCount > 1 || MixedProficiencyRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "mixed-proficiency-candidate",
+                "candidate",
+                0.78,
+                "Text appears to grant or modify multiple proficiency types.",
+                "ProficiencyTextParser");
+        }
+
+        if (hasSkill)
+        {
+            return new TextCaseInfo(
+                "skill-proficiency-candidate",
+                "candidate",
+                0.82,
+                "Text appears to grant or modify skill proficiency.",
+                "SkillProficiencyTextParser");
+        }
+
+        if (hasTool)
+        {
+            return new TextCaseInfo(
+                "tool-proficiency-candidate",
+                "candidate",
+                0.82,
+                "Text appears to grant or modify tool proficiency.",
+                "ToolProficiencyTextParser");
+        }
+
+        if (hasLanguage)
+        {
+            return new TextCaseInfo(
+                "language-proficiency-candidate",
+                "candidate",
+                0.82,
+                "Text appears to grant or modify language proficiency.",
+                "LanguageProficiencyTextParser");
+        }
+
+        if (hasWeapon)
+        {
+            return new TextCaseInfo(
+                "weapon-proficiency-candidate",
+                "candidate",
+                0.82,
+                "Text appears to grant or modify weapon proficiency.",
+                "WeaponProficiencyTextParser");
+        }
+
+        if (hasArmor)
+        {
+            return new TextCaseInfo(
+                "armor-proficiency-candidate",
+                "candidate",
+                0.82,
+                "Text appears to grant or modify armor or shield proficiency.",
+                "ArmorProficiencyTextParser");
+        }
+
+        if (hasSavingThrow)
+        {
+            return new TextCaseInfo(
+                "saving-throw-proficiency-candidate",
+                "candidate",
+                0.82,
+                "Text appears to grant or modify saving throw proficiency.",
+                "SavingThrowProficiencyTextParser");
+        }
+
+        return new TextCaseInfo(
+            "proficiency-candidate",
+            "candidate",
+            0.65,
+            "Text references proficiency, but the target type is not clear enough to classify.",
+            "ProficiencyTextParser");
+    }
+
+    private static string GetSemanticKey(string caseType)
+    {
+        return caseType switch
+        {
+            "skill-choice-candidate" or "skill-proficiency-candidate" => "skill-proficiency",
+            "tool-choice-candidate" or "tool-proficiency-candidate" => "tool-proficiency",
+            "language-choice-candidate" or "language-proficiency-candidate" => "language-proficiency",
+            _ => caseType
+        };
+    }
+
+    private static int CountTrue(params bool[] values)
+    {
+        return values.Count(value => value);
+    }
+
     [GeneratedRegex(@"\b(choose|select|pick)\s+(one|two|three|a|an|any|from|\d+)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ChoiceTextRegex();
 
@@ -678,6 +843,36 @@ internal static partial class DataQualityReportGenerator
 
     [GeneratedRegex(@"\b(proficiency|proficiencies|expertise)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ProficiencyTextRegex();
+
+    [GeneratedRegex(@"^\s*proficiencies\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ProficiencyHeadingRegex();
+
+    [GeneratedRegex(@"\b(?:expertise|proficiency bonus is doubled|double(?:d)?\s+(?:your\s+)?proficiency bonus|twice your proficiency bonus)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ExpertiseRegex();
+
+    [GeneratedRegex(@"\b(?:equal to your (?:{@variantrule\s+)?proficiency|proficiency bonus|number of times equal to your|PB)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ProficiencyBonusScalingRegex();
+
+    [GeneratedRegex(@"\b(?:skill|skills|{@skill\b|acrobatics|animal handling|arcana|athletics|deception|history|insight|intimidation|investigation|medicine|nature|perception|performance|persuasion|religion|sleight of hand|stealth|survival)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SkillProficiencyRegex();
+
+    [GeneratedRegex(@"\b(?:tool|tools|artisan's tools|gaming set|musical instrument|musical instruments|instrument|instruments|utensil|utensils|vehicle|vehicles|kit|supplies|thieves' tools|disguise kit|forgery kit|herbalism kit|navigator's tools|poisoner's kit)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ToolProficiencyRegex();
+
+    [GeneratedRegex(@"\b(?:language|languages|common|dwarvish|elvish|giant|gnomish|goblin|halfling|orc|abyssal|celestial|draconic|deep speech|infernal|primordial|sylvan|undercommon|minotaur)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex LanguageProficiencyRegex();
+
+    [GeneratedRegex(@"\b(?:weapon|weapons|firearm|firearms|battleaxe|handaxe|light hammer|warhammer|longsword|shortsword|shortbow|longbow|khopesh|spear|javelin|rapier|hand crossbow|trident|net|simple weapons|martial weapons)\b|\{@item\s+(?:battleaxe|handaxe|light hammer|warhammer|longsword|shortsword|shortbow|longbow|spear|javelin|rapier|hand crossbow|trident|net)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex WeaponProficiencyRegex();
+
+    [GeneratedRegex(@"\b(?:armor|armour|shield|shields|light armor|medium armor|heavy armor)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ArmorProficiencyRegex();
+
+    [GeneratedRegex(@"\b(?:saving throw|saving throws|strength saving throws?|dexterity saving throws?|constitution saving throws?|intelligence saving throws?|wisdom saving throws?|charisma saving throws?)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SavingThrowProficiencyRegex();
+
+    [GeneratedRegex(@"\b(?:skill or tool|skill, tool|tools? or skills?|skills? or tools?|language or tool|tool or language)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex MixedProficiencyRegex();
 
     [GeneratedRegex(@"\b(resistance|resistant|immunity|immune|vulnerability|vulnerable)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DefenseTextRegex();
