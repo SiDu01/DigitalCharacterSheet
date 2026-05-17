@@ -10,6 +10,7 @@ The current scope includes:
 - Character sheet with Main, Spells, Combat, Features, Items, and Proficiencies areas
 - Spell browser and character spell lists
 - Item browser and character inventory
+- Read-only wiki/library areas for conditions, rules, feats, races, and classes
 - Level-up workflow
 - Local settings, themes, bookmarks, and recent entries
 - Import/export support for characters
@@ -32,11 +33,12 @@ UI text should stay in English.
 - Main app folder / repository root: `D:\Dev\Digital Character Sheet`
 - Seed database builder: `D:\Dev\Digital Character Sheet\Tools\SeedDatabaseBuilder`
 - Seed database output: `D:\Dev\Digital Character Sheet\Resources\Raw\seed\digital-character-sheet.db3`
-- Local 5e Tools checkout/data folder: developer-local, not committed
+- Local 5e Tools checkout/data folder: `D:\Dev\Digital Character Sheet\external Resources\5e Tools\data`
 
 Important app files:
 
 - `Components\Pages\Home.razor`
+- `Components\Pages\Library.razor`
 - `Components\Pages\CharacterCreate.razor`
 - `Components\Pages\CharacterEdit.razor`
 - `Components\Pages\CharacterDetail.razor`
@@ -94,6 +96,7 @@ Definition data includes:
 
 - Spells
 - Items
+- Wiki entries
 - Classes
 - Subclasses
 - Races / ancestries
@@ -134,7 +137,7 @@ Choice JSON is used for selections that come from rules, such as ability choices
 
 ### Home
 
-The home page has tiles, bookmarks, and recently viewed entries. Items from bookmarks/recent entries should deep-link to the specific item, not just the category page.
+The home page has tiles, bookmarks, and recently viewed entries. There is no dashboard tile for Settings; settings remain available through navigation. Items and wiki entries from bookmarks/recent entries should deep-link to their specific detail route, not just the category page.
 
 ### Spells
 
@@ -145,6 +148,28 @@ General spell list and character spell lists exist. Spells with the same name ar
 General item list exists with categories and search. Magic item variants are grouped to avoid huge duplicate lists. Character inventory exists, with add-item flow using a full-screen item list modeled after the general item browser.
 
 Item effects are partially supported and should continue moving toward dynamic effects on the character.
+
+### Library / Wiki
+
+The Library is a read-only lookup area backed by the `WikiEntries` table. It currently includes:
+
+- Conditions and diseases
+- Actions and variant rules
+- Feats
+- Races and race versions
+- Classes and subclasses
+
+The Library is organized as separate category areas rather than one large combined list. Within a category, primary records are listed on the left and details are shown on the right.
+
+Important UX rules:
+
+- Subclasses are not shown as independent list records. They appear as activatable badges inside their parent class detail.
+- Race versions are not shown as independent list records. They appear as activatable badges inside their parent race detail.
+- Multiple subclass/race-version badges can be active at the same time.
+- If equal-named subclasses or race versions exist from multiple sources, they are grouped under one badge and the source is selected inside the detail.
+- Class descriptions are split by level.
+- Active subclass features are inserted into the class level list at the level where the class grants subclass features.
+- Library entries can be bookmarked and tracked as recently viewed, but bookmarks and recent entries are displayed on the Dashboard only, not inside the Library categories.
 
 ### Character Creator
 
@@ -210,6 +235,13 @@ Settings uses tabs. Theme switching exists between the default theme and the lea
 - Repository structure was flattened so the MAUI project now lives at `D:\Dev\Digital Character Sheet`.
 - Character Edit was rebuilt into a free-form edit center with section navigation, an overview, reference pane, class cards, and direct subclass editing.
 - Developer documentation was added under `docs\`.
+- A read-only Library/Wiki was added for Conditions, Rules, Feats, Races, and Classes.
+- Library categories were separated into their own areas instead of one combined list.
+- Subclasses and race versions were moved into their parent detail views as activatable badges.
+- Equal-named subclass/race-version entries from different sources are grouped with source switching.
+- Class feature detail in the Library is split by level and active subclass features are merged into the relevant class levels.
+- Library bookmarks and recently viewed entries are tracked for the Dashboard only.
+- The Dashboard Settings tile was removed.
 
 ## Known Issues / Watchlist
 
@@ -232,13 +264,14 @@ Before handing work back after meaningful changes:
 - Smoke test Character Edit if creator-related logic changed.
 - Smoke test Level-Up if class/feat/effect logic changed.
 - Open general Spells and Items lists.
+- Open Library categories, especially Classes and Races, after wiki changes.
 - If database/importer changed, rebuild seed database and verify app startup.
 - If tablet-specific behavior changed, install and test on tablet.
 
 ## Useful Investigation Tips
 
 - Prefer `rg` / `rg --files` for searches.
-- Check raw source examples in `D:\Dev\Digital Character Sheet\5e Tools\data`.
+- Check raw source examples in `D:\Dev\Digital Character Sheet\external Resources\5e Tools\data`.
 - For class level features, inspect `data\class\class-*.json`.
 - For feat category checks, use the imported `FeatDefinition.Category`; Origin Feats use category `O`.
 - If runtime behavior seems inconsistent with JSON, check whether the seed database was regenerated.
