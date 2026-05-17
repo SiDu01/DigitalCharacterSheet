@@ -58,6 +58,7 @@ The builder asks for a local `5e Tools\data` folder and writes the `.db3` file i
 - [Architecture](docs/ARCHITECTURE.md)
 - [Data and Rules](docs/DATA_AND_RULES.md)
 - [Development Workflow](docs/DEVELOPMENT.md)
+- [Restart Architecture Notes](docs/RESTART_ARCHITECTURE_NOTES.md)
 - [Build Notes](BUILDING.md)
 - [Handoff](Handoff.md)
 

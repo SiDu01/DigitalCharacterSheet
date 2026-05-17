@@ -52,6 +52,13 @@ Important app files:
 - `Services\DescriptionRuleMapper.cs`
 - `wwwroot\css\app.css`
 
+Related documentation:
+
+- `docs\ARCHITECTURE.md`
+- `docs\DATA_AND_RULES.md`
+- `docs\DEVELOPMENT.md`
+- `docs\RESTART_ARCHITECTURE_NOTES.md`
+
 ## Build Commands
 
 Run from:
