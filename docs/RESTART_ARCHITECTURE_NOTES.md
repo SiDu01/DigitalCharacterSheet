@@ -132,7 +132,75 @@ Rules:
 - character selections must preserve the exact source version selected
 - source preference should influence defaults, not erase alternatives
 
-## 8. Test the Difficult Rule Nodes Early
+## 8. Keep SQLite, but Narrow Its Responsibility
+
+A full restart should still keep SQLite. The app needs local reference data, user-owned character data, searching, filtering, migrations, source settings, bookmarks, recent entries, inventory state, and import/export behavior. Removing the database would likely make the app simpler only for a much smaller wiki-only tool.
+
+SQLite should not become the rule engine. It should be a storage and query layer.
+
+Recommended data flow:
+
+```text
+5e Tools JSON
+   -> Import/Normalize Tool
+   -> SQLite Seed DB
+   -> App Query Services
+   -> Rule Evaluation Layer
+   -> UI
+```
+
+Avoid this shape:
+
+```text
+SQLite rows
+   -> UI pages directly interpreting raw JSON and rule text
+```
+
+Useful service boundaries:
+
+- ReferenceDataStore: reads spells, items, wiki entries, classes, races, feats, and source versions.
+- CharacterStore: persists user-owned character state.
+- WikiService: provides read-only lookup data.
+- RuleEvaluationService: calculates choices, effects, warnings, and derived values.
+- ChoiceService: creates, validates, and persists rule choices.
+
+SQLite could be skipped only for a much smaller app with no complex character persistence, no migrations, few reference files, minimal filtering, and no offline state beyond simple preferences. That is not the current product shape.
+
+## 9. Prefer an Internal UI System Over a Large UI Framework
+
+A UI framework could help with common controls, but it should not be introduced just to avoid writing components. The app has a specific Android-tablet and leather-journal direction, and many external Blazor frameworks bring strong visual assumptions.
+
+Frameworks worth evaluating if the UI grows hard to maintain:
+
+- MudBlazor: mature and complete, but strongly Material-styled.
+- Blazorise: flexible and backend-agnostic, but still needs careful theming.
+- Fluent UI Blazor: polished, but more Microsoft/desktop-like.
+- Radzen Blazor: broad business-component coverage, but likely needs heavy visual adaptation.
+
+Recommended default:
+
+- do not replace the current UI with a full external framework
+- build a small internal component system around the app's real patterns
+- keep styling compatible with the default and leather themes
+- use external components only for targeted needs after testing them in MAUI Blazor Hybrid
+
+Useful internal components:
+
+- AppButton
+- IconButton
+- SourceSwitcher
+- SegmentedControl
+- DefinitionBrowser
+- DetailPane
+- FeatureLevelList
+- ChoicePanel
+- StatStepper
+- SheetPanel
+- ActivityBookmarkButton
+
+The goal is not to invent a framework. The goal is to stop repeating master/detail, source switching, choice, badge, and feature-list logic across pages.
+
+## 10. Test the Difficult Rule Nodes Early
 
 The test suite should focus first on high-risk rule and import examples, not broad UI coverage.
 
@@ -151,7 +219,7 @@ Important regression cases:
 
 These tests should run against importer output and rule evaluation, not only UI components.
 
-## 9. Build Reusable Browse and Detail Components Earlier
+## 11. Build Reusable Browse and Detail Components Earlier
 
 The app has several recurring surfaces:
 
@@ -175,7 +243,7 @@ A fresh implementation should build these as reusable UI patterns earlier:
 
 These should stay pragmatic components, not a large generic framework.
 
-## 10. Design Android Tablet Layouts First
+## 12. Design Android Tablet Layouts First
 
 Android tablet should drive the default layout decisions.
 
@@ -202,12 +270,13 @@ Highest-value incremental moves:
 3. Strengthen importer reports and add validation examples for known hard cases.
 4. Keep expanding the Library/Wiki as display data while attaching functional rules only when structured.
 5. Move item effects into the same dynamic effect pipeline as race, class, background, and feat effects.
-6. Add targeted regression tests around source grouping, repeatable choices, and subclass feature mapping.
+6. Introduce internal shared UI components for source switching, definition browsing, feature levels, and choice panels.
+7. Add targeted regression tests around source grouping, repeatable choices, and subclass feature mapping.
 
 ## Decision Summary
 
 If started again, the fundamental decision would be:
 
-Build a rules/import architecture first, then place the character workflows and wiki UI on top of it.
+Build a rules/import architecture first, keep SQLite as the storage/query layer, and place the character workflows and wiki UI on top of that.
 
-The current app should continue in that direction without throwing away the working MAUI/Blazor shell, SQLite persistence, or existing character workflows.
+The current app should continue in that direction without throwing away the working MAUI/Blazor shell, SQLite persistence, custom visual design, or existing character workflows.
