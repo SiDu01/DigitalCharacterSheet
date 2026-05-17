@@ -290,6 +290,16 @@ internal static partial class DataQualityReportGenerator
 
                 caseInfo = proficiencyCase;
             }
+            else if (detector.CaseType == "defense-candidate")
+            {
+                var defenseCase = ClassifyDefenseText(text);
+                if (defenseCase is null)
+                {
+                    continue;
+                }
+
+                caseInfo = defenseCase;
+            }
 
             if (!emittedSemanticKeys.Add(GetSemanticKey(caseInfo.CaseType)))
             {
@@ -515,7 +525,20 @@ internal static partial class DataQualityReportGenerator
             "repeatable-feat" => 88,
             "ability-score-candidate" => 84,
             "missing-class-features" => 82,
+            "spell-choice-candidate" => 81,
+            "ancestry-option-choice-candidate" => 81,
+            "feature-option-choice-candidate" => 81,
+            "ability-choice-candidate" => 81,
             "choice-candidate" => 80,
+            "damage-type-choice-candidate" => 79,
+            "target-choice-candidate" => 67,
+            "mixed-defense-candidate" => 66,
+            "damage-resistance-candidate" => 65,
+            "damage-immunity-candidate" => 64,
+            "defense-choice-candidate" => 64,
+            "effect-immunity-candidate" => 63,
+            "condition-immunity-candidate" => 63,
+            "damage-vulnerability-candidate" => 63,
             "mixed-proficiency-candidate" => 76,
             "expertise-candidate" => 75,
             "skill-proficiency-candidate" => 74,
@@ -559,21 +582,34 @@ internal static partial class DataQualityReportGenerator
             "missing-class-features" => 2,
             "repeatable-feat" => 3,
             "ability-score-candidate" => 4,
-            "choice-candidate" => 5,
-            "mixed-proficiency-candidate" => 6,
-            "expertise-candidate" => 7,
-            "skill-proficiency-candidate" => 8,
-            "tool-proficiency-candidate" => 9,
-            "language-proficiency-candidate" => 10,
-            "weapon-proficiency-candidate" => 11,
-            "armor-proficiency-candidate" => 12,
-            "saving-throw-proficiency-candidate" => 13,
-            "proficiency-bonus-scaling-candidate" => 14,
-            "proficiency-candidate" => 15,
-            "defense-candidate" => 16,
-            "no-subclass-grant-levels" => 17,
-            "duplicate-source-version" => 18,
-            "spell-rule-candidate" => 19,
+            "spell-choice-candidate" => 5,
+            "ancestry-option-choice-candidate" => 6,
+            "feature-option-choice-candidate" => 7,
+            "ability-choice-candidate" => 8,
+            "choice-candidate" => 9,
+            "damage-type-choice-candidate" => 10,
+            "mixed-proficiency-candidate" => 11,
+            "expertise-candidate" => 12,
+            "skill-proficiency-candidate" => 13,
+            "tool-proficiency-candidate" => 14,
+            "language-proficiency-candidate" => 15,
+            "weapon-proficiency-candidate" => 16,
+            "armor-proficiency-candidate" => 17,
+            "saving-throw-proficiency-candidate" => 18,
+            "proficiency-bonus-scaling-candidate" => 19,
+            "proficiency-candidate" => 20,
+            "target-choice-candidate" => 21,
+            "mixed-defense-candidate" => 22,
+            "damage-resistance-candidate" => 23,
+            "damage-immunity-candidate" => 24,
+            "defense-choice-candidate" => 25,
+            "effect-immunity-candidate" => 26,
+            "condition-immunity-candidate" => 27,
+            "damage-vulnerability-candidate" => 28,
+            "defense-candidate" => 29,
+            "no-subclass-grant-levels" => 30,
+            "duplicate-source-version" => 31,
+            "spell-rule-candidate" => 32,
             _ => 20
         };
     }
@@ -644,6 +680,11 @@ internal static partial class DataQualityReportGenerator
             return null;
         }
 
+        if (NonBuildChoiceRegex().IsMatch(cleaned))
+        {
+            return null;
+        }
+
         if (EquipmentChoiceRegex().IsMatch(cleaned))
         {
             return new TextCaseInfo(
@@ -652,6 +693,66 @@ internal static partial class DataQualityReportGenerator
                 0.82,
                 "Text appears to describe a starting equipment choice.",
                 "StartingEquipmentChoiceParser");
+        }
+
+        if (SpellChoiceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-choice-candidate",
+                "candidate",
+                0.86,
+                "Text appears to require choosing one or more spells or cantrips.",
+                "SpellChoiceTextParser");
+        }
+
+        if (AbilityChoiceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "ability-choice-candidate",
+                "candidate",
+                0.84,
+                "Text appears to require choosing an ability score.",
+                "AbilityChoiceTextParser");
+        }
+
+        if (AncestryOptionChoiceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "ancestry-option-choice-candidate",
+                "candidate",
+                0.84,
+                "Text appears to require choosing an ancestry, lineage, legacy, or similar character option.",
+                "AncestryOptionChoiceParser");
+        }
+
+        if (DamageTypeChoiceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "damage-type-choice-candidate",
+                "candidate",
+                0.84,
+                "Text appears to require choosing a damage type or energy affinity.",
+                "DamageTypeChoiceParser");
+        }
+
+        if (FeatureOptionChoiceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "feature-option-choice-candidate",
+                "candidate",
+                0.8,
+                "Text appears to require choosing between named feature options or effects.",
+                "FeatureOptionChoiceParser");
+        }
+
+        if (TargetChoiceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "target-choice-candidate",
+                "candidate",
+                0.72,
+                "Text appears to describe choosing a runtime target rather than a character build option.",
+                "TargetChoiceTextParser");
         }
 
         if (ToolChoiceRegex().IsMatch(cleaned))
@@ -807,6 +908,100 @@ internal static partial class DataQualityReportGenerator
             "ProficiencyTextParser");
     }
 
+    private static TextCaseInfo? ClassifyDefenseText(string text)
+    {
+        var cleaned = text.Trim();
+        if (DefenseHeadingRegex().IsMatch(cleaned))
+        {
+            return null;
+        }
+
+        var hasResistance = DamageResistanceRegex().IsMatch(cleaned);
+        var hasDamageImmunity = DamageImmunityRegex().IsMatch(cleaned);
+        var hasConditionImmunity = ConditionImmunityRegex().IsMatch(cleaned);
+        var hasVulnerability = DamageVulnerabilityRegex().IsMatch(cleaned);
+        var hasDefenseChoice = DefenseChoiceRegex().IsMatch(cleaned);
+        var hasEffectImmunity = EffectImmunityRegex().IsMatch(cleaned);
+        var categoryCount = CountTrue(hasResistance, hasDamageImmunity, hasConditionImmunity, hasVulnerability, hasDefenseChoice, hasEffectImmunity);
+
+        if (categoryCount > 1)
+        {
+            return new TextCaseInfo(
+                "mixed-defense-candidate",
+                "candidate",
+                0.78,
+                "Text appears to grant or modify multiple defensive traits.",
+                "DefenseTextParser");
+        }
+
+        if (hasResistance)
+        {
+            return new TextCaseInfo(
+                "damage-resistance-candidate",
+                "candidate",
+                0.84,
+                "Text appears to grant or modify damage resistance.",
+                "DamageResistanceTextParser");
+        }
+
+        if (hasDamageImmunity)
+        {
+            return new TextCaseInfo(
+                "damage-immunity-candidate",
+                "candidate",
+                0.84,
+                "Text appears to grant or modify damage immunity.",
+                "DamageImmunityTextParser");
+        }
+
+        if (hasDefenseChoice)
+        {
+            return new TextCaseInfo(
+                "defense-choice-candidate",
+                "candidate",
+                0.8,
+                "Text appears to determine a defensive trait from another character choice or table.",
+                "DefenseChoiceTextParser");
+        }
+
+        if (hasEffectImmunity)
+        {
+            return new TextCaseInfo(
+                "effect-immunity-candidate",
+                "candidate",
+                0.78,
+                "Text appears to grant immunity to an effect, spell, curse, or environment rather than a damage type.",
+                "EffectImmunityTextParser");
+        }
+
+        if (hasConditionImmunity)
+        {
+            return new TextCaseInfo(
+                "condition-immunity-candidate",
+                "candidate",
+                0.82,
+                "Text appears to grant or modify condition or disease immunity.",
+                "ConditionImmunityTextParser");
+        }
+
+        if (hasVulnerability)
+        {
+            return new TextCaseInfo(
+                "damage-vulnerability-candidate",
+                "candidate",
+                0.84,
+                "Text appears to grant or modify damage vulnerability.",
+                "DamageVulnerabilityTextParser");
+        }
+
+        return new TextCaseInfo(
+            "defense-candidate",
+            "candidate",
+            0.64,
+            "Text references resistance, immunity, or vulnerability, but the defensive trait is not clear enough to classify.",
+            "DefenseTextParser");
+    }
+
     private static string GetSemanticKey(string caseType)
     {
         return caseType switch
@@ -829,13 +1024,34 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"\b(?:roll|choose from|pick\s+(?:a|an|your)?\s*(?:favorite|goal|ideal|bond|flaw|event|routine|scam|origin|homeland|territory|districts?|secret|quirk|personality|characteristic)|choose\s+(?:one\s+of\s+(?:the\s+)?(?:\w+\s+){0,3})?(?:a|an|your)?\s*(?:favorite|goal|ideal|bond|flaw|event|routine|scam|origin|homeland|territory|districts?|secret|quirk|personality|characteristic))\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex FlavorChoiceRegex();
 
+    [GeneratedRegex(@"\b(?:DM can choose|DM's choice|pick a lock|disarm a trap)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex NonBuildChoiceRegex();
+
     [GeneratedRegex(@"\bChoose A or B\b|\{@item\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex EquipmentChoiceRegex();
+
+    [GeneratedRegex(@"\b(?:choose|select)\b.*\b(?:cantrip|cantrips|spell|spells|spell list|class list)\b|\bspell(?:s)?\s+(?:of your choice|from the .* spell list)\b|\{@spell\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellChoiceRegex();
+
+    [GeneratedRegex(@"\bchoose\s+(?:one\s+)?ability score\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex AbilityChoiceRegex();
+
+    [GeneratedRegex(@"\bchoose\s+(?:(?:a|an|one)\s+)?(?:kind of dragon|lineage|legacy|ancestry|animal enhancement|benefit|type of plane|moon|college|class)\b|\bchoose\s+one\s+of\s+(?:the\s+)?(?:following\s+)?(?:legacy|lineage|benefit|benefits|options)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex AncestryOptionChoiceRegex();
+
+    [GeneratedRegex(@"\bchoose\s+(?:one\s+of\s+the\s+following\s+)?(?:damage types?|energy type|acid|cold|fire|lightning|thunder|necrotic|radiant|force|psychic|poison)\b|\bpick a damage type\b|\bchoose a different damage type\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex DamageTypeChoiceRegex();
+
+    [GeneratedRegex(@"\b(?:choose|select)\s+(?:one|two|three|a|an|\d+)\s+(?:of\s+the\s+)?(?:following\s+)?(?:options?|effects?|features?|benefits?)\b|\bVariant Feature \(Choose 1\)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex FeatureOptionChoiceRegex();
+
+    [GeneratedRegex(@"\b(?:choose|select)\s+(?:one|a|an|\d+)\s+(?:ally|creature|target|space|item|card)\b|\byou can choose yourself\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex TargetChoiceRegex();
 
     [GeneratedRegex(@"\bchoose\s+(?:one|two|three|four|a|an|\d+).*(?:tool|tools|artisan's tools|gaming set|musical instrument|instrument|supplies|kit)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ToolChoiceRegex();
 
-    [GeneratedRegex(@"\bchoose\s+(?:one|two|three|four|a|an|\d+).*(?:language|languages|celestial|draconic|goblin|minotaur|common)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\bchoose\s+(?:one|two|three|four|a|an|\d+).*(?:language|languages|celestial|draconic|goblin|minotaur|common|elvish|giant|kraul|loxodon|sylvan)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex LanguageChoiceRegex();
 
     [GeneratedRegex(@"\bchoose\s+(?:one|two|three|four|a|an|\d+).*(?:skill|skills)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
@@ -876,6 +1092,27 @@ internal static partial class DataQualityReportGenerator
 
     [GeneratedRegex(@"\b(resistance|resistant|immunity|immune|vulnerability|vulnerable)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DefenseTextRegex();
+
+    [GeneratedRegex(@"^\s*(?:damage|draconic)\s+resistance\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex DefenseHeadingRegex();
+
+    [GeneratedRegex(@"\b(?:resistance|resistant)\b.*\b(?:acid|bludgeoning|cold|fire|force|lightning|necrotic|piercing|poison|psychic|radiant|slashing|thunder|all damage|damage type|\{\{damageType\}\}|damage)\b|\b(?:acid|bludgeoning|cold|fire|force|lightning|necrotic|piercing|poison|psychic|radiant|slashing|thunder)\s+damage\b.*\bresistance\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex DamageResistanceRegex();
+
+    [GeneratedRegex(@"\b(?:immune|immunity)\b.*\b(?:acid|bludgeoning|cold|fire|force|lightning|necrotic|piercing|poison|psychic|radiant|slashing|thunder|damage)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex DamageImmunityRegex();
+
+    [GeneratedRegex(@"\b(?:resistance|resistant|immunity|immune|vulnerability|vulnerable)\b.*\b(?:determined by|associated with|from .* table|chosen|choice|ancestry|lineage|legacy|\{\{damageType\}\})\b|\b(?:choice affects|damage resistance.*determined)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex DefenseChoiceRegex();
+
+    [GeneratedRegex(@"\b(?:immune|immunity)\b.*\b(?:curse|curses|spell|spells|effect|effects|magic|magical|read your thoughts|lying|telepathically|airless environment|gas|inhaled|disease)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex EffectImmunityRegex();
+
+    [GeneratedRegex(@"\b(?:immune|immunity|can't be|cannot be)\b.*\b(?:disease|exhaustion|poisoned|charmed|frightened|paralyzed|petrified|stunned|blinded|deafened|grappled|incapacitated|invisible|prone|restrained|unconscious|\{@condition\b)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ConditionImmunityRegex();
+
+    [GeneratedRegex(@"\b(?:vulnerability|vulnerable)\b.*\b(?:acid|bludgeoning|cold|fire|force|lightning|necrotic|piercing|poison|psychic|radiant|slashing|thunder|damage)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex DamageVulnerabilityRegex();
 
     [GeneratedRegex(@"\b(?:(?:your\s+)?(?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+score\s+increases?\s+by\s+\d+|(?:increase|increases?)\s+(?:your\s+)?(?:(?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)(?:\s*,\s*|\s+or\s+|\s+and\s+)?){1,}\s+score\s+by\s+\d+)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex AbilityTextRegex();
