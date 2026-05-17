@@ -2045,14 +2045,7 @@
 
     private static bool IsRepeatableFeat(FeatDefinition feat)
     {
-        if (string.IsNullOrWhiteSpace(feat.RawJson))
-        {
-            return false;
-        }
-
-        using var document = JsonDocument.Parse(feat.RawJson);
-        return document.RootElement.TryGetProperty("repeatable", out var repeatable)
-            && repeatable.ValueKind == JsonValueKind.True;
+        return feat.IsRepeatable;
     }
 
     private async Task RecomputeOptionEffectsAsync()

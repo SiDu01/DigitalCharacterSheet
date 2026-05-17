@@ -27,6 +27,8 @@ public sealed partial class AppDatabase
         await AddColumnIfMissingAsync("CharacterSkills", "ProficiencyLevel", "text DEFAULT 'None'");
         await AddColumnIfMissingAsync("ClassDefinitions", "RawJson", "text DEFAULT ''");
         await AddColumnIfMissingAsync("SubclassDefinitions", "RawJson", "text DEFAULT ''");
+        await AddColumnIfMissingAsync("FeatDefinitions", "AbilityJson", "text DEFAULT ''");
+        await AddColumnIfMissingAsync("FeatDefinitions", "IsRepeatable", "integer DEFAULT 0");
     }
 
     private async Task ApplyMagicVariantGroupingMigrationAsync()
@@ -46,6 +48,12 @@ public sealed partial class AppDatabase
         await AddColumnIfMissingAsync("Characters", "CurrentHitPoints", "integer DEFAULT 0");
         await AddColumnIfMissingAsync("Characters", "TemporaryHitPoints", "integer DEFAULT 0");
         await AddColumnIfMissingAsync("Characters", "ConditionsJson", "text DEFAULT ''");
+    }
+
+    private async Task ApplyFeatDefinitionNormalizationMigrationAsync()
+    {
+        await AddColumnIfMissingAsync("FeatDefinitions", "AbilityJson", "text DEFAULT ''");
+        await AddColumnIfMissingAsync("FeatDefinitions", "IsRepeatable", "integer DEFAULT 0");
     }
 
     private async Task AddColumnIfMissingAsync(string tableName, string columnName, string columnDefinition)

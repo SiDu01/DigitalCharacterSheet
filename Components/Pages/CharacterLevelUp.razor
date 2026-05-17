@@ -454,6 +454,7 @@
         && (LanguageProficiencyChoiceCount == 0 || selectedLanguageProficiencies.Count == LanguageProficiencyChoiceCount);
     private IReadOnlyList<FeatDefinition> AvailableFeatDefinitions => featDefinitions
         .Where(definition => string.Equals(definition.Name, "Ability Score Improvement", StringComparison.OrdinalIgnoreCase)
+            || definition.IsRepeatable
             || (character?.Feats.All(feat => feat.FeatDefinitionId != definition.Id) ?? true))
         .OrderBy(definition => definition.Name)
         .ThenBy(definition => definition.Source)

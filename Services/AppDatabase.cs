@@ -8,11 +8,11 @@ namespace DigitalCharacterSheet.Services;
 
 public sealed partial class AppDatabase
 {
-    private const int DatabaseVersion = 7;
+    private const int DatabaseVersion = 8;
     private const int SchemaVersion = 1;
     private const string ImportVersion = "spells-v1";
     private const string ClassImportVersion = "classes-v5";
-    private const string CharacterOptionImportVersion = "character-options-v2";
+    private const string CharacterOptionImportVersion = "character-options-v3";
     private const string SpellAccessImportVersion = "class-spell-access-v2";
     private const string ItemImportVersion = "items-v1";
     private const string WikiImportVersion = "wiki-v2";

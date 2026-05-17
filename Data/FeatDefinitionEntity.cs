@@ -21,5 +21,7 @@ public sealed class FeatDefinitionEntity
     public string Category { get; set; } = "";
     public string PrerequisiteJson { get; set; } = "";
     public string AdditionalSpellsJson { get; set; } = "";
+    public string AbilityJson { get; set; } = "";
+    public bool IsRepeatable { get; set; }
     public string RawJson { get; set; } = "";
 }

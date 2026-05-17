@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using DigitalCharacterSheet.Services;
 
 internal static partial class DataQualityReportGenerator
 {
@@ -161,11 +162,6 @@ internal static partial class DataQualityReportGenerator
             }
         }
 
-        if (category is "feat" && element.TryGetProperty("repeatable", out var repeatable) && repeatable.ValueKind is JsonValueKind.True)
-        {
-            context.AddCase(new UnhandledCase(category, name, source, path, "repeatable-feat", "candidate", 1.0, "Feat is repeatable and needs instance-aware choice/effect handling.", null, "RepeatableFeatParser"));
-        }
-
         if (category is "class")
         {
             AnalyzeClassSubclassGrantLevels(context, category, name, source, path, element);
@@ -240,6 +236,11 @@ internal static partial class DataQualityReportGenerator
         foreach (var detector in TextDetectors)
         {
             if (!detector.Pattern.IsMatch(text))
+            {
+                continue;
+            }
+
+            if (detector.CaseType == "ability-score-candidate" && AbilityRuleParser.TryBuildAbilityJsonFromText(text, out _))
             {
                 continue;
             }
@@ -560,7 +561,7 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"\b(resistance|resistant|immunity|immune|vulnerability|vulnerable)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DefenseTextRegex();
 
-    [GeneratedRegex(@"\b(add|increase|increases?)\s+(your\s+)?(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma|ability score)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(?:(?:your\s+)?(?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+score\s+increases?\s+by\s+\d+|(?:increase|increases?)\s+(?:your\s+)?(?:(?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)(?:\s*,\s*|\s+or\s+|\s+and\s+)?){1,}\s+score\s+by\s+\d+)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex AbilityTextRegex();
 
     [GeneratedRegex(@"\b(spell|cantrip|spellcasting|spell list)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]

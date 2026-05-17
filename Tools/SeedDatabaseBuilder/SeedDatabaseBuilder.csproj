@@ -12,6 +12,7 @@
         <Compile Include="..\..\Data\*.cs" LinkBase="Data" />
         <Compile Include="..\..\Models\*.cs" LinkBase="Models" />
         <Compile Include="..\..\Services\AppDatabase*.cs" LinkBase="Services" />
+        <Compile Include="..\..\Services\AbilityRuleParser.cs" Link="Services\AbilityRuleParser.cs" />
         <Compile Include="..\..\Services\CharacterAbilityChoiceService.cs" Link="Services\CharacterAbilityChoiceService.cs" />
         <Compile Include="..\..\Services\SpellImportService.cs" Link="Services\SpellImportService.cs" />
     </ItemGroup>

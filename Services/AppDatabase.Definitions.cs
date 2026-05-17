@@ -611,6 +611,15 @@ public sealed partial class AppDatabase
 
         foreach (var featElement in feats.EnumerateArray())
         {
+            var structuredAbilityJson = ReadRawJson(featElement, "ability");
+            var inferredAbilityJson = string.IsNullOrWhiteSpace(structuredAbilityJson)
+                ? AbilityRuleParser.BuildAbilityJsonFromText(featElement)
+                : "";
+            var abilityJson = string.IsNullOrWhiteSpace(structuredAbilityJson) ? inferredAbilityJson : structuredAbilityJson;
+            var rawJson = string.IsNullOrWhiteSpace(inferredAbilityJson)
+                ? featElement.GetRawText()
+                : AbilityRuleParser.EnrichRawJsonWithAbility(featElement, inferredAbilityJson);
+
             await _database.InsertAsync(new FeatDefinitionEntity
             {
                 Name = ReadString(featElement, "name"),
@@ -620,7 +629,9 @@ public sealed partial class AppDatabase
                 Category = ReadString(featElement, "category"),
                 PrerequisiteJson = ReadRawJson(featElement, "prerequisite"),
                 AdditionalSpellsJson = ReadRawJson(featElement, "additionalSpells"),
-                RawJson = featElement.GetRawText()
+                AbilityJson = abilityJson,
+                IsRepeatable = ReadBool(featElement, "repeatable"),
+                RawJson = rawJson
             });
         }
     }
@@ -688,6 +699,8 @@ public sealed partial class AppDatabase
             Slug = entity.Slug,
             PrerequisiteJson = entity.PrerequisiteJson,
             AdditionalSpellsJson = entity.AdditionalSpellsJson,
+            AbilityJson = entity.AbilityJson,
+            IsRepeatable = entity.IsRepeatable,
             RawJson = entity.RawJson
         };
     }

@@ -10,6 +10,8 @@ public sealed class FeatDefinition
     public string Slug { get; set; } = "";
     public string PrerequisiteJson { get; set; } = "";
     public string AdditionalSpellsJson { get; set; } = "";
+    public string AbilityJson { get; set; } = "";
+    public bool IsRepeatable { get; set; }
     public string RawJson { get; set; } = "";
 
     public string DisplayName => string.IsNullOrWhiteSpace(Category)

@@ -853,7 +853,7 @@
             return;
         }
 
-        if (feats.Any(feat => feat.FeatDefinitionId == featDefinition.Id))
+        if (!featDefinition.IsRepeatable && feats.Any(feat => feat.FeatDefinitionId == featDefinition.Id))
         {
             errorMessage = "This feat is already added.";
             return;

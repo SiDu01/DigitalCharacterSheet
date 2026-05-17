@@ -181,8 +181,8 @@ public sealed partial class AppDatabase
 
         await _database.ExecuteAsync("DELETE FROM FeatDefinitions");
         await _database.ExecuteAsync("""
-            INSERT INTO FeatDefinitions (Id, Name, Source, Slug, Page, Category, PrerequisiteJson, AdditionalSpellsJson, RawJson)
-            SELECT Id, Name, Source, Slug, Page, Category, PrerequisiteJson, AdditionalSpellsJson, RawJson
+            INSERT INTO FeatDefinitions (Id, Name, Source, Slug, Page, Category, PrerequisiteJson, AdditionalSpellsJson, AbilityJson, IsRepeatable, RawJson)
+            SELECT Id, Name, Source, Slug, Page, Category, PrerequisiteJson, AdditionalSpellsJson, AbilityJson, IsRepeatable, RawJson
             FROM seeddb.FeatDefinitions
             """);
     }
@@ -288,6 +288,9 @@ public sealed partial class AppDatabase
                 return;
             case 7:
                 await ApplyCharacterCombatStateMigrationAsync();
+                return;
+            case 8:
+                await ApplyFeatDefinitionNormalizationMigrationAsync();
                 return;
             default:
                 throw new InvalidOperationException($"No migration is defined for database version {version}.");
