@@ -25,7 +25,7 @@ while (string.IsNullOrWhiteSpace(sourceDataPath) || !IsValidSourceDataPath(sourc
     sourceDataPath = Console.ReadLine()?.Trim('"', ' ');
 }
 
-if (string.IsNullOrWhiteSpace(options.OutputPath))
+if (!options.ReportsOnly && string.IsNullOrWhiteSpace(options.OutputPath))
 {
     Console.WriteLine($"Default output folder: {Path.GetFullPath(defaultOutputDirectory)}");
     Console.WriteLine($"Seed database file: {SeedDatabaseFileName}");
@@ -37,20 +37,35 @@ if (string.IsNullOrWhiteSpace(options.OutputPath))
 }
 
 Console.WriteLine($"Using source data: {Path.GetFullPath(sourceDataPath)}");
-Console.WriteLine($"Writing seed database to: {Path.GetFullPath(outputPath)}");
 
-await AppDatabase.CreateSeedDatabaseAsync(outputPath, sourceDataPath);
+var reportDirectory = Path.Combine(projectRoot, "Tools", "SeedDatabaseBuilder", "reports");
 
-Console.WriteLine($"Seed database created: {Path.GetFullPath(outputPath)}");
+if (!options.ReportsOnly)
+{
+    Console.WriteLine($"Writing seed database to: {Path.GetFullPath(outputPath)}");
+    await AppDatabase.CreateSeedDatabaseAsync(outputPath, sourceDataPath);
+    Console.WriteLine($"Seed database created: {Path.GetFullPath(outputPath)}");
+}
 
-static (string? SourceDataPath, string? OutputPath) ParseArgs(string[] args)
+var reportResult = DataQualityReportGenerator.WriteReports(sourceDataPath, reportDirectory);
+Console.WriteLine($"Data quality report: {reportResult.MarkdownPath}");
+Console.WriteLine($"Unhandled cases: {reportResult.JsonPath}");
+
+static (string? SourceDataPath, string? OutputPath, bool ReportsOnly) ParseArgs(string[] args)
 {
     string? sourceDataPath = null;
     string? outputPath = null;
+    var reportsOnly = false;
 
     for (var index = 0; index < args.Length; index++)
     {
         var argument = args[index];
+        if (argument is "--reports-only")
+        {
+            reportsOnly = true;
+            continue;
+        }
+
         if (argument is "--source" or "-s")
         {
             sourceDataPath = ReadNextArgument(args, ref index, argument);
@@ -69,7 +84,7 @@ static (string? SourceDataPath, string? OutputPath) ParseArgs(string[] args)
         }
     }
 
-    return (sourceDataPath, outputPath);
+    return (sourceDataPath, outputPath, reportsOnly);
 }
 
 static string ReadNextArgument(string[] args, ref int index, string optionName)

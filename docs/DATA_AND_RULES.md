@@ -24,6 +24,12 @@ If importer logic, source JSON mappings, or reference-data schema changes, rebui
 
 The seed database builder should grow into the place where data quality is measured. Importers should not silently ignore rule-like structures that are not supported yet.
 
+Reports are generated after a normal seed build. They can also be generated without rebuilding the seed database:
+
+```powershell
+dotnet run --project Tools\SeedDatabaseBuilder\SeedDatabaseBuilder.csproj -- --reports-only --source "D:\Dev\Digital Character Sheet\external Resources\5e Tools\data"
+```
+
 Recommended report outputs:
 
 ```text

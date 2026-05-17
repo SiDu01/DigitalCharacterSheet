@@ -364,6 +364,7 @@ FodyWeavers.xsd
 
 # Digital Character Sheet local/generated assets
 /Resources/Raw
+Tools/SeedDatabaseBuilder/reports/
 *.apk
 *.aab
 *.db3
