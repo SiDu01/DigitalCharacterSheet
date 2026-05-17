@@ -20,6 +20,32 @@ dotnet run --project Tools\SeedDatabaseBuilder\SeedDatabaseBuilder.csproj
 
 If importer logic, source JSON mappings, or reference-data schema changes, rebuild the seed database.
 
+## Data Quality Reports
+
+The seed database builder should grow into the place where data quality is measured. Importers should not silently ignore rule-like structures that are not supported yet.
+
+Recommended report outputs:
+
+```text
+Tools\SeedDatabaseBuilder\reports\data-quality-report.md
+Tools\SeedDatabaseBuilder\reports\unhandled-cases.json
+Tools\SeedDatabaseBuilder\reports\unhandled-cases.md
+```
+
+`unhandled-cases.json` should be machine-readable so future tooling and tests can consume it. `unhandled-cases.md` should be human-readable so parser gaps can be reviewed and prioritized.
+
+Cases should be classified as `error`, `warning`, `unhandled`, `candidate`, or `wiki-only`. The goal is to turn real source-data gaps into a step-by-step parser backlog.
+
+Examples of cases worth reporting:
+
+- choice-like text such as "choose one" or "select two"
+- option lists embedded inside race, feat, class, subclass, or item entries
+- ability, proficiency, resistance, spell-grant, and ASI-like text not mapped to structured rules
+- repeatable feats
+- parent-link issues for race versions or subclasses
+- subclass features that cannot be mapped onto class grant levels
+- unknown entry types or table structures
+
 ## Reference Data
 
 Reference data is imported from `5e Tools` into SQLite tables and represented in the app by definition models.

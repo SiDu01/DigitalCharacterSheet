@@ -48,6 +48,69 @@ Useful reports:
 
 The goal is not to perfectly understand every source text automatically. The goal is to know what is structured, what is inferred, and what remains wiki-only.
 
+The importer should also emit unhandled cases instead of silently ignoring data. When it sees JSON structures, text patterns, entry types, or rule-like content that are not yet supported by a parser, it should record them to a report. This creates an implementation backlog from the real source data.
+
+Suggested report files:
+
+```text
+Tools/SeedDatabaseBuilder/reports/
+  data-quality-report.md
+  unhandled-cases.json
+  unhandled-cases.md
+```
+
+Suggested `unhandled-cases.json` shape:
+
+```json
+[
+  {
+    "category": "race",
+    "name": "Shifter",
+    "source": "MPMM",
+    "path": "race[42].entries[3]",
+    "caseType": "choice-candidate",
+    "severity": "candidate",
+    "confidence": 0.82,
+    "reason": "Entry contains a list that appears to require choosing one option.",
+    "textPreview": "When you choose this race, select one of the following...",
+    "suggestedParser": "RaceChoiceParser"
+  }
+]
+```
+
+Useful case classifications:
+
+- error: import output is probably wrong.
+- warning: data is usable but suspicious.
+- unhandled: the importer recognized a pattern but has no parser yet.
+- candidate: the importer found rule-like text that needs review.
+- wiki-only: intentionally display-only content.
+
+Good candidates to capture:
+
+- choose/select wording
+- option lists embedded in prose
+- ability bonus text without structured ability data
+- skill/tool/language proficiency text
+- repeatable feats
+- feats that grant ASI-like choices
+- subclass features that cannot be mapped to class grant levels
+- race versions or subclasses without a parent match
+- unknown entry `type` values
+- progression/scaling tables not yet interpreted
+- spell grants
+- resistances, immunities, and vulnerabilities
+- armor, weapon, and tool proficiencies
+
+Desired workflow:
+
+```text
+1. Importer reports an unhandled case.
+2. A parser or mapping rule is implemented.
+3. The case disappears from unhandled-cases.
+4. A regression test locks the behavior down.
+```
+
 ## 3. Build a Generic Choice System
 
 Many current features are variations of the same underlying problem: the app needs to present a constrained choice from a rule source and persist the answer.
