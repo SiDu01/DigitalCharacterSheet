@@ -569,6 +569,14 @@ internal static partial class DataQualityReportGenerator
             "spell-reference-list-candidate" => 58,
             "item-spell-list-candidate" => 58,
             "spell-modifier-candidate" => 58,
+            "item-spell-stat-block-candidate" => 58,
+            "spell-component-substitution-candidate" => 58,
+            "spell-template-effect-candidate" => 58,
+            "spell-cancellation-effect-candidate" => 58,
+            "spell-storage-effect-candidate" => 58,
+            "item-autonomous-spell-effect-candidate" => 58,
+            "spell-detection-reference-candidate" => 46,
+            "spell-recharge-rule-candidate" => 46,
             "item-spellcasting-bonus-candidate" => 58,
             "item-charge-spell-activation-candidate" => 58,
             "item-action-spell-activation-candidate" => 58,
@@ -698,46 +706,54 @@ internal static partial class DataQualityReportGenerator
             "spell-reference-list-candidate" => 49,
             "item-spell-list-candidate" => 50,
             "spell-modifier-candidate" => 51,
-            "item-spellcasting-bonus-candidate" => 52,
-            "item-charge-spell-activation-candidate" => 53,
-            "item-action-spell-activation-candidate" => 54,
-            "item-passive-spell-access-candidate" => 55,
-            "item-ritual-spell-activation-candidate" => 56,
-            "item-temporary-spell-grant-candidate" => 57,
-            "free-cast-spell-grant-candidate" => 58,
-            "spell-slot-expenditure-effect-candidate" => 59,
-            "spell-combat-interaction-candidate" => 60,
-            "spellcasting-focus-candidate" => 61,
-            "spell-slot-table-candidate" => 62,
-            "spell-slot-rule-candidate" => 63,
-            "spellbook-candidate" => 64,
-            "item-spell-activation-candidate" => 65,
-            "proficiency-limited-damage-candidate" => 66,
-            "proficiency-limited-save-effect-candidate" => 67,
-            "proficiency-uses-scaling-candidate" => 68,
-            "proficiency-dc-scaling-candidate" => 69,
-            "proficiency-damage-scaling-candidate" => 70,
-            "proficiency-healing-scaling-candidate" => 71,
-            "proficiency-movement-scaling-candidate" => 72,
-            "proficiency-roll-scaling-candidate" => 73,
-            "spell-removal-reference-candidate" => 74,
-            "spell-healing-interaction-candidate" => 75,
-            "spell-save-defense-candidate" => 76,
-            "spell-triggered-movement-candidate" => 77,
-            "magical-adhesion-effect-candidate" => 78,
-            "soul-magic-effect-candidate" => 79,
-            "statblock-replacement-effect-candidate" => 80,
-            "curse-attunement-effect-candidate" => 81,
-            "magical-item-effect-candidate" => 82,
-            "spell-affected-object-reference" => 83,
-            "spell-effect-reference-candidate" => 84,
-            "spell-rule-candidate" => 85,
-            "no-subclass-grant-levels" => 86,
-            "foundry-overlay-duplicate" => 87,
-            "duplicate-source-version" => 88,
-            "defense-flavor-reference" => 89,
-            "expertise-flavor-reference" => 90,
-            "spell-flavor-reference" => 91,
+            "item-spell-stat-block-candidate" => 52,
+            "spell-component-substitution-candidate" => 53,
+            "spell-template-effect-candidate" => 54,
+            "spell-cancellation-effect-candidate" => 55,
+            "spell-storage-effect-candidate" => 56,
+            "item-autonomous-spell-effect-candidate" => 57,
+            "spell-detection-reference-candidate" => 58,
+            "spell-recharge-rule-candidate" => 59,
+            "item-spellcasting-bonus-candidate" => 60,
+            "item-charge-spell-activation-candidate" => 61,
+            "item-action-spell-activation-candidate" => 62,
+            "item-passive-spell-access-candidate" => 63,
+            "item-ritual-spell-activation-candidate" => 64,
+            "item-temporary-spell-grant-candidate" => 65,
+            "free-cast-spell-grant-candidate" => 66,
+            "spell-slot-expenditure-effect-candidate" => 67,
+            "spell-combat-interaction-candidate" => 68,
+            "spellcasting-focus-candidate" => 69,
+            "spell-slot-table-candidate" => 70,
+            "spell-slot-rule-candidate" => 71,
+            "spellbook-candidate" => 72,
+            "item-spell-activation-candidate" => 73,
+            "proficiency-limited-damage-candidate" => 74,
+            "proficiency-limited-save-effect-candidate" => 75,
+            "proficiency-uses-scaling-candidate" => 76,
+            "proficiency-dc-scaling-candidate" => 77,
+            "proficiency-damage-scaling-candidate" => 78,
+            "proficiency-healing-scaling-candidate" => 79,
+            "proficiency-movement-scaling-candidate" => 80,
+            "proficiency-roll-scaling-candidate" => 81,
+            "spell-removal-reference-candidate" => 82,
+            "spell-healing-interaction-candidate" => 83,
+            "spell-save-defense-candidate" => 84,
+            "spell-triggered-movement-candidate" => 85,
+            "magical-adhesion-effect-candidate" => 86,
+            "soul-magic-effect-candidate" => 87,
+            "statblock-replacement-effect-candidate" => 88,
+            "curse-attunement-effect-candidate" => 89,
+            "magical-item-effect-candidate" => 90,
+            "spell-affected-object-reference" => 91,
+            "spell-effect-reference-candidate" => 92,
+            "spell-rule-candidate" => 93,
+            "no-subclass-grant-levels" => 94,
+            "foundry-overlay-duplicate" => 95,
+            "duplicate-source-version" => 96,
+            "defense-flavor-reference" => 97,
+            "expertise-flavor-reference" => 98,
+            "spell-flavor-reference" => 99,
             _ => 60
         };
     }
@@ -1425,6 +1441,16 @@ internal static partial class DataQualityReportGenerator
                 "SpellReferenceListParser");
         }
 
+        if (ItemSpellListSentenceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-spell-list-candidate",
+                "candidate",
+                0.8,
+                "Text appears to describe a fixed spell list provided by an item.",
+                "ItemSpellListParser");
+        }
+
         if (SpellcastingPrerequisiteRegex().IsMatch(cleaned))
         {
             return new TextCaseInfo(
@@ -1600,6 +1626,86 @@ internal static partial class DataQualityReportGenerator
                 0.78,
                 "Text appears to modify spells, spell attacks, spell damage, components, or concentration.",
                 "SpellModifierTextParser");
+        }
+
+        if (ItemSpellStatBlockRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-spell-stat-block-candidate",
+                "candidate",
+                0.78,
+                "Text appears to provide fixed spell attack or save DC values for an item-cast spell.",
+                "ItemSpellStatBlockParser");
+        }
+
+        if (SpellComponentSubstitutionRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-component-substitution-candidate",
+                "candidate",
+                0.76,
+                "Text appears to replace, supply, or waive spell components without granting a spell.",
+                "SpellComponentSubstitutionParser");
+        }
+
+        if (SpellTemplateEffectRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-template-effect-candidate",
+                "candidate",
+                0.76,
+                "Text uses an existing spell as a template for another item or feature effect.",
+                "SpellTemplateEffectParser");
+        }
+
+        if (SpellCancellationEffectRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-cancellation-effect-candidate",
+                "candidate",
+                0.76,
+                "Text cancels, absorbs, destroys, or tracks levels of incoming or active spells.",
+                "SpellCancellationEffectParser");
+        }
+
+        if (SpellStorageEffectRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-storage-effect-candidate",
+                "candidate",
+                0.74,
+                "Text appears to store, contain, copy, or preserve spells in an object or creature.",
+                "SpellStorageEffectParser");
+        }
+
+        if (ItemAutonomousSpellEffectRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-autonomous-spell-effect-candidate",
+                "candidate",
+                0.74,
+                "Text describes an item or non-character object casting or emitting a spell effect.",
+                "ItemAutonomousSpellEffectParser");
+        }
+
+        if (SpellDetectionReferenceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-detection-reference-candidate",
+                "candidate",
+                0.72,
+                "Text references a spell revealing, detecting, or identifying another property.",
+                "SpellDetectionReferenceParser");
+        }
+
+        if (SpellRechargeRuleRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-recharge-rule-candidate",
+                "candidate",
+                0.72,
+                "Text limits when an item or feature can cast the same spell again.",
+                "SpellRechargeRuleParser");
         }
 
         if (SpellChoiceRegex().IsMatch(cleaned))
@@ -1960,8 +2066,11 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"^\s*(?:\d+(?:st|nd|rd|th)-level spell|level \d+ spell)\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellLevelHeadingRegex();
 
-    [GeneratedRegex(@"^\s*(?:\{@spell\s+[^}]+}\s*(?:,|and)?\s*)+$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^\s*(?:\{@spell\s+[^}]+}\s*(?:\([^)]*\))?\s*(?:,|and|or)?\s*)+$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellReferenceListRegex();
+
+    [GeneratedRegex(@"\b(?:following spells|following spell|can be used to cast the following spells|can cast the following spells|spells:)\b.*\{@spell\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ItemSpellListSentenceRegex();
 
     [GeneratedRegex(@"\bspellcasting ability\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellcastingAbilityRegex();
@@ -1996,8 +2105,32 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"\b(?:expend|spend|use)\s+(?:a|one|\d+|an)\s+spell slots?\b.*\b(?:roll|damage|heal|restore|protective|effect|target|creature|bonus|reaction)\b|\b(?:reaction|bonus action|action)\b.*\bexpend\s+(?:a|one|\d+|an)\s+spell slots?\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellSlotExpenditureEffectRegex();
 
-    [GeneratedRegex(@"\b(?:when you cast|whenever you cast|spell you cast|spells you cast|spell attacks?|spell attack rolls?|spell save DC|spell damage|spell components?|requires no spell components?|concentration on (?:it|a spell)|maintain .* concentration|ignore resistance|reroll .* spell|restore .* with a spell|triggering spell|chosen spell list|replace one of the spells)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(?:when you cast|whenever you cast|spell you cast|spells you cast|spell attacks?|spell attack rolls?|spell save DC|spell damage|spell components?|requires no spell components?|concentration on (?:it|a spell)|maintain .* concentration|ignore resistance|reroll .* spell|reroll .* damage dice|restore .* with a spell|triggering spell|chosen spell list|replace one of the spells|Metamagic option on a spell|spell's range increases|spell has a range|spell has a duration|double the spell's duration|spell's casting time|change the spell's casting time|damage-dealing spell|increase the level of the \{@spell)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellModifierRegex();
+
+    [GeneratedRegex(@"\b(?:the spell's saving throw DC is|spell's saving throw DC|spell save DC is|saving throw DC is \d+).*?\b(?:attack bonus is|\{@hit\s*[-+]?\d+}|spell attack)\b|\b(?:attack bonus is|\{@hit\s*[-+]?\d+}).*?\b(?:spell's saving throw DC|spell save DC|saving throw DC)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ItemSpellStatBlockRegex();
+
+    [GeneratedRegex(@"\b(?:substitute for|material components?|components you need to cast|without any somatic or verbal components|requires no spell components?|spell components are provided|provide the .* components)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellComponentSubstitutionRegex();
+
+    [GeneratedRegex(@"\b(?:functions as|function as|as the \{@spell|as a \{@spell|as if you had cast|as if cast|under the effect of|affected by a \{@spell|equivalent to that of the \{@spell|comparable to that produced by a \{@spell|gains? the effects? of (?:the|a) \{@spell|no \{@status concentration} required|with all the attendant)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellTemplateEffectRegex();
+
+    [GeneratedRegex(@"\b(?:cancel(?:s|ed)?|absorb(?:s|ed)?|destroy(?:s|ed)?|dispel(?:s|led)?|counter(?:s|ed)?|levels of spells|spell whose level|active spells?)\b.*\b(?:spell|spells|{@spell)\b|\b(?:spell|spells|{@spell)\b.*\b(?:cancel(?:s|ed)?|absorb(?:s|ed)?|destroy(?:s|ed)?|dispel(?:s|led)?|counter(?:s|ed)?|levels of spells|active spells?)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellCancellationEffectRegex();
+
+    [GeneratedRegex(@"\b(?:store|stores|stored|contains?|hold|copy|replica|spell scroll|spellcasting magic|spell within|contains a crystallized bit of spellcasting magic|ring of spell storing|secret chest)\b.*\b(?:spell|spells|spell scroll|spellcasting magic|{@spell|{@item ring of spell storing)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellStorageEffectRegex();
+
+    [GeneratedRegex(@"\b(?:vessel|dodecahedron|object|item|die|orb)\s+casts?\s+(?:the\s+)?\{@spell\b|\b(?:dodecahedron|object|item|die|lantern|statuette|figurine|orb)\b.*\bcasts?\s+(?:the\s+)?\{@spell\b|\b(?:emanate light equivalent to|sheds light comparable to|spell effects can't pass through|light equivalent to that of the \{@spell)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ItemAutonomousSpellEffectRegex();
+
+    [GeneratedRegex(@"(?:\{@spell\s+(?:identify|detect evil and good)[^}]*}|identify spell|detect evil and good spell).*?\b(?:reveals?|detected|determine|learn|know|contains?|alignment|creature|property)\b|\b(?:reveals?|detected|determine|learn|know|alignment)\b.*?(?:\{@spell\s+(?:identify|detect evil and good)[^}]*}|identify spell|detect evil and good spell)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellDetectionReferenceRegex();
+
+    [GeneratedRegex(@"\b(?:once .* used to cast a spell|once .* cast a spell|used to cast a spell|can't be used to cast that spell again|can't use .* cast that spell again|until the next dawn|until dawn|regains? .* ability to cast)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellRechargeRuleRegex();
 
     [GeneratedRegex(@"\b(?:charges?|expend|while holding|while wearing|while attuned|as an action|bonus action|command word|study .* at the end of a long rest|cast .* from the item|use .* to cast|use .* and cast|allows you to cast|granted the ability to cast|gain the ability to cast|cast \{@spell|casts? \{@spell|gain the effect of the \{@spell|from the .* and cast|pressing .* you cast|summoned as if you had cast)\b.*\b(?:spell|cantrip|spell slot|{@spell)\b|^\s*cast\s+\{@spell\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ItemSpellActivationRegex();
