@@ -542,6 +542,8 @@ internal static partial class DataQualityReportGenerator
             "choice-candidate" => 80,
             "damage-type-choice-candidate" => 79,
             "target-choice-candidate" => 67,
+            "damage-condition-defense-candidate" => 67,
+            "conditional-defense-candidate" => 67,
             "mixed-defense-candidate" => 66,
             "object-defense-candidate" => 66,
             "damage-resistance-candidate" => 65,
@@ -553,11 +555,14 @@ internal static partial class DataQualityReportGenerator
             "effect-immunity-candidate" => 63,
             "condition-immunity-candidate" => 63,
             "damage-vulnerability-candidate" => 63,
+            "background-spell-list-candidate" => 62,
             "innate-spell-grant-candidate" => 61,
+            "level-gated-spell-grant-candidate" => 61,
             "spellcasting-ability-candidate" => 60,
             "spell-list-access-candidate" => 60,
             "spellcasting-prerequisite-candidate" => 59,
             "spell-reference-list-candidate" => 58,
+            "item-spell-list-candidate" => 58,
             "spell-modifier-candidate" => 58,
             "spellcasting-focus-candidate" => 57,
             "spell-slot-rule-candidate" => 57,
@@ -572,6 +577,8 @@ internal static partial class DataQualityReportGenerator
             "spell-effect-reference-candidate" => 44,
             "mixed-proficiency-candidate" => 76,
             "expertise-candidate" => 75,
+            "all-skill-proficiency-candidate" => 75,
+            "proficiency-choice-candidate" => 75,
             "skill-proficiency-candidate" => 74,
             "tool-proficiency-candidate" => 73,
             "language-proficiency-candidate" => 72,
@@ -582,7 +589,10 @@ internal static partial class DataQualityReportGenerator
             "proficiency-candidate" => 70,
             "defense-candidate" => 62,
             "no-subclass-grant-levels" => 58,
+            "foundry-overlay-duplicate" => 50,
             "duplicate-source-version" => 48,
+            "expertise-flavor-reference" => 35,
+            "spell-flavor-reference" => 34,
             "spell-rule-candidate" => 30,
             _ => 2
         });
@@ -621,47 +631,57 @@ internal static partial class DataQualityReportGenerator
             "damage-type-choice-candidate" => 10,
             "mixed-proficiency-candidate" => 11,
             "expertise-candidate" => 12,
-            "skill-proficiency-candidate" => 13,
-            "tool-proficiency-candidate" => 14,
-            "language-proficiency-candidate" => 15,
-            "weapon-proficiency-candidate" => 16,
-            "armor-proficiency-candidate" => 17,
-            "saving-throw-proficiency-candidate" => 18,
-            "proficiency-bonus-scaling-candidate" => 19,
-            "proficiency-candidate" => 20,
-            "target-choice-candidate" => 21,
-            "mixed-defense-candidate" => 22,
-            "object-defense-candidate" => 23,
-            "damage-resistance-candidate" => 24,
-            "defense-reference-candidate" => 25,
-            "defense-bypass-candidate" => 26,
-            "damage-immunity-candidate" => 27,
-            "defense-choice-candidate" => 28,
-            "condition-save-effect-candidate" => 29,
-            "effect-immunity-candidate" => 30,
-            "condition-immunity-candidate" => 31,
-            "damage-vulnerability-candidate" => 32,
-            "defense-candidate" => 33,
-            "innate-spell-grant-candidate" => 34,
-            "spellcasting-ability-candidate" => 35,
-            "spell-list-access-candidate" => 36,
-            "spellcasting-prerequisite-candidate" => 37,
-            "spell-reference-list-candidate" => 38,
-            "spell-modifier-candidate" => 39,
-            "spellcasting-focus-candidate" => 40,
-            "spell-slot-rule-candidate" => 41,
-            "spellbook-candidate" => 42,
-            "item-spell-activation-candidate" => 43,
-            "proficiency-uses-scaling-candidate" => 44,
-            "proficiency-dc-scaling-candidate" => 45,
-            "proficiency-damage-scaling-candidate" => 46,
-            "proficiency-healing-scaling-candidate" => 47,
-            "proficiency-movement-scaling-candidate" => 48,
-            "proficiency-roll-scaling-candidate" => 49,
-            "spell-effect-reference-candidate" => 50,
-            "spell-rule-candidate" => 51,
-            "no-subclass-grant-levels" => 52,
-            "duplicate-source-version" => 53,
+            "all-skill-proficiency-candidate" => 13,
+            "proficiency-choice-candidate" => 14,
+            "skill-proficiency-candidate" => 15,
+            "tool-proficiency-candidate" => 16,
+            "language-proficiency-candidate" => 17,
+            "weapon-proficiency-candidate" => 18,
+            "armor-proficiency-candidate" => 19,
+            "saving-throw-proficiency-candidate" => 20,
+            "proficiency-bonus-scaling-candidate" => 21,
+            "proficiency-candidate" => 22,
+            "target-choice-candidate" => 23,
+            "damage-condition-defense-candidate" => 24,
+            "conditional-defense-candidate" => 25,
+            "mixed-defense-candidate" => 26,
+            "object-defense-candidate" => 27,
+            "damage-resistance-candidate" => 28,
+            "defense-reference-candidate" => 29,
+            "defense-bypass-candidate" => 30,
+            "damage-immunity-candidate" => 31,
+            "defense-choice-candidate" => 32,
+            "condition-save-effect-candidate" => 33,
+            "effect-immunity-candidate" => 34,
+            "condition-immunity-candidate" => 35,
+            "damage-vulnerability-candidate" => 36,
+            "defense-candidate" => 37,
+            "level-gated-spell-grant-candidate" => 38,
+            "innate-spell-grant-candidate" => 39,
+            "spellcasting-ability-candidate" => 40,
+            "spell-list-access-candidate" => 41,
+            "spellcasting-prerequisite-candidate" => 42,
+            "background-spell-list-candidate" => 43,
+            "spell-reference-list-candidate" => 44,
+            "item-spell-list-candidate" => 45,
+            "spell-modifier-candidate" => 46,
+            "spellcasting-focus-candidate" => 47,
+            "spell-slot-rule-candidate" => 48,
+            "spellbook-candidate" => 49,
+            "item-spell-activation-candidate" => 50,
+            "proficiency-uses-scaling-candidate" => 51,
+            "proficiency-dc-scaling-candidate" => 52,
+            "proficiency-damage-scaling-candidate" => 53,
+            "proficiency-healing-scaling-candidate" => 54,
+            "proficiency-movement-scaling-candidate" => 55,
+            "proficiency-roll-scaling-candidate" => 56,
+            "spell-effect-reference-candidate" => 57,
+            "spell-rule-candidate" => 58,
+            "no-subclass-grant-levels" => 59,
+            "foundry-overlay-duplicate" => 60,
+            "duplicate-source-version" => 61,
+            "expertise-flavor-reference" => 62,
+            "spell-flavor-reference" => 63,
             _ => 60
         };
     }
@@ -862,6 +882,16 @@ internal static partial class DataQualityReportGenerator
         var hasSavingThrow = SavingThrowProficiencyRegex().IsMatch(cleaned);
         var categoryCount = CountTrue(hasSkill, hasTool, hasLanguage, hasWeapon, hasArmor, hasSavingThrow);
 
+        if (ExpertiseFlavorRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "expertise-flavor-reference",
+                "wiki-only",
+                0.72,
+                "Text uses expertise as descriptive flavor rather than granting expertise.",
+                "NoMechanicalRuleParser");
+        }
+
         if (hasExpertise)
         {
             return new TextCaseInfo(
@@ -875,6 +905,26 @@ internal static partial class DataQualityReportGenerator
         if (ProficiencyBonusScalingRegex().IsMatch(cleaned))
         {
             return ClassifyProficiencyBonusScalingText(cleaned);
+        }
+
+        if (AllSkillProficiencyRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "all-skill-proficiency-candidate",
+                "candidate",
+                0.86,
+                "Text appears to grant proficiency in all skills.",
+                "AllSkillProficiencyParser");
+        }
+
+        if (ProficiencyChoiceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "proficiency-choice-candidate",
+                "candidate",
+                0.84,
+                "Text appears to grant a choice between one or more proficiency types.",
+                "ProficiencyChoiceParser");
         }
 
         if (categoryCount > 1 || MixedProficiencyRegex().IsMatch(cleaned))
@@ -1001,6 +1051,26 @@ internal static partial class DataQualityReportGenerator
         var hasEffectImmunity = EffectImmunityRegex().IsMatch(cleaned);
         var hasConditionSaveEffect = ConditionSaveEffectRegex().IsMatch(cleaned);
         var categoryCount = CountTrue(hasResistance, hasDamageImmunity, hasConditionImmunity, hasVulnerability, hasDefenseChoice, hasEffectImmunity, hasConditionSaveEffect);
+
+        if (DamageConditionDefenseRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "damage-condition-defense-candidate",
+                "candidate",
+                0.82,
+                "Text appears to combine damage immunity/resistance with condition immunity.",
+                "DamageConditionDefenseParser");
+        }
+
+        if (categoryCount > 0 && ConditionalDefenseRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "conditional-defense-candidate",
+                "candidate",
+                0.82,
+                "Text appears to grant a defensive trait only while a condition, state, or circumstance is true.",
+                "ConditionalDefenseParser");
+        }
 
         if (categoryCount > 1)
         {
@@ -1173,6 +1243,16 @@ internal static partial class DataQualityReportGenerator
             return null;
         }
 
+        if (SpellFlavorReferenceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-flavor-reference",
+                "wiki-only",
+                0.68,
+                "Text references spells as descriptive flavor rather than a mechanical spell grant.",
+                "NoMechanicalRuleParser");
+        }
+
         if (SpellLevelHeadingRegex().IsMatch(cleaned))
         {
             return null;
@@ -1180,6 +1260,27 @@ internal static partial class DataQualityReportGenerator
 
         if (SpellReferenceListRegex().IsMatch(cleaned))
         {
+            if (string.Equals(category, "background", StringComparison.OrdinalIgnoreCase))
+            {
+                return new TextCaseInfo(
+                    "background-spell-list-candidate",
+                    "candidate",
+                    0.86,
+                    "Text appears to be a background spell-list table entry.",
+                    "BackgroundSpellListParser");
+            }
+
+            if (string.Equals(category, "item", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(category, "item-group", StringComparison.OrdinalIgnoreCase))
+            {
+                return new TextCaseInfo(
+                    "item-spell-list-candidate",
+                    "candidate",
+                    0.8,
+                    "Text appears to be an item spell-list table or embedded item spell reference.",
+                    "ItemSpellListParser");
+            }
+
             return new TextCaseInfo(
                 "spell-reference-list-candidate",
                 "candidate",
@@ -1238,6 +1339,27 @@ internal static partial class DataQualityReportGenerator
                 "SpellbookTextParser");
         }
 
+        if (string.Equals(category, "item", StringComparison.OrdinalIgnoreCase)
+            && ItemSpellActivationRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-spell-activation-candidate",
+                "candidate",
+                0.8,
+                "Text appears to describe spellcasting through an item activation or charge effect.",
+                "ItemSpellActivationParser");
+        }
+
+        if (LevelGatedSpellGrantRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "level-gated-spell-grant-candidate",
+                "candidate",
+                0.86,
+                "Text appears to grant spells when a character reaches a specific level.",
+                "LevelGatedSpellGrantParser");
+        }
+
         if (SpellModifierRegex().IsMatch(cleaned))
         {
             return new TextCaseInfo(
@@ -1276,17 +1398,6 @@ internal static partial class DataQualityReportGenerator
                 0.84,
                 "Text appears to grant known, prepared, or castable spells outside normal class spellcasting.",
                 "InnateSpellGrantParser");
-        }
-
-        if (string.Equals(category, "item", StringComparison.OrdinalIgnoreCase)
-            && ItemSpellActivationRegex().IsMatch(cleaned))
-        {
-            return new TextCaseInfo(
-                "item-spell-activation-candidate",
-                "candidate",
-                0.78,
-                "Text appears to describe spellcasting through an item activation or charge effect.",
-                "ItemSpellActivationParser");
         }
 
         if (SpellEffectReferenceRegex().IsMatch(cleaned))
@@ -1372,6 +1483,9 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"\b(?:expertise|proficiency bonus is doubled|double(?:d)?\s+(?:your\s+)?proficiency bonus|twice your proficiency bonus)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ExpertiseRegex();
 
+    [GeneratedRegex(@"\b(?:define your expertise|area of expertise|areas of expertise|with expertise in|expertise with|professional expertise)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ExpertiseFlavorRegex();
+
     [GeneratedRegex(@"\b(?:equal to your (?:{@variantrule\s+)?proficiency|proficiency bonus|number of times equal to your|PB)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ProficiencyBonusScalingRegex();
 
@@ -1395,6 +1509,12 @@ internal static partial class DataQualityReportGenerator
 
     [GeneratedRegex(@"\b(?:skill|skills|{@skill\b|acrobatics|animal handling|arcana|athletics|deception|history|insight|intimidation|investigation|medicine|nature|perception|performance|persuasion|religion|sleight of hand|stealth|survival)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SkillProficiencyRegex();
+
+    [GeneratedRegex(@"\bgain proficiency in all skills\b|\bproficiency in all skills\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex AllSkillProficiencyRegex();
+
+    [GeneratedRegex(@"\b(?:proficiency|proficiencies|proficient)\b.*\b(?:of your choice|your choice|choose|chosen)\b|\b(?:choose|chosen)\b.*\b(?:proficiency|proficiencies|proficient)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ProficiencyChoiceRegex();
 
     [GeneratedRegex(@"\b(?:tool|tools|artisan's tools|gaming set|musical instrument|musical instruments|instrument|instruments|utensil|utensils|vehicle|vehicles|kit|supplies|thieves' tools|disguise kit|forgery kit|herbalism kit|navigator's tools|poisoner's kit)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ToolProficiencyRegex();
@@ -1450,6 +1570,12 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"\b(?:vulnerability|vulnerable)\b.*\b(?:acid|bludgeoning|cold|fire|force|lightning|necrotic|piercing|poison|psychic|radiant|slashing|thunder|damage)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DamageVulnerabilityRegex();
 
+    [GeneratedRegex(@"\b(?:poison|poisoned|fire|cold|lightning|necrotic|radiant|psychic|thunder|acid)\s+damage\b.*\b(?:condition|poisoned|charmed|frightened|paralyzed|petrified|stunned|blinded|deafened)\b|\b(?:condition|poisoned|charmed|frightened|paralyzed|petrified|stunned|blinded|deafened)\b.*\b(?:poison|fire|cold|lightning|necrotic|radiant|psychic|thunder|acid)\s+damage\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex DamageConditionDefenseRegex();
+
+    [GeneratedRegex(@"\b(?:while|when|whenever|until|during|as long as|if you are|if the|against|from attacks made by|from .* damage dealt by|provided by)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ConditionalDefenseRegex();
+
     [GeneratedRegex(@"\b(?:(?:your\s+)?(?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+score\s+increases?\s+by\s+\d+|(?:increase|increases?)\s+(?:your\s+)?(?:(?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)(?:\s*,\s*|\s+or\s+|\s+and\s+)?){1,}\s+score\s+by\s+\d+)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex AbilityTextRegex();
 
@@ -1461,6 +1587,9 @@ internal static partial class DataQualityReportGenerator
 
     [GeneratedRegex(@"\b(?:consider customizing how your spells look|your magic often|your spells tend to|is a favorite of .* spellcasters|oh, yeah, that spell|any spellcasting class or subclass can work well|learning a new spell or adopting)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellFlavorRegex();
+
+    [GeneratedRegex(@"\b(?:your magic is meant to|your magic might|as you cast your spells|using the \{@spell .* cantrip|spellcasters often|flavor of your spells|appearance of your spells)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellFlavorReferenceRegex();
 
     [GeneratedRegex(@"^\s*(?:\d+(?:st|nd|rd|th)-level spell|level \d+ spell)\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellLevelHeadingRegex();
@@ -1488,6 +1617,9 @@ internal static partial class DataQualityReportGenerator
 
     [GeneratedRegex(@"\b(?:you know|you also know|also know|you learn|you can cast|can cast|always have .* prepared|have .* spell prepared|cast .* without a spell slot|cast .* with this trait|regain the ability to do so|regain all expended uses|once you cast|starting at .* level, you can cast)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex InnateSpellGrantRegex();
+
+    [GeneratedRegex(@"\b(?:when you reach|at|starting at)\s+(?:character\s+)?level\s+\d+|(?:when you reach|at|starting at)\s+\d+(?:st|nd|rd|th)\s+level\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex LevelGatedSpellGrantRegex();
 
     [GeneratedRegex(@"\b(?:when you cast|whenever you cast|spell you cast|spells you cast|spell attacks?|spell attack rolls?|spell save DC|spell damage|spell components?|requires no spell components?|concentration on (?:it|a spell)|maintain .* concentration|ignore resistance|reroll .* spell|restore .* with a spell|triggering spell|chosen spell list|replace one of the spells)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellModifierRegex();
@@ -1550,17 +1682,24 @@ internal static partial class DataQualityReportGenerator
             foreach (var pair in duplicateLookup.Where(pair => pair.Value.Count > 1).OrderBy(pair => pair.Key))
             {
                 var parts = pair.Key.Split('|');
+                var hasFoundryOverlay = pair.Value.Any(path => path.Contains("foundry.json", StringComparison.OrdinalIgnoreCase));
+                var caseType = hasFoundryOverlay ? "foundry-overlay-duplicate" : "duplicate-source-version";
+                var reason = hasFoundryOverlay
+                    ? $"Found {pair.Value.Count} entries with the same category, name, and source, including a Foundry overlay entry."
+                    : $"Found {pair.Value.Count} entries with the same category, name, and source.";
+                var suggestedParser = hasFoundryOverlay ? "FoundryOverlayGrouper" : "SourceVersionGrouper";
+
                 AddCase(new UnhandledCase(
                     parts[0],
                     parts.Length > 1 ? parts[1] : "",
                     parts.Length > 2 ? parts[2] : "",
                     string.Join(", ", pair.Value.Take(5)),
-                    "duplicate-source-version",
+                    caseType,
                     "warning",
                     null,
-                    $"Found {pair.Value.Count} entries with the same category, name, and source.",
+                    reason,
                     null,
-                    "SourceVersionGrouper"));
+                    suggestedParser));
             }
         }
     }
