@@ -543,14 +543,19 @@ internal static partial class DataQualityReportGenerator
             "damage-type-choice-candidate" => 79,
             "target-choice-candidate" => 67,
             "damage-condition-defense-candidate" => 67,
+            "defense-choice-candidate" => 67,
+            "reactive-defense-candidate" => 67,
+            "item-attuned-defense-candidate" => 67,
+            "temporary-defense-candidate" => 67,
             "conditional-defense-candidate" => 67,
+            "permanent-damage-resistance-candidate" => 66,
+            "trap-damage-resistance-candidate" => 66,
             "mixed-defense-candidate" => 66,
             "object-defense-candidate" => 66,
             "damage-resistance-candidate" => 65,
             "defense-reference-candidate" => 65,
             "defense-bypass-candidate" => 65,
             "damage-immunity-candidate" => 64,
-            "defense-choice-candidate" => 64,
             "condition-save-effect-candidate" => 64,
             "effect-immunity-candidate" => 63,
             "condition-immunity-candidate" => 63,
@@ -605,6 +610,7 @@ internal static partial class DataQualityReportGenerator
             "no-subclass-grant-levels" => 58,
             "foundry-overlay-duplicate" => 50,
             "duplicate-source-version" => 48,
+            "defense-flavor-reference" => 36,
             "expertise-flavor-reference" => 35,
             "spell-flavor-reference" => 34,
             "spell-rule-candidate" => 30,
@@ -657,59 +663,65 @@ internal static partial class DataQualityReportGenerator
             "proficiency-candidate" => 22,
             "target-choice-candidate" => 23,
             "damage-condition-defense-candidate" => 24,
-            "conditional-defense-candidate" => 25,
-            "mixed-defense-candidate" => 26,
-            "object-defense-candidate" => 27,
-            "damage-resistance-candidate" => 28,
-            "defense-reference-candidate" => 29,
-            "defense-bypass-candidate" => 30,
-            "damage-immunity-candidate" => 31,
-            "defense-choice-candidate" => 32,
-            "condition-save-effect-candidate" => 33,
-            "effect-immunity-candidate" => 34,
-            "condition-immunity-candidate" => 35,
-            "damage-vulnerability-candidate" => 36,
-            "defense-candidate" => 37,
-            "level-gated-spell-grant-candidate" => 38,
-            "innate-spell-grant-candidate" => 39,
-            "spellcasting-ability-candidate" => 40,
-            "spell-list-access-candidate" => 41,
-            "spellcasting-prerequisite-candidate" => 42,
-            "background-spell-list-candidate" => 43,
-            "spell-reference-list-candidate" => 44,
-            "item-spell-list-candidate" => 45,
-            "spell-modifier-candidate" => 46,
-            "item-spellcasting-bonus-candidate" => 47,
-            "item-charge-spell-activation-candidate" => 48,
-            "item-action-spell-activation-candidate" => 49,
-            "item-passive-spell-access-candidate" => 50,
-            "item-ritual-spell-activation-candidate" => 51,
-            "item-temporary-spell-grant-candidate" => 52,
-            "free-cast-spell-grant-candidate" => 53,
-            "spell-slot-expenditure-effect-candidate" => 54,
-            "spell-combat-interaction-candidate" => 55,
-            "spellcasting-focus-candidate" => 56,
-            "spell-slot-table-candidate" => 57,
-            "spell-slot-rule-candidate" => 58,
-            "spellbook-candidate" => 59,
-            "item-spell-activation-candidate" => 60,
-            "proficiency-limited-damage-candidate" => 61,
-            "proficiency-limited-save-effect-candidate" => 62,
-            "proficiency-uses-scaling-candidate" => 63,
-            "proficiency-dc-scaling-candidate" => 64,
-            "proficiency-damage-scaling-candidate" => 65,
-            "proficiency-healing-scaling-candidate" => 66,
-            "proficiency-movement-scaling-candidate" => 67,
-            "proficiency-roll-scaling-candidate" => 68,
-            "spell-removal-reference-candidate" => 69,
-            "spell-affected-object-reference" => 70,
-            "spell-effect-reference-candidate" => 71,
-            "spell-rule-candidate" => 72,
-            "no-subclass-grant-levels" => 73,
-            "foundry-overlay-duplicate" => 74,
-            "duplicate-source-version" => 75,
-            "expertise-flavor-reference" => 76,
-            "spell-flavor-reference" => 77,
+            "defense-choice-candidate" => 25,
+            "reactive-defense-candidate" => 26,
+            "item-attuned-defense-candidate" => 27,
+            "temporary-defense-candidate" => 28,
+            "conditional-defense-candidate" => 29,
+            "permanent-damage-resistance-candidate" => 30,
+            "trap-damage-resistance-candidate" => 31,
+            "mixed-defense-candidate" => 32,
+            "object-defense-candidate" => 33,
+            "damage-resistance-candidate" => 34,
+            "defense-reference-candidate" => 35,
+            "defense-bypass-candidate" => 36,
+            "damage-immunity-candidate" => 37,
+            "condition-save-effect-candidate" => 38,
+            "effect-immunity-candidate" => 39,
+            "condition-immunity-candidate" => 40,
+            "damage-vulnerability-candidate" => 41,
+            "defense-candidate" => 42,
+            "level-gated-spell-grant-candidate" => 43,
+            "innate-spell-grant-candidate" => 44,
+            "spellcasting-ability-candidate" => 45,
+            "spell-list-access-candidate" => 46,
+            "spellcasting-prerequisite-candidate" => 47,
+            "background-spell-list-candidate" => 48,
+            "spell-reference-list-candidate" => 49,
+            "item-spell-list-candidate" => 50,
+            "spell-modifier-candidate" => 51,
+            "item-spellcasting-bonus-candidate" => 52,
+            "item-charge-spell-activation-candidate" => 53,
+            "item-action-spell-activation-candidate" => 54,
+            "item-passive-spell-access-candidate" => 55,
+            "item-ritual-spell-activation-candidate" => 56,
+            "item-temporary-spell-grant-candidate" => 57,
+            "free-cast-spell-grant-candidate" => 58,
+            "spell-slot-expenditure-effect-candidate" => 59,
+            "spell-combat-interaction-candidate" => 60,
+            "spellcasting-focus-candidate" => 61,
+            "spell-slot-table-candidate" => 62,
+            "spell-slot-rule-candidate" => 63,
+            "spellbook-candidate" => 64,
+            "item-spell-activation-candidate" => 65,
+            "proficiency-limited-damage-candidate" => 66,
+            "proficiency-limited-save-effect-candidate" => 67,
+            "proficiency-uses-scaling-candidate" => 68,
+            "proficiency-dc-scaling-candidate" => 69,
+            "proficiency-damage-scaling-candidate" => 70,
+            "proficiency-healing-scaling-candidate" => 71,
+            "proficiency-movement-scaling-candidate" => 72,
+            "proficiency-roll-scaling-candidate" => 73,
+            "spell-removal-reference-candidate" => 74,
+            "spell-affected-object-reference" => 75,
+            "spell-effect-reference-candidate" => 76,
+            "spell-rule-candidate" => 77,
+            "no-subclass-grant-levels" => 78,
+            "foundry-overlay-duplicate" => 79,
+            "duplicate-source-version" => 80,
+            "defense-flavor-reference" => 81,
+            "expertise-flavor-reference" => 82,
+            "spell-flavor-reference" => 83,
             _ => 60
         };
     }
@@ -1041,6 +1053,16 @@ internal static partial class DataQualityReportGenerator
             return null;
         }
 
+        if (DefenseFlavorRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "defense-flavor-reference",
+                "wiki-only",
+                0.68,
+                "Text uses resistance, immunity, or vulnerability as descriptive language rather than a mechanical defense.",
+                "NoMechanicalRuleParser");
+        }
+
         if (DefenseReferenceRegex().IsMatch(cleaned))
         {
             return new TextCaseInfo(
@@ -1090,6 +1112,46 @@ internal static partial class DataQualityReportGenerator
                 "DamageConditionDefenseParser");
         }
 
+        if (hasDefenseChoice)
+        {
+            return new TextCaseInfo(
+                "defense-choice-candidate",
+                "candidate",
+                0.84,
+                "Text appears to choose or derive a defensive trait from a selected damage type, ancestry, table, or option.",
+                "DefenseChoiceTextParser");
+        }
+
+        if (categoryCount > 0 && ReactiveDefenseRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "reactive-defense-candidate",
+                "candidate",
+                0.84,
+                "Text appears to grant resistance or another defense as a reaction or response to damage.",
+                "ReactiveDefenseParser");
+        }
+
+        if (categoryCount > 0 && ItemAttunedDefenseRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-attuned-defense-candidate",
+                "candidate",
+                0.84,
+                "Text appears to grant a defensive trait while wearing, holding, carrying, or attuned to an item.",
+                "ItemAttunedDefenseParser");
+        }
+
+        if (categoryCount > 0 && TemporaryDefenseRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "temporary-defense-candidate",
+                "candidate",
+                0.82,
+                "Text appears to grant a defensive trait for a limited duration or until a rest/event.",
+                "TemporaryDefenseParser");
+        }
+
         if (categoryCount > 0 && ConditionalDefenseRegex().IsMatch(cleaned))
         {
             return new TextCaseInfo(
@@ -1110,6 +1172,26 @@ internal static partial class DataQualityReportGenerator
                 "DefenseTextParser");
         }
 
+        if (TrapDamageResistanceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "trap-damage-resistance-candidate",
+                "candidate",
+                0.84,
+                "Text appears to grant resistance to trap damage.",
+                "TrapDamageResistanceParser");
+        }
+
+        if (PermanentDamageResistanceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "permanent-damage-resistance-candidate",
+                "candidate",
+                0.86,
+                "Text appears to grant an unconditional damage resistance.",
+                "PermanentDamageResistanceParser");
+        }
+
         if (hasResistance)
         {
             return new TextCaseInfo(
@@ -1128,16 +1210,6 @@ internal static partial class DataQualityReportGenerator
                 0.84,
                 "Text appears to grant or modify damage immunity.",
                 "DamageImmunityTextParser");
-        }
-
-        if (hasDefenseChoice)
-        {
-            return new TextCaseInfo(
-                "defense-choice-candidate",
-                "candidate",
-                0.8,
-                "Text appears to determine a defensive trait from another character choice or table.",
-                "DefenseChoiceTextParser");
         }
 
         if (hasConditionSaveEffect)
@@ -1720,6 +1792,9 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"^\s*(?:damage|draconic)\s+resistance\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DefenseHeadingRegex();
 
+    [GeneratedRegex(@"\b(?:water-resistant|ordinary people|rigid discipline|leave their mark|resistance movement|resistance efforts|resistance army|resistance member|the resistance)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex DefenseFlavorRegex();
+
     [GeneratedRegex(@"^\s*(?:\{#itemEntry\s+(?:Potion|Ring) of Resistance(?:\|[^}]*)?}|Armor of (?:Acid|Cold|Fire|Force|Lightning|Necrotic|Poison|Psychic|Radiant|Thunder) Resistance(?:\|[^}]*)?)\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DefenseReferenceRegex();
 
@@ -1735,7 +1810,7 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"\b(?:immune|immunity)\b.*\b(?:acid|bludgeoning|cold|fire|force|lightning|necrotic|piercing|poison|psychic|radiant|slashing|thunder|damage)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DamageImmunityRegex();
 
-    [GeneratedRegex(@"\b(?:resistance|resistant|immunity|immune|vulnerability|vulnerable)\b.*\b(?:determined by|associated with|from .* table|chosen|choice|ancestry|lineage|legacy|\{\{damageType\}\})\b|\b(?:choice affects|damage resistance.*determined)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(?:choose|chosen|choice|your choice|DM's choice|determined by|associated with|from .* table|ancestry|lineage|legacy|\{\{damageType\}\})\b.*\b(?:resistance|resistant|immunity|immune|vulnerability|vulnerable|damage type)\b|\b(?:resistance|resistant|immunity|immune|vulnerability|vulnerable|damage type)\b.*\b(?:choose|chosen|choice|your choice|DM's choice|determined by|associated with|from .* table|ancestry|lineage|legacy|\{\{damageType\}\})\b|\b(?:choice affects|damage resistance.*determined)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DefenseChoiceRegex();
 
     [GeneratedRegex(@"\b(?:immune|immunity)\b.*\b(?:curse|curses|spell|spells|effect|effects|magic|magical|read your thoughts|lying|telepathically|airless environment|gas|inhaled|disease)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
@@ -1753,8 +1828,23 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"\b(?:poison|poisoned|fire|cold|lightning|necrotic|radiant|psychic|thunder|acid)\s+damage\b.*\b(?:condition|poisoned|charmed|frightened|paralyzed|petrified|stunned|blinded|deafened)\b|\b(?:condition|poisoned|charmed|frightened|paralyzed|petrified|stunned|blinded|deafened)\b.*\b(?:poison|fire|cold|lightning|necrotic|radiant|psychic|thunder|acid)\s+damage\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DamageConditionDefenseRegex();
 
+    [GeneratedRegex(@"\b(?:reaction|immediately after|when you take|when .* hits you|takes? damage|that instance of damage|that attack's damage)\b.*\b(?:resistance|resistant|immune|immunity)\b|\b(?:resistance|resistant|immune|immunity)\b.*\b(?:reaction|that instance of damage|that attack's damage)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ReactiveDefenseRegex();
+
+    [GeneratedRegex(@"\b(?:while|when|as long as)\b.*\b(?:wearing|holding|carrying|attuned|attuned to|wielding|on your person)\b.*\b(?:resistance|resistant|immunity|immune|vulnerability|vulnerable|Damage Absorption)\b|\b(?:resistance|resistant|immunity|immune|Damage Absorption)\b.*\b(?:wearing|holding|carrying|attuned|wielding|on your person)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ItemAttunedDefenseRegex();
+
+    [GeneratedRegex(@"\b(?:until you finish|until the end|for \{@dice|for \d+ (?:rounds?|minutes?|hours?|days?)|lasts for|for the duration|until your next|until you complete|while .* lasts)\b.*\b(?:resistance|resistant|immunity|immune|vulnerability|vulnerable)\b|\b(?:resistance|resistant|immunity|immune|vulnerability|vulnerable)\b.*\b(?:until you finish|until the end|for \{@dice|for \d+ (?:rounds?|minutes?|hours?|days?)|lasts for|for the duration|until your next|until you complete|while .* lasts)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex TemporaryDefenseRegex();
+
     [GeneratedRegex(@"\b(?:while|when|whenever|until|during|as long as|if you are|if the|against|from attacks made by|from .* damage dealt by|provided by)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ConditionalDefenseRegex();
+
+    [GeneratedRegex(@"\bresistance to (?:the )?damage dealt by traps\b|\bresistant to (?:the )?damage dealt by traps\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex TrapDamageResistanceRegex();
+
+    [GeneratedRegex(@"\b(?:you have|you gain|you are granted|you also have)\b\s+(?:\{@variantrule\s+)?(?:resistance|Resistance|resistant)\b.*\b(?:acid|bludgeoning|cold|fire|force|lightning|necrotic|piercing|poison|psychic|radiant|slashing|thunder|damage)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex PermanentDamageResistanceRegex();
 
     [GeneratedRegex(@"\b(?:(?:your\s+)?(?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+score\s+increases?\s+by\s+\d+|(?:increase|increases?)\s+(?:your\s+)?(?:(?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)(?:\s*,\s*|\s+or\s+|\s+and\s+)?){1,}\s+score\s+by\s+\d+)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex AbilityTextRegex();
