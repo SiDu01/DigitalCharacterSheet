@@ -579,6 +579,14 @@ internal static partial class DataQualityReportGenerator
             "spell-slot-expenditure-effect-candidate" => 58,
             "spell-combat-interaction-candidate" => 58,
             "spell-removal-reference-candidate" => 46,
+            "spell-healing-interaction-candidate" => 46,
+            "spell-save-defense-candidate" => 46,
+            "spell-triggered-movement-candidate" => 46,
+            "magical-adhesion-effect-candidate" => 45,
+            "soul-magic-effect-candidate" => 45,
+            "statblock-replacement-effect-candidate" => 45,
+            "curse-attunement-effect-candidate" => 45,
+            "magical-item-effect-candidate" => 45,
             "spellcasting-focus-candidate" => 57,
             "spell-slot-rule-candidate" => 57,
             "spell-slot-table-candidate" => 57,
@@ -713,15 +721,23 @@ internal static partial class DataQualityReportGenerator
             "proficiency-movement-scaling-candidate" => 72,
             "proficiency-roll-scaling-candidate" => 73,
             "spell-removal-reference-candidate" => 74,
-            "spell-affected-object-reference" => 75,
-            "spell-effect-reference-candidate" => 76,
-            "spell-rule-candidate" => 77,
-            "no-subclass-grant-levels" => 78,
-            "foundry-overlay-duplicate" => 79,
-            "duplicate-source-version" => 80,
-            "defense-flavor-reference" => 81,
-            "expertise-flavor-reference" => 82,
-            "spell-flavor-reference" => 83,
+            "spell-healing-interaction-candidate" => 75,
+            "spell-save-defense-candidate" => 76,
+            "spell-triggered-movement-candidate" => 77,
+            "magical-adhesion-effect-candidate" => 78,
+            "soul-magic-effect-candidate" => 79,
+            "statblock-replacement-effect-candidate" => 80,
+            "curse-attunement-effect-candidate" => 81,
+            "magical-item-effect-candidate" => 82,
+            "spell-affected-object-reference" => 83,
+            "spell-effect-reference-candidate" => 84,
+            "spell-rule-candidate" => 85,
+            "no-subclass-grant-levels" => 86,
+            "foundry-overlay-duplicate" => 87,
+            "duplicate-source-version" => 88,
+            "defense-flavor-reference" => 89,
+            "expertise-flavor-reference" => 90,
+            "spell-flavor-reference" => 91,
             _ => 60
         };
     }
@@ -1636,6 +1652,36 @@ internal static partial class DataQualityReportGenerator
                 "SpellRemovalReferenceParser");
         }
 
+        if (SpellHealingInteractionRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-healing-interaction-candidate",
+                "candidate",
+                0.74,
+                "Text modifies healing or hit point restoration from a spell or similar feature.",
+                "SpellHealingInteractionParser");
+        }
+
+        if (SpellSaveDefenseRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-save-defense-candidate",
+                "candidate",
+                0.74,
+                "Text grants a save, AC, or damage defense against a spell or magical effect.",
+                "SpellSaveDefenseParser");
+        }
+
+        if (SpellTriggeredMovementRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-triggered-movement-candidate",
+                "candidate",
+                0.72,
+                "Text moves, teleports, or repositions a creature after casting or using spell-related magic.",
+                "SpellTriggeredMovementParser");
+        }
+
         if (SpellCombatInteractionRegex().IsMatch(cleaned))
         {
             return new TextCaseInfo(
@@ -1644,6 +1690,56 @@ internal static partial class DataQualityReportGenerator
                 0.72,
                 "Text modifies or reacts to spell damage, spell saves, or spell-created conditions without granting spells.",
                 "SpellCombatInteractionParser");
+        }
+
+        if (StatblockReplacementRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "statblock-replacement-effect-candidate",
+                "candidate",
+                0.74,
+                "Text appears to replace or retain statistics while transformed into another form.",
+                "StatblockReplacementEffectParser");
+        }
+
+        if (CurseAttunementEffectRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "curse-attunement-effect-candidate",
+                "candidate",
+                0.72,
+                "Text appears to describe a curse, attunement side effect, or cursed item consequence.",
+                "CurseAttunementEffectParser");
+        }
+
+        if (SoulMagicEffectRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "soul-magic-effect-candidate",
+                "candidate",
+                0.72,
+                "Text appears to describe a magical soul, death, or resurrection-related effect.",
+                "SoulMagicEffectParser");
+        }
+
+        if (MagicalAdhesionEffectRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "magical-adhesion-effect-candidate",
+                "candidate",
+                0.72,
+                "Text appears to magically attach, bind, enlarge, shrink, or otherwise alter an object.",
+                "MagicalAdhesionEffectParser");
+        }
+
+        if (MagicalItemEffectRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "magical-item-effect-candidate",
+                "candidate",
+                0.66,
+                "Text appears to describe a magical item effect that is not a spellcasting grant.",
+                "MagicalItemEffectParser");
         }
 
         if (SpellEffectReferenceRegex().IsMatch(cleaned))
@@ -1930,8 +2026,32 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"\b(?:removed with|remove(?:d)? by|ended with|ended only with|spell can end|spell ends|dispel magic|remove curse|greater restoration|lesser restoration|similar magic)\b.*\b(?:spell|magic|curse|effect|condition|{@spell)\b|\b\{@spell (?:remove curse|greater restoration|lesser restoration|dispel magic)[^}]*}\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellRemovalReferenceRegex();
 
-    [GeneratedRegex(@"\b(?:fails? a saving throw against a spell|saving throw against .* spell|damage .* from .* spell|spell that deals damage|attack, spell, or feature|from that spell|spell-created|can't cast spells)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(?:restore|restores|restored|healing|heal|hit points?|Battle Medic)\b.*\b(?:spell|spells|magical healing)\b|\b(?:spell|spells)\b.*\b(?:restore|restores|restored|healing|heal|hit points?)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellHealingInteractionRegex();
+
+    [GeneratedRegex(@"\b(?:saving throw .* against a spell|against a spell or other harmful effect|damage from a spell|damage taken by .* spell|take damage from a spell|failed save into a successful one|fail a saving throw against .* spell)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellSaveDefenseRegex();
+
+    [GeneratedRegex(@"\b(?:after casting the spell|immediately after casting|when you use .* spell|when you cast|teleport|teleports|transport|move up to|unoccupied space)\b.*\b(?:spell|spells|Metamagic|magical|teleport|unoccupied space)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellTriggeredMovementRegex();
+
+    [GeneratedRegex(@"\b(?:fails? a saving throw against a spell|saving throw against .* spell|damage .* from .* spell|spell that deals damage|attack, spell, or feature|from that spell|spell-created|can't cast spells|cursed with \{@spell|takes? .* damage from your .* spell)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellCombatInteractionRegex();
+
+    [GeneratedRegex(@"\b(?:game statistics are replaced|stat block of the chosen form|retain your creature type|retain .* scores|chosen form)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex StatblockReplacementRegex();
+
+    [GeneratedRegex(@"\b(?:curse|cursed|attunement ends|becomes attuned|attunes? to|detrimental properties|unusual curse|can't describe its ability|attune to the)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex CurseAttunementEffectRegex();
+
+    [GeneratedRegex(@"\b(?:soul|souls|devours its soul|soul has been|slays the creature|death|prevent death|resurrection|revivify|raise dead)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SoulMagicEffectRegex();
+
+    [GeneratedRegex(@"\b(?:magically adhere|magically adheres|magically attached|ten times heavier|larger than normal|smaller than normal|grows larger|grows smaller|enlarge|reduce|altered magically|magically augmented)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex MagicalAdhesionEffectRegex();
+
+    [GeneratedRegex(@"\b(?:magical|magically|magic)\b.*\b(?:effect|effects|property|properties|flames|light|aura|emanation|surface|object|creature|target|saving throw|damage|condition|conjure|conjured)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex MagicalItemEffectRegex();
 
     [GeneratedRegex(@"\b(?:attack or a spell|attack or spell|spell or effect|targeted by the spell|target of the .* spell|affected by the spell|benefit from several spells|cast on you|when .* casts? a spell|whenever .* casts? a spell|spell attack|spell save|spell damage|somatic components of a spell|concentrating on a spell|spell ends|spell takes effect|only .* spell can|spell or similar|as if affected by|provides no defense against|targeted by a spell that ends a curse|spells and other magical effects|spell can end|spell is sufficient|per the \{@spell|as per the \{@spell)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellEffectReferenceRegex();
