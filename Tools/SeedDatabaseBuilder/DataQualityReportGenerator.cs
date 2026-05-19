@@ -272,7 +272,7 @@ internal static partial class DataQualityReportGenerator
             var caseInfo = detector.ToCaseInfo();
             if (detector.CaseType == "choice-candidate")
             {
-                var choiceCase = ClassifyChoiceText(text);
+                var choiceCase = ClassifyChoiceText(category, text);
                 if (choiceCase is null)
                 {
                     continue;
@@ -536,6 +536,11 @@ internal static partial class DataQualityReportGenerator
             "ability-score-candidate" => 84,
             "missing-class-features" => 82,
             "spell-choice-candidate" => 81,
+            "ancestry-spell-choice-candidate" => 81,
+            "feat-spell-choice-candidate" => 81,
+            "feat-spell-table-choice-candidate" => 81,
+            "item-temporary-spell-choice-candidate" => 81,
+            "spell-modifier-choice-candidate" => 80,
             "ancestry-option-choice-candidate" => 81,
             "feature-option-choice-candidate" => 81,
             "ability-choice-candidate" => 81,
@@ -590,6 +595,9 @@ internal static partial class DataQualityReportGenerator
             "item-charge-spell-preparation-candidate" => 58,
             "item-charge-spell-modifier-candidate" => 58,
             "item-at-will-spell-activation-candidate" => 58,
+            "item-recharge-direct-spell-activation-candidate" => 58,
+            "item-recharge-spell-list-activation-candidate" => 58,
+            "item-recharge-spell-reference-candidate" => 46,
             "item-recharge-spell-activation-candidate" => 58,
             "item-stored-spell-activation-candidate" => 58,
             "item-spell-effect-activation-candidate" => 58,
@@ -635,12 +643,20 @@ internal static partial class DataQualityReportGenerator
             "mixed-proficiency-candidate" => 76,
             "expertise-candidate" => 75,
             "all-skill-proficiency-candidate" => 75,
+            "mixed-proficiency-choice-candidate" => 75,
+            "skill-proficiency-choice-candidate" => 75,
             "proficiency-choice-candidate" => 75,
+            "tool-proficiency-choice-candidate" => 74,
             "skill-proficiency-candidate" => 74,
+            "weapon-tool-proficiency-choice-candidate" => 73,
+            "weapon-proficiency-choice-candidate" => 73,
             "tool-proficiency-candidate" => 73,
+            "language-proficiency-choice-candidate" => 72,
             "language-proficiency-candidate" => 72,
             "weapon-proficiency-candidate" => 72,
+            "armor-proficiency-choice-candidate" => 72,
             "armor-proficiency-candidate" => 72,
+            "saving-throw-proficiency-choice-candidate" => 72,
             "saving-throw-proficiency-candidate" => 72,
             "proficiency-bonus-scaling-candidate" => 71,
             "proficiency-candidate" => 70,
@@ -682,122 +698,138 @@ internal static partial class DataQualityReportGenerator
             "repeatable-feat" => 3,
             "ability-score-candidate" => 4,
             "spell-choice-candidate" => 5,
-            "ancestry-option-choice-candidate" => 6,
-            "feature-option-choice-candidate" => 7,
-            "ability-choice-candidate" => 8,
-            "choice-candidate" => 9,
-            "damage-type-choice-candidate" => 10,
-            "mixed-proficiency-candidate" => 11,
-            "expertise-candidate" => 12,
-            "all-skill-proficiency-candidate" => 13,
-            "proficiency-choice-candidate" => 14,
-            "skill-proficiency-candidate" => 15,
-            "tool-proficiency-candidate" => 16,
-            "language-proficiency-candidate" => 17,
-            "weapon-proficiency-candidate" => 18,
-            "armor-proficiency-candidate" => 19,
-            "saving-throw-proficiency-candidate" => 20,
-            "proficiency-bonus-scaling-candidate" => 21,
-            "proficiency-candidate" => 22,
-            "target-choice-candidate" => 23,
-            "damage-condition-defense-candidate" => 24,
-            "defense-choice-candidate" => 25,
-            "reactive-defense-candidate" => 26,
-            "item-attuned-defense-candidate" => 27,
-            "temporary-defense-candidate" => 28,
-            "conditional-defense-candidate" => 29,
-            "permanent-damage-resistance-candidate" => 30,
-            "trap-damage-resistance-candidate" => 31,
-            "mixed-defense-candidate" => 32,
-            "object-defense-candidate" => 33,
-            "damage-resistance-candidate" => 34,
-            "defense-reference-candidate" => 35,
-            "defense-bypass-candidate" => 36,
-            "damage-immunity-candidate" => 37,
-            "condition-save-effect-candidate" => 38,
-            "effect-immunity-candidate" => 39,
-            "condition-immunity-candidate" => 40,
-            "damage-vulnerability-candidate" => 41,
-            "defense-candidate" => 42,
-            "level-gated-spell-grant-candidate" => 43,
-            "innate-spell-grant-candidate" => 44,
-            "spellcasting-ability-candidate" => 45,
-            "spell-list-access-candidate" => 46,
-            "spellcasting-prerequisite-candidate" => 47,
-            "background-spell-list-candidate" => 48,
-            "ancestry-spell-list-candidate" => 49,
-            "feat-spell-list-candidate" => 50,
-            "spell-reference-list-candidate" => 51,
-            "item-spell-list-candidate" => 52,
-            "item-spell-table-entry-candidate" => 53,
-            "item-spellbook-list-candidate" => 54,
-            "spell-modifier-candidate" => 55,
-            "item-spell-stat-block-candidate" => 56,
-            "spell-component-substitution-candidate" => 57,
-            "spell-template-effect-candidate" => 58,
-            "spell-cancellation-effect-candidate" => 59,
-            "spell-storage-effect-candidate" => 60,
-            "item-autonomous-spell-effect-candidate" => 61,
-            "spell-detection-reference-candidate" => 62,
-            "spell-recharge-rule-candidate" => 63,
-            "spell-consumable-use-candidate" => 64,
-            "item-group-member-reference" => 65,
-            "spellbook-level-list-candidate" => 66,
-            "item-random-spell-effect-candidate" => 67,
-            "spell-sensor-effect-candidate" => 68,
-            "item-spellcasting-bonus-candidate" => 69,
-            "item-charge-spell-preparation-candidate" => 70,
-            "item-charge-spell-modifier-candidate" => 71,
-            "item-at-will-spell-activation-candidate" => 72,
-            "item-recharge-spell-activation-candidate" => 73,
-            "item-stored-spell-activation-candidate" => 74,
-            "item-spell-effect-activation-candidate" => 75,
-            "item-granted-limited-spell-uses-candidate" => 76,
-            "item-action-spell-list-activation-candidate" => 77,
-            "item-action-direct-spell-activation-candidate" => 78,
-            "item-passive-direct-spell-access-candidate" => 79,
-            "item-charge-spell-list-activation-candidate" => 80,
-            "item-charge-direct-spell-activation-candidate" => 81,
-            "item-triggered-charge-spell-effect-candidate" => 82,
-            "item-charge-spell-activation-candidate" => 83,
-            "item-action-spell-activation-candidate" => 84,
-            "item-passive-spell-access-candidate" => 85,
-            "item-ritual-spell-activation-candidate" => 86,
-            "item-temporary-spell-grant-candidate" => 87,
-            "free-cast-spell-grant-candidate" => 88,
-            "spell-slot-expenditure-effect-candidate" => 89,
-            "spell-combat-interaction-candidate" => 90,
-            "spellcasting-focus-candidate" => 91,
-            "spell-slot-table-candidate" => 92,
-            "spell-slot-rule-candidate" => 93,
-            "spellbook-candidate" => 94,
-            "item-spell-activation-candidate" => 95,
-            "proficiency-limited-damage-candidate" => 96,
-            "proficiency-limited-save-effect-candidate" => 97,
-            "proficiency-uses-scaling-candidate" => 98,
-            "proficiency-dc-scaling-candidate" => 99,
-            "proficiency-damage-scaling-candidate" => 100,
-            "proficiency-healing-scaling-candidate" => 101,
-            "proficiency-movement-scaling-candidate" => 102,
-            "proficiency-roll-scaling-candidate" => 103,
-            "spell-removal-reference-candidate" => 104,
-            "spell-healing-interaction-candidate" => 105,
-            "spell-save-defense-candidate" => 106,
-            "spell-triggered-movement-candidate" => 107,
-            "magical-adhesion-effect-candidate" => 108,
-            "soul-magic-effect-candidate" => 109,
-            "statblock-replacement-effect-candidate" => 110,
-            "curse-attunement-effect-candidate" => 111,
-            "magical-item-effect-candidate" => 112,
-            "spell-affected-object-reference" => 113,
-            "spell-effect-reference-candidate" => 114,
-            "spell-rule-candidate" => 115,
-            "no-subclass-grant-levels" => 116,
-            "foundry-overlay-duplicate" => 117,
-            "duplicate-source-version" => 118,
-            "defense-flavor-reference" => 119,
-            "expertise-flavor-reference" => 120,
-            "spell-flavor-reference" => 121,
+            "ancestry-spell-choice-candidate" => 6,
+            "feat-spell-choice-candidate" => 7,
+            "feat-spell-table-choice-candidate" => 8,
+            "item-temporary-spell-choice-candidate" => 9,
+            "spell-modifier-choice-candidate" => 10,
+            "ancestry-option-choice-candidate" => 11,
+            "feature-option-choice-candidate" => 12,
+            "ability-choice-candidate" => 13,
+            "choice-candidate" => 14,
+            "damage-type-choice-candidate" => 15,
+            "mixed-proficiency-candidate" => 16,
+            "expertise-candidate" => 17,
+            "all-skill-proficiency-candidate" => 18,
+            "mixed-proficiency-choice-candidate" => 19,
+            "skill-proficiency-choice-candidate" => 20,
+            "tool-proficiency-choice-candidate" => 21,
+            "weapon-tool-proficiency-choice-candidate" => 22,
+            "weapon-proficiency-choice-candidate" => 23,
+            "language-proficiency-choice-candidate" => 24,
+            "armor-proficiency-choice-candidate" => 25,
+            "saving-throw-proficiency-choice-candidate" => 26,
+            "proficiency-choice-candidate" => 27,
+            "skill-proficiency-candidate" => 28,
+            "tool-proficiency-candidate" => 29,
+            "language-proficiency-candidate" => 30,
+            "weapon-proficiency-candidate" => 31,
+            "armor-proficiency-candidate" => 32,
+            "saving-throw-proficiency-candidate" => 33,
+            "proficiency-bonus-scaling-candidate" => 34,
+            "proficiency-candidate" => 35,
+            "target-choice-candidate" => 36,
+            "damage-condition-defense-candidate" => 37,
+            "defense-choice-candidate" => 38,
+            "reactive-defense-candidate" => 39,
+            "item-attuned-defense-candidate" => 40,
+            "temporary-defense-candidate" => 41,
+            "conditional-defense-candidate" => 42,
+            "permanent-damage-resistance-candidate" => 43,
+            "trap-damage-resistance-candidate" => 44,
+            "mixed-defense-candidate" => 45,
+            "object-defense-candidate" => 46,
+            "damage-resistance-candidate" => 47,
+            "defense-reference-candidate" => 48,
+            "defense-bypass-candidate" => 49,
+            "damage-immunity-candidate" => 50,
+            "condition-save-effect-candidate" => 51,
+            "effect-immunity-candidate" => 52,
+            "condition-immunity-candidate" => 53,
+            "damage-vulnerability-candidate" => 54,
+            "defense-candidate" => 55,
+            "level-gated-spell-grant-candidate" => 56,
+            "innate-spell-grant-candidate" => 57,
+            "spellcasting-ability-candidate" => 58,
+            "spell-list-access-candidate" => 59,
+            "spellcasting-prerequisite-candidate" => 60,
+            "background-spell-list-candidate" => 61,
+            "ancestry-spell-list-candidate" => 62,
+            "feat-spell-list-candidate" => 63,
+            "spell-reference-list-candidate" => 64,
+            "item-spell-list-candidate" => 65,
+            "item-spell-table-entry-candidate" => 66,
+            "item-spellbook-list-candidate" => 67,
+            "spell-modifier-candidate" => 68,
+            "item-spell-stat-block-candidate" => 69,
+            "spell-component-substitution-candidate" => 70,
+            "spell-template-effect-candidate" => 71,
+            "spell-cancellation-effect-candidate" => 72,
+            "spell-storage-effect-candidate" => 73,
+            "item-autonomous-spell-effect-candidate" => 74,
+            "spell-detection-reference-candidate" => 75,
+            "spell-recharge-rule-candidate" => 76,
+            "spell-consumable-use-candidate" => 77,
+            "item-group-member-reference" => 78,
+            "spellbook-level-list-candidate" => 79,
+            "item-random-spell-effect-candidate" => 80,
+            "spell-sensor-effect-candidate" => 81,
+            "item-spellcasting-bonus-candidate" => 82,
+            "item-charge-spell-preparation-candidate" => 83,
+            "item-charge-spell-modifier-candidate" => 84,
+            "item-at-will-spell-activation-candidate" => 85,
+            "item-recharge-direct-spell-activation-candidate" => 86,
+            "item-recharge-spell-list-activation-candidate" => 87,
+            "item-recharge-spell-reference-candidate" => 88,
+            "item-recharge-spell-activation-candidate" => 89,
+            "item-stored-spell-activation-candidate" => 90,
+            "item-spell-effect-activation-candidate" => 91,
+            "item-granted-limited-spell-uses-candidate" => 92,
+            "item-action-spell-list-activation-candidate" => 93,
+            "item-action-direct-spell-activation-candidate" => 94,
+            "item-passive-direct-spell-access-candidate" => 95,
+            "item-charge-spell-list-activation-candidate" => 96,
+            "item-charge-direct-spell-activation-candidate" => 97,
+            "item-triggered-charge-spell-effect-candidate" => 98,
+            "item-charge-spell-activation-candidate" => 99,
+            "item-action-spell-activation-candidate" => 100,
+            "item-passive-spell-access-candidate" => 101,
+            "item-ritual-spell-activation-candidate" => 102,
+            "item-temporary-spell-grant-candidate" => 103,
+            "free-cast-spell-grant-candidate" => 104,
+            "spell-slot-expenditure-effect-candidate" => 105,
+            "spell-combat-interaction-candidate" => 106,
+            "spellcasting-focus-candidate" => 107,
+            "spell-slot-table-candidate" => 108,
+            "spell-slot-rule-candidate" => 109,
+            "spellbook-candidate" => 110,
+            "item-spell-activation-candidate" => 111,
+            "proficiency-limited-damage-candidate" => 112,
+            "proficiency-limited-save-effect-candidate" => 113,
+            "proficiency-uses-scaling-candidate" => 114,
+            "proficiency-dc-scaling-candidate" => 115,
+            "proficiency-damage-scaling-candidate" => 116,
+            "proficiency-healing-scaling-candidate" => 117,
+            "proficiency-movement-scaling-candidate" => 118,
+            "proficiency-roll-scaling-candidate" => 119,
+            "spell-removal-reference-candidate" => 120,
+            "spell-healing-interaction-candidate" => 121,
+            "spell-save-defense-candidate" => 122,
+            "spell-triggered-movement-candidate" => 123,
+            "magical-adhesion-effect-candidate" => 124,
+            "soul-magic-effect-candidate" => 125,
+            "statblock-replacement-effect-candidate" => 126,
+            "curse-attunement-effect-candidate" => 127,
+            "magical-item-effect-candidate" => 128,
+            "spell-affected-object-reference" => 129,
+            "spell-effect-reference-candidate" => 130,
+            "spell-rule-candidate" => 131,
+            "no-subclass-grant-levels" => 132,
+            "foundry-overlay-duplicate" => 133,
+            "duplicate-source-version" => 134,
+            "defense-flavor-reference" => 135,
+            "expertise-flavor-reference" => 136,
+            "spell-flavor-reference" => 137,
             _ => 60
         };
     }
@@ -872,7 +904,7 @@ internal static partial class DataQualityReportGenerator
         return string.IsNullOrWhiteSpace(value) ? fallback : value;
     }
 
-    private static TextCaseInfo? ClassifyChoiceText(string text)
+    private static TextCaseInfo? ClassifyChoiceText(string category, string text)
     {
         var cleaned = text.Trim();
         if (FlavorChoiceRegex().IsMatch(cleaned))
@@ -897,12 +929,7 @@ internal static partial class DataQualityReportGenerator
 
         if (SpellChoiceRegex().IsMatch(cleaned))
         {
-            return new TextCaseInfo(
-                "spell-choice-candidate",
-                "candidate",
-                0.86,
-                "Text appears to require choosing one or more spells or cantrips.",
-                "SpellChoiceTextParser");
+            return ClassifySpellChoiceText(category, cleaned);
         }
 
         if (AbilityChoiceRegex().IsMatch(cleaned))
@@ -993,6 +1020,107 @@ internal static partial class DataQualityReportGenerator
             "ChoiceTextParser");
     }
 
+    private static TextCaseInfo ClassifySpellChoiceText(string category, string cleaned)
+    {
+        if (IsAncestryCategory(category))
+        {
+            return new TextCaseInfo(
+                "ancestry-spell-choice-candidate",
+                "candidate",
+                0.86,
+                "Text appears to require choosing ancestry-granted spells or cantrips.",
+                "AncestrySpellChoiceParser");
+        }
+
+        if (string.Equals(category, "feat", StringComparison.OrdinalIgnoreCase)
+            && ExplicitSpellChoiceListRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "feat-spell-table-choice-candidate",
+                "candidate",
+                0.86,
+                "Text appears to require choosing spells from an explicit feat spell table or list.",
+                "FeatSpellTableChoiceParser");
+        }
+
+        if (string.Equals(category, "feat", StringComparison.OrdinalIgnoreCase))
+        {
+            return new TextCaseInfo(
+                "feat-spell-choice-candidate",
+                "candidate",
+                0.86,
+                "Text appears to require choosing feat-granted spells or cantrips.",
+                "FeatSpellChoiceParser");
+        }
+
+        if (IsItemCategory(category) && SpellModifierChoiceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-modifier-choice-candidate",
+                "candidate",
+                0.82,
+                "Text appears to choose targets or options for modifying a spell rather than choosing a spell to learn.",
+                "SpellModifierChoiceParser");
+        }
+
+        if (IsItemCategory(category) && ItemTemporarySpellChoiceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-temporary-spell-choice-candidate",
+                "candidate",
+                0.84,
+                "Text appears to temporarily choose a spell or cantrip from an item.",
+                "ItemTemporarySpellChoiceParser");
+        }
+
+        return new TextCaseInfo(
+            "spell-choice-candidate",
+            "candidate",
+            0.86,
+            "Text appears to require choosing one or more spells or cantrips.",
+            "SpellChoiceTextParser");
+    }
+
+    private static TextCaseInfo ClassifyItemRechargeSpellActivationText(string cleaned)
+    {
+        if (ItemRechargeSpellListActivationRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-recharge-spell-list-activation-candidate",
+                "candidate",
+                0.83,
+                "Text appears to cast one spell from an item-provided list with a recharge or rest limit.",
+                "ItemRechargeSpellListActivationParser");
+        }
+
+        if (ItemRechargeDirectSpellActivationRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-recharge-direct-spell-activation-candidate",
+                "candidate",
+                0.83,
+                "Text appears to cast one or more named spells from an item with a recharge or rest limit.",
+                "ItemRechargeDirectSpellActivationParser");
+        }
+
+        if (ItemRechargeSpellReferenceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-recharge-spell-reference-candidate",
+                "candidate",
+                0.72,
+                "Text mentions a spell with recharge-like wording but does not directly grant item spellcasting.",
+                "ItemRechargeSpellReferenceParser");
+        }
+
+        return new TextCaseInfo(
+            "item-recharge-spell-activation-candidate",
+            "candidate",
+            0.82,
+            "Text appears to cast a spell from an item with a rest, dawn, or other recharge limit.",
+            "ItemRechargeSpellActivationParser");
+    }
+
     private static TextCaseInfo? ClassifyProficiencyText(string text)
     {
         var cleaned = text.Trim();
@@ -1047,12 +1175,7 @@ internal static partial class DataQualityReportGenerator
 
         if (ProficiencyChoiceRegex().IsMatch(cleaned))
         {
-            return new TextCaseInfo(
-                "proficiency-choice-candidate",
-                "candidate",
-                0.84,
-                "Text appears to grant a choice between one or more proficiency types.",
-                "ProficiencyChoiceParser");
+            return ClassifyProficiencyChoiceText(hasSkill, hasTool, hasLanguage, hasWeapon, hasArmor, hasSavingThrow, categoryCount);
         }
 
         if (categoryCount > 1 || MixedProficiencyRegex().IsMatch(cleaned))
@@ -1131,6 +1254,103 @@ internal static partial class DataQualityReportGenerator
             0.65,
             "Text references proficiency, but the target type is not clear enough to classify.",
             "ProficiencyTextParser");
+    }
+
+    private static TextCaseInfo ClassifyProficiencyChoiceText(
+        bool hasSkill,
+        bool hasTool,
+        bool hasLanguage,
+        bool hasWeapon,
+        bool hasArmor,
+        bool hasSavingThrow,
+        int categoryCount)
+    {
+        if (categoryCount > 1)
+        {
+            if (hasWeapon && hasTool && !hasSkill && !hasLanguage && !hasArmor && !hasSavingThrow)
+            {
+                return new TextCaseInfo(
+                    "weapon-tool-proficiency-choice-candidate",
+                    "candidate",
+                    0.84,
+                    "Text appears to choose between weapon and tool proficiencies.",
+                    "WeaponToolProficiencyChoiceParser");
+            }
+
+            return new TextCaseInfo(
+                "mixed-proficiency-choice-candidate",
+                "candidate",
+                0.84,
+                "Text appears to choose between multiple proficiency types.",
+                "MixedProficiencyChoiceParser");
+        }
+
+        if (hasSkill)
+        {
+            return new TextCaseInfo(
+                "skill-proficiency-choice-candidate",
+                "candidate",
+                0.84,
+                "Text appears to choose one or more skill proficiencies.",
+                "SkillProficiencyChoiceParser");
+        }
+
+        if (hasTool)
+        {
+            return new TextCaseInfo(
+                "tool-proficiency-choice-candidate",
+                "candidate",
+                0.84,
+                "Text appears to choose one or more tool proficiencies.",
+                "ToolProficiencyChoiceParser");
+        }
+
+        if (hasLanguage)
+        {
+            return new TextCaseInfo(
+                "language-proficiency-choice-candidate",
+                "candidate",
+                0.84,
+                "Text appears to choose one or more language proficiencies.",
+                "LanguageProficiencyChoiceParser");
+        }
+
+        if (hasWeapon)
+        {
+            return new TextCaseInfo(
+                "weapon-proficiency-choice-candidate",
+                "candidate",
+                0.84,
+                "Text appears to choose one or more weapon proficiencies.",
+                "WeaponProficiencyChoiceParser");
+        }
+
+        if (hasArmor)
+        {
+            return new TextCaseInfo(
+                "armor-proficiency-choice-candidate",
+                "candidate",
+                0.84,
+                "Text appears to choose one or more armor or shield proficiencies.",
+                "ArmorProficiencyChoiceParser");
+        }
+
+        if (hasSavingThrow)
+        {
+            return new TextCaseInfo(
+                "saving-throw-proficiency-choice-candidate",
+                "candidate",
+                0.84,
+                "Text appears to choose one or more saving throw proficiencies.",
+                "SavingThrowProficiencyChoiceParser");
+        }
+
+        return new TextCaseInfo(
+            "proficiency-choice-candidate",
+            "candidate",
+            0.84,
+            "Text appears to grant a choice between one or more proficiency types.",
+            "ProficiencyChoiceParser");
     }
 
     private static TextCaseInfo? ClassifyDefenseText(string text)
@@ -1574,12 +1794,7 @@ internal static partial class DataQualityReportGenerator
 
         if (IsItemCategory(category) && ItemRechargeSpellActivationRegex().IsMatch(cleaned))
         {
-            return new TextCaseInfo(
-                "item-recharge-spell-activation-candidate",
-                "candidate",
-                0.82,
-                "Text appears to cast a spell from an item with a rest, dawn, or other recharge limit.",
-                "ItemRechargeSpellActivationParser");
+            return ClassifyItemRechargeSpellActivationText(cleaned);
         }
 
         if (IsItemCategory(category) && ItemStoredSpellActivationRegex().IsMatch(cleaned))
@@ -2018,12 +2233,7 @@ internal static partial class DataQualityReportGenerator
 
         if (SpellChoiceRegex().IsMatch(cleaned))
         {
-            return new TextCaseInfo(
-                "spell-choice-candidate",
-                "candidate",
-                0.86,
-                "Text appears to require choosing one or more spells or cantrips.",
-                "SpellChoiceTextParser");
+            return ClassifySpellChoiceText(category, cleaned);
         }
 
         if (SpellcastingAbilityRegex().IsMatch(cleaned))
@@ -2178,10 +2388,15 @@ internal static partial class DataQualityReportGenerator
     {
         return caseType switch
         {
-            "skill-choice-candidate" or "skill-proficiency-candidate" => "skill-proficiency",
-            "tool-choice-candidate" or "tool-proficiency-candidate" => "tool-proficiency",
-            "language-choice-candidate" or "language-proficiency-candidate" => "language-proficiency",
-            "spell-choice-candidate" => "spell-choice",
+            "skill-choice-candidate" or "skill-proficiency-choice-candidate" or "skill-proficiency-candidate" => "skill-proficiency",
+            "tool-choice-candidate" or "tool-proficiency-choice-candidate" or "tool-proficiency-candidate" => "tool-proficiency",
+            "language-choice-candidate" or "language-proficiency-choice-candidate" or "language-proficiency-candidate" => "language-proficiency",
+            "spell-choice-candidate"
+                or "ancestry-spell-choice-candidate"
+                or "feat-spell-choice-candidate"
+                or "feat-spell-table-choice-candidate"
+                or "item-temporary-spell-choice-candidate" => "spell-choice",
+            "spell-modifier-choice-candidate" => "spell-modifier-choice",
             _ => caseType
         };
     }
@@ -2205,6 +2420,15 @@ internal static partial class DataQualityReportGenerator
 
     [GeneratedRegex(@"\b(?:choose|select)\b.*\b(?:cantrip|cantrips|spell|spells|spell list|class list)\b|\b(?:cantrip|cantrips|spell|spells)\s+of your choice\b|\bchoose.*\{@filter[^}]*\bspells\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellChoiceRegex();
+
+    [GeneratedRegex(@"\bchoose\s+(?:one|two|three|\d+)\s+from\s+(?:\{@spell[^}]+}\s*(?:,|and|or)?\s*)+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ExplicitSpellChoiceListRegex();
+
+    [GeneratedRegex(@"\b(?:choose|chosen)\s+(?:one|up to \d+|\d+)\s+(?:creatures?|targets?)\b.*\b(?:affected by the spell|takes? damage from the spell|saving throws? against the spell)\b|\b(?:affected by the spell|takes? damage from the spell)\b.*\b(?:choose|chosen)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellModifierChoiceRegex();
+
+    [GeneratedRegex(@"\b(?:for \d+ hours?|before you finish your next long rest|until you finish your next long rest|when you finish a long rest|at the end of a long rest|study .* at the end of a long rest)\b.*\b(?:choose|chosen)\b.*\b(?:spell|cantrip|spell list|class list)\b|\b(?:choose|chosen)\b.*\b(?:spell|cantrip|spell list|class list)\b.*\b(?:for \d+ hours?|before you finish your next long rest|until you finish your next long rest|when you finish a long rest|at the end of a long rest)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ItemTemporarySpellChoiceRegex();
 
     [GeneratedRegex(@"\bchoose\s+(?:one\s+)?ability score\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex AbilityChoiceRegex();
@@ -2305,7 +2529,7 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"\b(?:water-resistant|ordinary people|rigid discipline|leave their mark|resistance movement|resistance efforts|resistance army|resistance member|the resistance)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DefenseFlavorRegex();
 
-    [GeneratedRegex(@"^\s*(?:\{#itemEntry\s+(?:Potion|Ring) of Resistance(?:\|[^}]*)?}|Armor of (?:Acid|Cold|Fire|Force|Lightning|Necrotic|Poison|Psychic|Radiant|Thunder) Resistance(?:\|[^}]*)?)\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^\s*(?:\{#itemEntry\s+(?:Potion|Ring) of Resistance(?:\|[^}]*)?}|(?:Potion|Ring|Armor) of (?:Acid|Bludgeoning|Cold|Fire|Force|Lightning|Necrotic|Piercing|Poison|Psychic|Radiant|Slashing|Thunder) Resistance(?:\|[^}]*)?)\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DefenseReferenceRegex();
 
     [GeneratedRegex(@"\b(?:object|painting|tower|door|walls?|roof|device|orb|copy|figurine|construct|has AC|AC \d+|hit points|HP \d+)\b.*\b(?:immunity|immune|resistance|resistant|vulnerability|vulnerable)\b|\b(?:immunity|immune|resistance|resistant)\b.*\b(?:object|painting|tower|door|walls?|roof|device|orb|copy|figurine|construct|hit points|HP \d+)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
@@ -2323,7 +2547,7 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"\b(?:choose|chosen|choice|your choice|DM's choice|determined by|associated with|from .* table|ancestry|lineage|legacy|\{\{damageType\}\})\b.*\b(?:resistance|resistant|immunity|immune|vulnerability|vulnerable|damage type)\b|\b(?:resistance|resistant|immunity|immune|vulnerability|vulnerable|damage type)\b.*\b(?:choose|chosen|choice|your choice|DM's choice|determined by|associated with|from .* table|ancestry|lineage|legacy|\{\{damageType\}\})\b|\b(?:choice affects|damage resistance.*determined)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DefenseChoiceRegex();
 
-    [GeneratedRegex(@"\b(?:immune|immunity)\b.*\b(?:curse|curses|spell|spells|effect|effects|magic|magical|read your thoughts|lying|telepathically|airless environment|gas|inhaled|disease)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(?:immune|immunity)\b.*\b(?:curse|curses|spell|spells|effect|effects|properties|property|magic|magical|read your thoughts|lying|telepathically|airless environment|gas|inhaled|disease)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex EffectImmunityRegex();
 
     [GeneratedRegex(@"\b(?:must succeed on|make a .* saving throw|failed save|on a failed save|move one of the following conditions|be \{@condition|become \{@condition)\b.*\b(?:\{@condition|condition|poisoned|frightened|blinded|deafened|charmed|paralyzed|stunned)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
@@ -2481,6 +2705,15 @@ internal static partial class DataQualityReportGenerator
 
     [GeneratedRegex(@"\b(?:cast|casts|used to cast|use .* to cast|property .* used|once .* cast|once .* used)\b.*\b(?:spell|cantrip|{@spell)\b.*\b(?:can't|cannot|can not|must finish|until the next dawn|until dawn|finish a short or long rest|finish a long rest|30 days|regains? all expended uses?)\b|\b(?:can't|cannot|can not|must finish|until the next dawn|until dawn|finish a short or long rest|finish a long rest|30 days)\b.*\b(?:cast|casts|used to cast|spell|cantrip|{@spell)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ItemRechargeSpellActivationRegex();
+
+    [GeneratedRegex(@"\b(?:cast|casts|used to cast|use .* to cast|can use .* to cast|property .* used|once .* cast|once .* used|cast from|cast .* from (?:it|the item|the \w+)|can cast)\b.*\{@spell\b.*\b(?:can't|cannot|can not|must finish|until the next dawn|until dawn|finish a short or long rest|finish a long rest|regains? all expended uses?|regains? .* at dawn)\b|\b(?:can't|cannot|can not|must finish|until the next dawn|until dawn|finish a short or long rest|finish a long rest)\b.*\b(?:cast|casts|used to cast|use .* to cast|can cast)\b.*\{@spell\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ItemRechargeDirectSpellActivationRegex();
+
+    [GeneratedRegex(@"\b(?:cast|casts|use .* to cast|can cast)\b.*\b(?:one of the following spells|following spells|cast either|one of its spells|one of the spells)\b.*\b(?:can't|cannot|can not|must finish|until the next dawn|until dawn|finish a short or long rest|finish a long rest|regains? all expended uses?)\b|\b(?:can't|cannot|can not|must finish|until the next dawn|until dawn|finish a short or long rest|finish a long rest)\b.*\b(?:one of the following spells|following spells|cast either|one of its spells|one of the spells)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ItemRechargeSpellListActivationRegex();
+
+    [GeneratedRegex(@"\b(?:targeted by|affected by|destroyed by|reveals? only|similar reveals|spell effects? can't|can't be dispelled|can't be removed|attunement .* ends|ends? a curse|remove curse|disintegrate)\b.*\b(?:spell|{@spell)\b|\b(?:spell|{@spell)\b.*\b(?:targeted by|affected by|destroyed by|reveals? only|similar reveals|spell effects? can't|can't be dispelled|can't be removed|attunement .* ends|ends? a curse|remove curse|disintegrate)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ItemRechargeSpellReferenceRegex();
 
     [GeneratedRegex(@"\b(?:stored inside|spell stored|contains a single|imbue .* with a spell|spell is stored|card holds|magic tattoo contains|wrought on your skin|to use the tattoo|brandish this card)\b.*\b(?:spell|cantrip|{@spell|{@filter)\b|\b(?:spell|cantrip|{@spell|{@filter)\b.*\b(?:stored inside|spell stored|contains a single|imbue .* with a spell|spell is stored|card holds|magic tattoo contains|wrought on your skin|to use the tattoo|brandish this card)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ItemStoredSpellActivationRegex();
