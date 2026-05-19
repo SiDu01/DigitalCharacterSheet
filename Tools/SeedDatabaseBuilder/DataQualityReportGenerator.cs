@@ -302,7 +302,7 @@ internal static partial class DataQualityReportGenerator
             }
             else if (detector.CaseType == "spell-rule-candidate")
             {
-                var spellCase = ClassifySpellText(category, text);
+                var spellCase = ClassifySpellText(category, path, text);
                 if (spellCase is null)
                 {
                     continue;
@@ -540,6 +540,7 @@ internal static partial class DataQualityReportGenerator
             "feat-spell-choice-candidate" => 81,
             "feat-spell-table-choice-candidate" => 81,
             "item-temporary-spell-choice-candidate" => 81,
+            "item-spell-choice-candidate" => 81,
             "spell-modifier-choice-candidate" => 80,
             "ancestry-option-choice-candidate" => 81,
             "feature-option-choice-candidate" => 81,
@@ -570,6 +571,9 @@ internal static partial class DataQualityReportGenerator
             "background-multi-spell-list-entry-candidate" => 62,
             "background-qualified-spell-list-entry-candidate" => 62,
             "innate-spell-grant-candidate" => 61,
+            "ancestry-innate-spell-grant-candidate" => 61,
+            "feat-innate-spell-grant-candidate" => 61,
+            "item-innate-spell-grant-candidate" => 61,
             "level-gated-spell-grant-candidate" => 61,
             "spellcasting-ability-candidate" => 60,
             "spell-list-access-candidate" => 60,
@@ -585,11 +589,21 @@ internal static partial class DataQualityReportGenerator
             "feat-multi-spell-list-entry-candidate" => 62,
             "feat-qualified-spell-list-entry-candidate" => 62,
             "item-single-spell-table-entry-candidate" => 58,
+            "item-row-single-spell-table-entry-candidate" => 58,
+            "item-list-single-spell-table-entry-candidate" => 58,
+            "item-source-qualified-single-spell-table-entry-candidate" => 58,
             "item-multi-spell-table-entry-candidate" => 58,
             "item-qualified-spell-table-entry-candidate" => 58,
             "item-spell-table-entry-candidate" => 58,
             "item-spellbook-list-candidate" => 58,
             "spell-modifier-candidate" => 58,
+            "spell-damage-modifier-candidate" => 58,
+            "spell-save-dc-modifier-candidate" => 58,
+            "spell-attack-modifier-candidate" => 58,
+            "spell-component-modifier-candidate" => 58,
+            "spell-concentration-modifier-candidate" => 58,
+            "spell-range-duration-modifier-candidate" => 58,
+            "spell-healing-modifier-candidate" => 58,
             "item-spell-stat-block-candidate" => 58,
             "spell-component-substitution-candidate" => 58,
             "spell-template-effect-candidate" => 58,
@@ -608,6 +622,11 @@ internal static partial class DataQualityReportGenerator
             "item-charge-spell-modifier-candidate" => 58,
             "item-at-will-spell-activation-candidate" => 58,
             "item-limited-spell-modifier-candidate" => 58,
+            "item-dawn-recharge-spell-activation-candidate" => 58,
+            "item-long-rest-recharge-spell-activation-candidate" => 58,
+            "item-short-long-rest-recharge-spell-activation-candidate" => 58,
+            "item-roll-recharge-spell-activation-candidate" => 58,
+            "item-once-per-day-spell-activation-candidate" => 58,
             "item-recharge-direct-spell-activation-candidate" => 58,
             "item-recharge-spell-list-activation-candidate" => 58,
             "item-recharge-spell-reference-candidate" => 46,
@@ -719,7 +738,8 @@ internal static partial class DataQualityReportGenerator
             "feat-spell-choice-candidate" => 7,
             "feat-spell-table-choice-candidate" => 8,
             "item-temporary-spell-choice-candidate" => 9,
-            "spell-modifier-choice-candidate" => 10,
+            "item-spell-choice-candidate" => 10,
+            "spell-modifier-choice-candidate" => 11,
             "ancestry-option-choice-candidate" => 11,
             "feature-option-choice-candidate" => 12,
             "ability-choice-candidate" => 13,
@@ -776,12 +796,22 @@ internal static partial class DataQualityReportGenerator
             "spell-reference-list-candidate" => 64,
             "item-spell-list-candidate" => 65,
             "item-single-spell-table-entry-candidate" => 66,
-            "item-multi-spell-table-entry-candidate" => 67,
-            "item-qualified-spell-table-entry-candidate" => 68,
-            "item-spell-table-entry-candidate" => 69,
-            "item-spellbook-list-candidate" => 70,
-            "spell-modifier-candidate" => 71,
-            "item-spell-stat-block-candidate" => 72,
+            "item-row-single-spell-table-entry-candidate" => 67,
+            "item-list-single-spell-table-entry-candidate" => 68,
+            "item-source-qualified-single-spell-table-entry-candidate" => 69,
+            "item-multi-spell-table-entry-candidate" => 70,
+            "item-qualified-spell-table-entry-candidate" => 71,
+            "item-spell-table-entry-candidate" => 72,
+            "item-spellbook-list-candidate" => 73,
+            "spell-modifier-candidate" => 74,
+            "spell-damage-modifier-candidate" => 75,
+            "spell-save-dc-modifier-candidate" => 76,
+            "spell-attack-modifier-candidate" => 77,
+            "spell-component-modifier-candidate" => 78,
+            "spell-concentration-modifier-candidate" => 79,
+            "spell-range-duration-modifier-candidate" => 80,
+            "spell-healing-modifier-candidate" => 81,
+            "item-spell-stat-block-candidate" => 82,
             "spell-component-substitution-candidate" => 73,
             "spell-template-effect-candidate" => 74,
             "spell-cancellation-effect-candidate" => 75,
@@ -798,6 +828,11 @@ internal static partial class DataQualityReportGenerator
             "item-charge-spell-preparation-candidate" => 86,
             "item-charge-spell-modifier-candidate" => 87,
             "item-at-will-spell-activation-candidate" => 88,
+            "item-dawn-recharge-spell-activation-candidate" => 89,
+            "item-long-rest-recharge-spell-activation-candidate" => 90,
+            "item-short-long-rest-recharge-spell-activation-candidate" => 91,
+            "item-roll-recharge-spell-activation-candidate" => 92,
+            "item-once-per-day-spell-activation-candidate" => 93,
             "item-recharge-direct-spell-activation-candidate" => 89,
             "item-recharge-spell-list-activation-candidate" => 90,
             "item-recharge-spell-reference-candidate" => 91,
@@ -1096,6 +1131,16 @@ internal static partial class DataQualityReportGenerator
                 "ItemTemporarySpellChoiceParser");
         }
 
+        if (IsItemCategory(category))
+        {
+            return new TextCaseInfo(
+                "item-spell-choice-candidate",
+                "candidate",
+                0.84,
+                "Text appears to require choosing one or more item-granted spells or cantrips.",
+                "ItemSpellChoiceParser");
+        }
+
         return new TextCaseInfo(
             "spell-choice-candidate",
             "candidate",
@@ -1114,6 +1159,56 @@ internal static partial class DataQualityReportGenerator
                 0.82,
                 "Text appears to limit or recharge an item-based spell modifier rather than cast a spell from the item.",
                 "ItemLimitedSpellModifierParser");
+        }
+
+        if (ItemDawnRechargeRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-dawn-recharge-spell-activation-candidate",
+                "candidate",
+                0.83,
+                "Text appears to cast spells from an item and recharge at dawn.",
+                "ItemDawnRechargeSpellActivationParser");
+        }
+
+        if (ItemShortLongRestRechargeRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-short-long-rest-recharge-spell-activation-candidate",
+                "candidate",
+                0.83,
+                "Text appears to cast spells from an item and recharge on a short or long rest.",
+                "ItemShortLongRestRechargeSpellActivationParser");
+        }
+
+        if (ItemLongRestRechargeRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-long-rest-recharge-spell-activation-candidate",
+                "candidate",
+                0.83,
+                "Text appears to cast spells from an item and recharge on a long rest.",
+                "ItemLongRestRechargeSpellActivationParser");
+        }
+
+        if (ItemRollRechargeRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-roll-recharge-spell-activation-candidate",
+                "candidate",
+                0.82,
+                "Text appears to cast spells from an item with roll-based recharge.",
+                "ItemRollRechargeSpellActivationParser");
+        }
+
+        if (ItemOncePerDaySpellActivationRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-once-per-day-spell-activation-candidate",
+                "candidate",
+                0.82,
+                "Text appears to cast spells from an item once per day.",
+                "ItemOncePerDaySpellActivationParser");
         }
 
         if (ItemRechargeSpellListActivationRegex().IsMatch(cleaned))
@@ -1174,7 +1269,7 @@ internal static partial class DataQualityReportGenerator
             "ItemSpellActivationParser");
     }
 
-    private static TextCaseInfo ClassifyItemSpellTableEntryText(string cleaned)
+    private static TextCaseInfo ClassifyItemSpellTableEntryText(string cleaned, string path)
     {
         var spellCount = SpellTagRegex().Matches(cleaned).Count;
         if (spellCount > 1)
@@ -1199,6 +1294,36 @@ internal static partial class DataQualityReportGenerator
 
         if (spellCount == 1)
         {
+            if (SpellTagWithSourceRegex().IsMatch(cleaned))
+            {
+                return new TextCaseInfo(
+                    "item-source-qualified-single-spell-table-entry-candidate",
+                    "candidate",
+                    0.82,
+                    "Text appears to be a single source-qualified spell reference in an item table cell.",
+                    "ItemSourceQualifiedSingleSpellTableEntryParser");
+            }
+
+            if (path.Contains(".rows[", StringComparison.OrdinalIgnoreCase))
+            {
+                return new TextCaseInfo(
+                    "item-row-single-spell-table-entry-candidate",
+                    "candidate",
+                    0.82,
+                    "Text appears to be a single spell reference in an item table row cell.",
+                    "ItemRowSingleSpellTableEntryParser");
+            }
+
+            if (path.Contains(".items[", StringComparison.OrdinalIgnoreCase))
+            {
+                return new TextCaseInfo(
+                    "item-list-single-spell-table-entry-candidate",
+                    "candidate",
+                    0.82,
+                    "Text appears to be a single spell reference in an item list cell.",
+                    "ItemListSingleSpellTableEntryParser");
+            }
+
             return new TextCaseInfo(
                 "item-single-spell-table-entry-candidate",
                 "candidate",
@@ -1294,6 +1419,126 @@ internal static partial class DataQualityReportGenerator
             0.86,
             "Text appears to grant a spell that can be cast once without spending a spell slot.",
             "FreeCastSpellGrantParser");
+    }
+
+    private static TextCaseInfo ClassifyInnateSpellGrantText(string category)
+    {
+        if (IsAncestryCategory(category))
+        {
+            return new TextCaseInfo(
+                "ancestry-innate-spell-grant-candidate",
+                "candidate",
+                0.84,
+                "Text appears to grant ancestry known, prepared, or castable spells outside normal class spellcasting.",
+                "AncestryInnateSpellGrantParser");
+        }
+
+        if (string.Equals(category, "feat", StringComparison.OrdinalIgnoreCase))
+        {
+            return new TextCaseInfo(
+                "feat-innate-spell-grant-candidate",
+                "candidate",
+                0.84,
+                "Text appears to grant feat known, prepared, or castable spells outside normal class spellcasting.",
+                "FeatInnateSpellGrantParser");
+        }
+
+        if (IsItemCategory(category))
+        {
+            return new TextCaseInfo(
+                "item-innate-spell-grant-candidate",
+                "candidate",
+                0.82,
+                "Text appears to grant item-based known, prepared, or castable spells outside normal class spellcasting.",
+                "ItemInnateSpellGrantParser");
+        }
+
+        return new TextCaseInfo(
+            "innate-spell-grant-candidate",
+            "candidate",
+            0.84,
+            "Text appears to grant known, prepared, or castable spells outside normal class spellcasting.",
+            "InnateSpellGrantParser");
+    }
+
+    private static TextCaseInfo ClassifySpellModifierText(string cleaned)
+    {
+        if (SpellDamageModifierRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-damage-modifier-candidate",
+                "candidate",
+                0.8,
+                "Text appears to modify spell damage or damage dice.",
+                "SpellDamageModifierParser");
+        }
+
+        if (SpellSaveDcModifierRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-save-dc-modifier-candidate",
+                "candidate",
+                0.8,
+                "Text appears to modify spell save DCs or saving throws against spells.",
+                "SpellSaveDcModifierParser");
+        }
+
+        if (SpellAttackModifierRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-attack-modifier-candidate",
+                "candidate",
+                0.8,
+                "Text appears to modify spell attacks or spell attack rolls.",
+                "SpellAttackModifierParser");
+        }
+
+        if (SpellComponentModifierRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-component-modifier-candidate",
+                "candidate",
+                0.8,
+                "Text appears to modify, replace, or waive spell components.",
+                "SpellComponentModifierParser");
+        }
+
+        if (SpellConcentrationModifierRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-concentration-modifier-candidate",
+                "candidate",
+                0.8,
+                "Text appears to modify concentration rules for a spell.",
+                "SpellConcentrationModifierParser");
+        }
+
+        if (SpellRangeDurationModifierRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-range-duration-modifier-candidate",
+                "candidate",
+                0.8,
+                "Text appears to modify spell range, area, duration, or casting time.",
+                "SpellRangeDurationModifierParser");
+        }
+
+        if (SpellHealingModifierRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "spell-healing-modifier-candidate",
+                "candidate",
+                0.78,
+                "Text appears to modify healing or hit point restoration from spells.",
+                "SpellHealingModifierParser");
+        }
+
+        return new TextCaseInfo(
+            "spell-modifier-candidate",
+            "candidate",
+            0.78,
+            "Text appears to modify spells, spell attacks, spell damage, components, or concentration.",
+            "SpellModifierTextParser");
     }
 
     private static TextCaseInfo? ClassifyProficiencyText(string text)
@@ -1833,7 +2078,7 @@ internal static partial class DataQualityReportGenerator
             "ProficiencyBonusScalingParser");
     }
 
-    private static TextCaseInfo? ClassifySpellText(string category, string text)
+    private static TextCaseInfo? ClassifySpellText(string category, string path, string text)
     {
         var cleaned = text.Trim();
         if (SpellHeadingRegex().IsMatch(cleaned))
@@ -1918,7 +2163,7 @@ internal static partial class DataQualityReportGenerator
             if (string.Equals(category, "item", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(category, "item-group", StringComparison.OrdinalIgnoreCase))
             {
-                return ClassifyItemSpellTableEntryText(cleaned);
+                return ClassifyItemSpellTableEntryText(cleaned, path);
             }
 
             return new TextCaseInfo(
@@ -2270,12 +2515,7 @@ internal static partial class DataQualityReportGenerator
 
         if (SpellModifierRegex().IsMatch(cleaned))
         {
-            return new TextCaseInfo(
-                "spell-modifier-candidate",
-                "candidate",
-                0.78,
-                "Text appears to modify spells, spell attacks, spell damage, components, or concentration.",
-                "SpellModifierTextParser");
+            return ClassifySpellModifierText(cleaned);
         }
 
         if (ItemSpellStatBlockRegex().IsMatch(cleaned))
@@ -2405,12 +2645,7 @@ internal static partial class DataQualityReportGenerator
 
         if (InnateSpellGrantRegex().IsMatch(cleaned))
         {
-            return new TextCaseInfo(
-                "innate-spell-grant-candidate",
-                "candidate",
-                0.84,
-                "Text appears to grant known, prepared, or castable spells outside normal class spellcasting.",
-                "InnateSpellGrantParser");
+            return ClassifyInnateSpellGrantText(category);
         }
 
         if (SpellAffectedObjectReferenceRegex().IsMatch(cleaned))
@@ -2552,7 +2787,8 @@ internal static partial class DataQualityReportGenerator
                 or "ancestry-spell-choice-candidate"
                 or "feat-spell-choice-candidate"
                 or "feat-spell-table-choice-candidate"
-                or "item-temporary-spell-choice-candidate" => "spell-choice",
+                or "item-temporary-spell-choice-candidate"
+                or "item-spell-choice-candidate" => "spell-choice",
             "spell-modifier-choice-candidate" => "spell-modifier-choice",
             _ => caseType
         };
@@ -2770,6 +3006,9 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"\{@spell\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellTagRegex();
 
+    [GeneratedRegex(@"\{@spell\s+[^}|]+(?:\|[^}]+)+}", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellTagWithSourceRegex();
+
     [GeneratedRegex(@"^\s*\{@spell\s+[^}]+}\s*(?:\([^)]*\)|\[[^\]]*]|-[^-]+|to the\b|only\b|if\b|when\b|as\b|save \{@dc|\{@dc|\{@hit)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ItemQualifiedSpellTableEntryRegex();
 
@@ -2814,6 +3053,27 @@ internal static partial class DataQualityReportGenerator
 
     [GeneratedRegex(@"\b(?:when you cast|whenever you cast|spell you cast|spells you cast|spell attacks?|spell attack rolls?|spell save DC|spell damage|spell components?|requires no spell components?|concentration on (?:it|a spell)|maintain .* concentration|ignore resistance|reroll .* spell|reroll .* damage dice|restore .* with a spell|triggering spell|chosen spell list|replace one of the spells|Metamagic option on a spell|spell's range increases|spell has a range|spell has a duration|double the spell's duration|spell's casting time|change the spell's casting time|damage-dealing spell|increase the level of the \{@spell|save DC of .* spell increases|effect causes you to cast a spell|effect has multiple possible subjects|effect covers an area|cast a cantrip you don't know)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellModifierRegex();
+
+    [GeneratedRegex(@"\b(?:spell damage|damage-dealing spell|damage dice|damage die|reroll .* damage|ignore resistance|takes? .* damage from your .* spell|extra damage|add .* damage|increase .* damage)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellDamageModifierRegex();
+
+    [GeneratedRegex(@"\b(?:spell save DC|save DC of .* spell|saving throws? against .* spell|spell's saving throw DC|disadvantage on .* saving throw|save DC .* spell increases)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellSaveDcModifierRegex();
+
+    [GeneratedRegex(@"\b(?:spell attacks?|spell attack rolls?|attack rolls? .* spells?|bonus to .* spell attack)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellAttackModifierRegex();
+
+    [GeneratedRegex(@"\b(?:spell components?|material components?|somatic .* components?|verbal .* components?|requires no spell components?|without .* components?|substitute for .* components?|provide .* components?)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellComponentModifierRegex();
+
+    [GeneratedRegex(@"\b(?:concentration on (?:it|a spell)|concentration .* spell|maintain .* concentration|no \{@status concentration}|doesn't require concentration|without concentration)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellConcentrationModifierRegex();
+
+    [GeneratedRegex(@"\b(?:spell's range|range increases|spell has a range|spell has a duration|double the spell's duration|spell's duration|spell's casting time|change the spell's casting time|casting time of .* spell|area of .* spell|effect covers an area)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellRangeDurationModifierRegex();
+
+    [GeneratedRegex(@"\b(?:restore .* with a spell|regain .* hit points .* spell|healing .* spell|spell restores|hit point restoration)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellHealingModifierRegex();
 
     [GeneratedRegex(@"\b(?:the spell's saving throw DC is|spell's saving throw DC|spell save DC is|save DC(?: of)?(?: is)? \d+|the Save DC is \d+).*?\b(?:attack bonus is|attack bonus of|\{@hit\s*[-+]?\d+}|spell attack)\b|\b(?:attack bonus is|attack bonus of|\{@hit\s*[-+]?\d+}).*?\b(?:spell's saving throw DC|spell save DC|saving throw DC|save DC)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ItemSpellStatBlockRegex();
@@ -2871,6 +3131,21 @@ internal static partial class DataQualityReportGenerator
 
     [GeneratedRegex(@"\bwhen you cast\b.*\bspell\b.*\b(?:modify|metamagic|treat the spell|spell slot|reroll|change|increase|extend|careful|distant|empowered|heightened|quickened|subtle)\b.*\b(?:once|can't|cannot|finish a long rest|until the next dawn)\b|\b(?:once|can't|cannot|finish a long rest|until the next dawn)\b.*\bwhen you cast\b.*\bspell\b.*\b(?:modify|metamagic|treat the spell|spell slot|reroll|change|increase|extend)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ItemLimitedSpellModifierRegex();
+
+    [GeneratedRegex(@"\b(?:until the next dawn|until dawn|daily at dawn|regains? .* at dawn|recharges? .* at dawn)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ItemDawnRechargeRegex();
+
+    [GeneratedRegex(@"\b(?:finish a short or long rest|finishes a short or long rest|short or long rest)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ItemShortLongRestRechargeRegex();
+
+    [GeneratedRegex(@"\b(?:finish a long rest|finishes a long rest|when you finish .* long rest|after you finish .* long rest|until you finish .* long rest|regain .* when .* long rest)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ItemLongRestRechargeRegex();
+
+    [GeneratedRegex(@"\b(?:roll a \{@dice|on a roll of|recharges? on|roll .* can't use|roll .* regain)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ItemRollRechargeRegex();
+
+    [GeneratedRegex(@"\b(?:once per day|1/day|one time per day|once each day)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ItemOncePerDaySpellActivationRegex();
 
     [GeneratedRegex(@"\b(?:cast|casts|used to cast|use .* to cast|can use .* to cast|property .* used|once .* cast|once .* used|cast from|cast .* from (?:it|the item|the \w+)|can cast)\b.*\{@spell\b.*\b(?:can't|cannot|can not|must finish|until the next dawn|until dawn|finish a short or long rest|finish a long rest|regains? all expended uses?|regains? .* at dawn)\b|\b(?:can't|cannot|can not|must finish|until the next dawn|until dawn|finish a short or long rest|finish a long rest)\b.*\b(?:cast|casts|used to cast|use .* to cast|can cast)\b.*\{@spell\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ItemRechargeDirectSpellActivationRegex();
