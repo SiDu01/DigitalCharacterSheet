@@ -40,6 +40,8 @@ Tools\SeedDatabaseBuilder\reports\unhandled-cases.md
 
 `unhandled-cases.json` should be machine-readable so future tooling and tests can consume it. `unhandled-cases.md` should be human-readable so parser gaps can be reviewed and prioritized.
 
+The detailed generator workflow is documented in `docs\DATA_QUALITY_REPORT_GENERATOR.md`.
+
 Cases should be classified as `error`, `warning`, `unhandled`, `candidate`, or `wiki-only`. The goal is to turn real source-data gaps into a step-by-step parser backlog.
 
 Examples of cases worth reporting:

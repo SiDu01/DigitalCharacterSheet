@@ -56,6 +56,7 @@ Related documentation:
 
 - `docs\ARCHITECTURE.md`
 - `docs\DATA_AND_RULES.md`
+- `docs\DATA_QUALITY_REPORT_GENERATOR.md`
 - `docs\DEVELOPMENT.md`
 - `docs\RESTART_ARCHITECTURE_NOTES.md`
 
@@ -85,6 +86,12 @@ Seed database builder:
 dotnet run --project Tools\SeedDatabaseBuilder\SeedDatabaseBuilder.csproj
 ```
 
+Data quality reports only:
+
+```powershell
+dotnet run --project Tools\SeedDatabaseBuilder\SeedDatabaseBuilder.csproj -- --reports-only --source "D:\Dev\Digital Character Sheet\external Resources\5e Tools\data"
+```
+
 The Android build usually shows a known warning about `AndroidFastDeploymentType`. This has not been treated as a blocker.
 
 ## Runtime Data
@@ -96,6 +103,22 @@ The seed database is created by `Tools\SeedDatabaseBuilder`. The builder asks fo
 Important principle:
 
 - If importer logic, schema, or source JSON mappings change, regenerate the seed database before expecting the app to reflect those changes.
+
+## Data Quality Reports
+
+`Tools\SeedDatabaseBuilder\DataQualityReportGenerator.cs` scans raw 5e Tools JSON and writes a parser backlog for unsupported or suspicious data shapes. It does not modify the seed database or app data.
+
+Outputs:
+
+- `Tools\SeedDatabaseBuilder\reports\data-quality-report.md`
+- `Tools\SeedDatabaseBuilder\reports\unhandled-cases.json`
+- `Tools\SeedDatabaseBuilder\reports\unhandled-cases.md`
+
+The generator currently scans races/race versions, backgrounds, feats, items/item groups/base items, classes, and subclasses. It reports shape problems such as missing names, missing parent links, duplicate source versions, unknown entry types, and text-derived candidates for choices, abilities, proficiencies, defenses, spell rules, spell lists, spell grants, spell modifiers, and item spell activations.
+
+Recent report work split broad spell candidates into more actionable buckets, including item spell table cells, item recharge spell activation timing, spell modifier types, innate spell grants by category, and item spell choices.
+
+Full generator documentation is in `docs\DATA_QUALITY_REPORT_GENERATOR.md`.
 
 ## Data Model Overview
 
@@ -242,6 +265,7 @@ Settings uses tabs. Theme switching exists between the default theme and the lea
 - Repository structure was flattened so the MAUI project now lives at `D:\Dev\Digital Character Sheet`.
 - Character Edit was rebuilt into a free-form edit center with section navigation, an overview, reference pane, class cards, and direct subclass editing.
 - Developer documentation was added under `docs\`.
+- `docs\DATA_QUALITY_REPORT_GENERATOR.md` was added for the seed builder report/backlog pipeline.
 - A read-only Library/Wiki was added for Conditions, Rules, Feats, Races, and Classes.
 - Library categories were separated into their own areas instead of one combined list.
 - Subclasses and race versions were moved into their parent detail views as activatable badges.
@@ -249,12 +273,14 @@ Settings uses tabs. Theme switching exists between the default theme and the lea
 - Class feature detail in the Library is split by level and active subclass features are merged into the relevant class levels.
 - Library bookmarks and recently viewed entries are tracked for the Dashboard only.
 - The Dashboard Settings tile was removed.
+- Data quality reports now provide more specific parser candidates for spell choices, spell table entries, innate spell grants, spell modifiers, and item spell activation/recharge patterns.
 
 ## Known Issues / Watchlist
 
 - Character Create and Character Edit intentionally have different UX. Shared rule behavior should stay aligned, but Edit should remain a broader maintenance surface.
 - `Apply granted feats` is currently one broad toggle, not per-source/per-feat persistence.
 - Effect parsing from natural-language feature text is incomplete.
+- Data quality reports identify many remaining parser candidates; these are backlog signals, not app behavior changes by themselves.
 - Some class/subclass/race/background/feat effects may still not map to dynamic effects.
 - Item effects should be further unified with the broader GrantedEffects/effect-calculation system.
 - Some level-up choices may still need better rule-specific handling.
@@ -290,6 +316,7 @@ Before handing work back after meaningful changes:
 3. Continue hardening Level-Up choice detection and rule application.
 4. Unify item effects with the dynamic character effect system.
 5. Expand parser/mapper coverage for class, subclass, race, background, feat, and item descriptions.
-6. Add clearer UI indicators for inferred/mapped effects and whether they are user-adjusted.
-7. Polish Combat tab information density and action detail behavior.
-8. Keep Android tablet install tests as part of larger changes.
+6. Use `data-quality-report.md` and `unhandled-cases.json` to choose the next parser candidates by volume, confidence, and app impact.
+7. Add clearer UI indicators for inferred/mapped effects and whether they are user-adjusted.
+8. Polish Combat tab information density and action detail behavior.
+9. Keep Android tablet install tests as part of larger changes.
