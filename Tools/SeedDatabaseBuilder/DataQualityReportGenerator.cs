@@ -566,6 +566,9 @@ internal static partial class DataQualityReportGenerator
             "condition-immunity-candidate" => 63,
             "damage-vulnerability-candidate" => 63,
             "background-spell-list-candidate" => 62,
+            "background-single-spell-list-entry-candidate" => 62,
+            "background-multi-spell-list-entry-candidate" => 62,
+            "background-qualified-spell-list-entry-candidate" => 62,
             "innate-spell-grant-candidate" => 61,
             "level-gated-spell-grant-candidate" => 61,
             "spellcasting-ability-candidate" => 60,
@@ -574,7 +577,16 @@ internal static partial class DataQualityReportGenerator
             "spell-reference-list-candidate" => 58,
             "item-spell-list-candidate" => 58,
             "ancestry-spell-list-candidate" => 62,
+            "ancestry-single-spell-list-entry-candidate" => 62,
+            "ancestry-multi-spell-list-entry-candidate" => 62,
+            "ancestry-qualified-spell-list-entry-candidate" => 62,
             "feat-spell-list-candidate" => 62,
+            "feat-single-spell-list-entry-candidate" => 62,
+            "feat-multi-spell-list-entry-candidate" => 62,
+            "feat-qualified-spell-list-entry-candidate" => 62,
+            "item-single-spell-table-entry-candidate" => 58,
+            "item-multi-spell-table-entry-candidate" => 58,
+            "item-qualified-spell-table-entry-candidate" => 58,
             "item-spell-table-entry-candidate" => 58,
             "item-spellbook-list-candidate" => 58,
             "spell-modifier-candidate" => 58,
@@ -595,6 +607,7 @@ internal static partial class DataQualityReportGenerator
             "item-charge-spell-preparation-candidate" => 58,
             "item-charge-spell-modifier-candidate" => 58,
             "item-at-will-spell-activation-candidate" => 58,
+            "item-limited-spell-modifier-candidate" => 58,
             "item-recharge-direct-spell-activation-candidate" => 58,
             "item-recharge-spell-list-activation-candidate" => 58,
             "item-recharge-spell-reference-candidate" => 46,
@@ -611,8 +624,12 @@ internal static partial class DataQualityReportGenerator
             "item-charge-spell-activation-candidate" => 58,
             "item-action-spell-activation-candidate" => 58,
             "item-passive-spell-access-candidate" => 58,
+            "item-spell-activation-reference-candidate" => 46,
             "item-ritual-spell-activation-candidate" => 58,
             "item-temporary-spell-grant-candidate" => 58,
+            "ancestry-free-cast-spell-grant-candidate" => 58,
+            "feat-free-cast-spell-grant-candidate" => 58,
+            "item-free-cast-spell-grant-candidate" => 58,
             "free-cast-spell-grant-candidate" => 58,
             "spell-slot-expenditure-effect-candidate" => 58,
             "spell-combat-interaction-candidate" => 58,
@@ -758,78 +775,84 @@ internal static partial class DataQualityReportGenerator
             "feat-spell-list-candidate" => 63,
             "spell-reference-list-candidate" => 64,
             "item-spell-list-candidate" => 65,
-            "item-spell-table-entry-candidate" => 66,
-            "item-spellbook-list-candidate" => 67,
-            "spell-modifier-candidate" => 68,
-            "item-spell-stat-block-candidate" => 69,
-            "spell-component-substitution-candidate" => 70,
-            "spell-template-effect-candidate" => 71,
-            "spell-cancellation-effect-candidate" => 72,
-            "spell-storage-effect-candidate" => 73,
-            "item-autonomous-spell-effect-candidate" => 74,
-            "spell-detection-reference-candidate" => 75,
-            "spell-recharge-rule-candidate" => 76,
-            "spell-consumable-use-candidate" => 77,
-            "item-group-member-reference" => 78,
-            "spellbook-level-list-candidate" => 79,
-            "item-random-spell-effect-candidate" => 80,
-            "spell-sensor-effect-candidate" => 81,
-            "item-spellcasting-bonus-candidate" => 82,
-            "item-charge-spell-preparation-candidate" => 83,
-            "item-charge-spell-modifier-candidate" => 84,
-            "item-at-will-spell-activation-candidate" => 85,
-            "item-recharge-direct-spell-activation-candidate" => 86,
-            "item-recharge-spell-list-activation-candidate" => 87,
-            "item-recharge-spell-reference-candidate" => 88,
-            "item-recharge-spell-activation-candidate" => 89,
-            "item-stored-spell-activation-candidate" => 90,
-            "item-spell-effect-activation-candidate" => 91,
-            "item-granted-limited-spell-uses-candidate" => 92,
-            "item-action-spell-list-activation-candidate" => 93,
-            "item-action-direct-spell-activation-candidate" => 94,
-            "item-passive-direct-spell-access-candidate" => 95,
-            "item-charge-spell-list-activation-candidate" => 96,
-            "item-charge-direct-spell-activation-candidate" => 97,
-            "item-triggered-charge-spell-effect-candidate" => 98,
-            "item-charge-spell-activation-candidate" => 99,
-            "item-action-spell-activation-candidate" => 100,
-            "item-passive-spell-access-candidate" => 101,
-            "item-ritual-spell-activation-candidate" => 102,
-            "item-temporary-spell-grant-candidate" => 103,
-            "free-cast-spell-grant-candidate" => 104,
-            "spell-slot-expenditure-effect-candidate" => 105,
-            "spell-combat-interaction-candidate" => 106,
-            "spellcasting-focus-candidate" => 107,
-            "spell-slot-table-candidate" => 108,
-            "spell-slot-rule-candidate" => 109,
-            "spellbook-candidate" => 110,
-            "item-spell-activation-candidate" => 111,
-            "proficiency-limited-damage-candidate" => 112,
-            "proficiency-limited-save-effect-candidate" => 113,
-            "proficiency-uses-scaling-candidate" => 114,
-            "proficiency-dc-scaling-candidate" => 115,
-            "proficiency-damage-scaling-candidate" => 116,
-            "proficiency-healing-scaling-candidate" => 117,
-            "proficiency-movement-scaling-candidate" => 118,
-            "proficiency-roll-scaling-candidate" => 119,
-            "spell-removal-reference-candidate" => 120,
-            "spell-healing-interaction-candidate" => 121,
-            "spell-save-defense-candidate" => 122,
-            "spell-triggered-movement-candidate" => 123,
-            "magical-adhesion-effect-candidate" => 124,
-            "soul-magic-effect-candidate" => 125,
-            "statblock-replacement-effect-candidate" => 126,
-            "curse-attunement-effect-candidate" => 127,
-            "magical-item-effect-candidate" => 128,
-            "spell-affected-object-reference" => 129,
-            "spell-effect-reference-candidate" => 130,
-            "spell-rule-candidate" => 131,
-            "no-subclass-grant-levels" => 132,
-            "foundry-overlay-duplicate" => 133,
-            "duplicate-source-version" => 134,
-            "defense-flavor-reference" => 135,
-            "expertise-flavor-reference" => 136,
-            "spell-flavor-reference" => 137,
+            "item-single-spell-table-entry-candidate" => 66,
+            "item-multi-spell-table-entry-candidate" => 67,
+            "item-qualified-spell-table-entry-candidate" => 68,
+            "item-spell-table-entry-candidate" => 69,
+            "item-spellbook-list-candidate" => 70,
+            "spell-modifier-candidate" => 71,
+            "item-spell-stat-block-candidate" => 72,
+            "spell-component-substitution-candidate" => 73,
+            "spell-template-effect-candidate" => 74,
+            "spell-cancellation-effect-candidate" => 75,
+            "spell-storage-effect-candidate" => 76,
+            "item-autonomous-spell-effect-candidate" => 77,
+            "spell-detection-reference-candidate" => 78,
+            "spell-recharge-rule-candidate" => 79,
+            "spell-consumable-use-candidate" => 80,
+            "item-group-member-reference" => 81,
+            "spellbook-level-list-candidate" => 82,
+            "item-random-spell-effect-candidate" => 83,
+            "spell-sensor-effect-candidate" => 84,
+            "item-spellcasting-bonus-candidate" => 85,
+            "item-charge-spell-preparation-candidate" => 86,
+            "item-charge-spell-modifier-candidate" => 87,
+            "item-at-will-spell-activation-candidate" => 88,
+            "item-recharge-direct-spell-activation-candidate" => 89,
+            "item-recharge-spell-list-activation-candidate" => 90,
+            "item-recharge-spell-reference-candidate" => 91,
+            "item-recharge-spell-activation-candidate" => 92,
+            "item-stored-spell-activation-candidate" => 93,
+            "item-spell-effect-activation-candidate" => 94,
+            "item-granted-limited-spell-uses-candidate" => 95,
+            "item-action-spell-list-activation-candidate" => 96,
+            "item-action-direct-spell-activation-candidate" => 97,
+            "item-passive-direct-spell-access-candidate" => 98,
+            "item-charge-spell-list-activation-candidate" => 99,
+            "item-charge-direct-spell-activation-candidate" => 100,
+            "item-triggered-charge-spell-effect-candidate" => 101,
+            "item-charge-spell-activation-candidate" => 102,
+            "item-action-spell-activation-candidate" => 103,
+            "item-passive-spell-access-candidate" => 104,
+            "item-ritual-spell-activation-candidate" => 105,
+            "item-temporary-spell-grant-candidate" => 106,
+            "ancestry-free-cast-spell-grant-candidate" => 107,
+            "feat-free-cast-spell-grant-candidate" => 108,
+            "item-free-cast-spell-grant-candidate" => 109,
+            "free-cast-spell-grant-candidate" => 110,
+            "spell-slot-expenditure-effect-candidate" => 111,
+            "spell-combat-interaction-candidate" => 112,
+            "spellcasting-focus-candidate" => 113,
+            "spell-slot-table-candidate" => 114,
+            "spell-slot-rule-candidate" => 115,
+            "spellbook-candidate" => 116,
+            "item-spell-activation-candidate" => 117,
+            "proficiency-limited-damage-candidate" => 118,
+            "proficiency-limited-save-effect-candidate" => 119,
+            "proficiency-uses-scaling-candidate" => 120,
+            "proficiency-dc-scaling-candidate" => 121,
+            "proficiency-damage-scaling-candidate" => 122,
+            "proficiency-healing-scaling-candidate" => 123,
+            "proficiency-movement-scaling-candidate" => 124,
+            "proficiency-roll-scaling-candidate" => 125,
+            "spell-removal-reference-candidate" => 126,
+            "spell-healing-interaction-candidate" => 127,
+            "spell-save-defense-candidate" => 128,
+            "spell-triggered-movement-candidate" => 129,
+            "magical-adhesion-effect-candidate" => 130,
+            "soul-magic-effect-candidate" => 131,
+            "statblock-replacement-effect-candidate" => 132,
+            "curse-attunement-effect-candidate" => 133,
+            "magical-item-effect-candidate" => 134,
+            "spell-affected-object-reference" => 135,
+            "spell-effect-reference-candidate" => 136,
+            "spell-rule-candidate" => 137,
+            "no-subclass-grant-levels" => 138,
+            "foundry-overlay-duplicate" => 139,
+            "duplicate-source-version" => 140,
+            "defense-flavor-reference" => 141,
+            "expertise-flavor-reference" => 142,
+            "spell-flavor-reference" => 143,
             _ => 60
         };
     }
@@ -1083,6 +1106,16 @@ internal static partial class DataQualityReportGenerator
 
     private static TextCaseInfo ClassifyItemRechargeSpellActivationText(string cleaned)
     {
+        if (ItemLimitedSpellModifierRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-limited-spell-modifier-candidate",
+                "candidate",
+                0.82,
+                "Text appears to limit or recharge an item-based spell modifier rather than cast a spell from the item.",
+                "ItemLimitedSpellModifierParser");
+        }
+
         if (ItemRechargeSpellListActivationRegex().IsMatch(cleaned))
         {
             return new TextCaseInfo(
@@ -1119,6 +1152,148 @@ internal static partial class DataQualityReportGenerator
             0.82,
             "Text appears to cast a spell from an item with a rest, dawn, or other recharge limit.",
             "ItemRechargeSpellActivationParser");
+    }
+
+    private static TextCaseInfo ClassifyItemSpellActivationText(string cleaned)
+    {
+        if (ItemSpellActivationReferenceRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-spell-activation-reference-candidate",
+                "candidate",
+                0.72,
+                "Text references spells or spell effects near item rules but does not directly grant item spellcasting.",
+                "ItemSpellActivationReferenceParser");
+        }
+
+        return new TextCaseInfo(
+            "item-spell-activation-candidate",
+            "candidate",
+            0.8,
+            "Text appears to describe spellcasting through an item activation or charge effect.",
+            "ItemSpellActivationParser");
+    }
+
+    private static TextCaseInfo ClassifyItemSpellTableEntryText(string cleaned)
+    {
+        var spellCount = SpellTagRegex().Matches(cleaned).Count;
+        if (spellCount > 1)
+        {
+            return new TextCaseInfo(
+                "item-multi-spell-table-entry-candidate",
+                "candidate",
+                0.82,
+                "Text appears to be an item table cell that references multiple spells.",
+                "ItemMultiSpellTableEntryParser");
+        }
+
+        if (spellCount == 1 && ItemQualifiedSpellTableEntryRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                "item-qualified-spell-table-entry-candidate",
+                "candidate",
+                0.82,
+                "Text appears to be an item spell table entry with a qualifier, restriction, or note.",
+                "ItemQualifiedSpellTableEntryParser");
+        }
+
+        if (spellCount == 1)
+        {
+            return new TextCaseInfo(
+                "item-single-spell-table-entry-candidate",
+                "candidate",
+                0.82,
+                "Text appears to be a single spell reference in an item table cell.",
+                "ItemSingleSpellTableEntryParser");
+        }
+
+        return new TextCaseInfo(
+            "item-spell-table-entry-candidate",
+            "candidate",
+            0.8,
+            "Text appears to be a single item spell table entry or embedded item spell reference.",
+            "ItemSpellTableEntryParser");
+    }
+
+    private static TextCaseInfo ClassifySpellListEntryText(string cleaned, string prefix, string parserPrefix, string description)
+    {
+        var spellCount = SpellTagRegex().Matches(cleaned).Count;
+        if (spellCount > 1)
+        {
+            return new TextCaseInfo(
+                $"{prefix}-multi-spell-list-entry-candidate",
+                "candidate",
+                0.84,
+                $"Text appears to be a {description} with multiple spells.",
+                $"{parserPrefix}MultiSpellListEntryParser");
+        }
+
+        if (spellCount == 1 && ItemQualifiedSpellTableEntryRegex().IsMatch(cleaned))
+        {
+            return new TextCaseInfo(
+                $"{prefix}-qualified-spell-list-entry-candidate",
+                "candidate",
+                0.84,
+                $"Text appears to be a {description} with a qualifier, restriction, or note.",
+                $"{parserPrefix}QualifiedSpellListEntryParser");
+        }
+
+        if (spellCount == 1)
+        {
+            return new TextCaseInfo(
+                $"{prefix}-single-spell-list-entry-candidate",
+                "candidate",
+                0.84,
+                $"Text appears to be a single-spell {description}.",
+                $"{parserPrefix}SingleSpellListEntryParser");
+        }
+
+        return new TextCaseInfo(
+            $"{prefix}-spell-list-candidate",
+            "candidate",
+            0.84,
+            $"Text appears to be a {description}.",
+            $"{parserPrefix}SpellListParser");
+    }
+
+    private static TextCaseInfo ClassifyFreeCastSpellGrantText(string category)
+    {
+        if (IsAncestryCategory(category))
+        {
+            return new TextCaseInfo(
+                "ancestry-free-cast-spell-grant-candidate",
+                "candidate",
+                0.86,
+                "Text appears to grant ancestry spellcasting that can be used without spending a spell slot.",
+                "AncestryFreeCastSpellGrantParser");
+        }
+
+        if (string.Equals(category, "feat", StringComparison.OrdinalIgnoreCase))
+        {
+            return new TextCaseInfo(
+                "feat-free-cast-spell-grant-candidate",
+                "candidate",
+                0.86,
+                "Text appears to grant feat spellcasting that can be used without spending a spell slot.",
+                "FeatFreeCastSpellGrantParser");
+        }
+
+        if (IsItemCategory(category))
+        {
+            return new TextCaseInfo(
+                "item-free-cast-spell-grant-candidate",
+                "candidate",
+                0.84,
+                "Text appears to grant item spellcasting that can be used without spending a spell slot.",
+                "ItemFreeCastSpellGrantParser");
+        }
+
+        return new TextCaseInfo(
+            "free-cast-spell-grant-candidate",
+            "candidate",
+            0.86,
+            "Text appears to grant a spell that can be cast once without spending a spell slot.",
+            "FreeCastSpellGrantParser");
     }
 
     private static TextCaseInfo? ClassifyProficiencyText(string text)
@@ -1715,43 +1890,35 @@ internal static partial class DataQualityReportGenerator
         {
             if (string.Equals(category, "background", StringComparison.OrdinalIgnoreCase))
             {
-                return new TextCaseInfo(
-                    "background-spell-list-candidate",
-                    "candidate",
-                    0.86,
-                    "Text appears to be a background spell-list table entry.",
-                    "BackgroundSpellListParser");
+                return ClassifySpellListEntryText(
+                    cleaned,
+                    "background",
+                    "Background",
+                    "background spell-list table entry");
             }
 
             if (IsAncestryCategory(category))
             {
-                return new TextCaseInfo(
-                    "ancestry-spell-list-candidate",
-                    "candidate",
-                    0.84,
-                    "Text appears to be an ancestry or race-version spell-list table entry.",
-                    "AncestrySpellListParser");
+                return ClassifySpellListEntryText(
+                    cleaned,
+                    "ancestry",
+                    "Ancestry",
+                    "ancestry or race-version spell-list table entry");
             }
 
             if (string.Equals(category, "feat", StringComparison.OrdinalIgnoreCase))
             {
-                return new TextCaseInfo(
-                    "feat-spell-list-candidate",
-                    "candidate",
-                    0.84,
-                    "Text appears to be a feat spell-list table entry.",
-                    "FeatSpellListParser");
+                return ClassifySpellListEntryText(
+                    cleaned,
+                    "feat",
+                    "Feat",
+                    "feat spell-list table entry");
             }
 
             if (string.Equals(category, "item", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(category, "item-group", StringComparison.OrdinalIgnoreCase))
             {
-                return new TextCaseInfo(
-                    "item-spell-table-entry-candidate",
-                    "candidate",
-                    0.8,
-                    "Text appears to be a single item spell table entry or embedded item spell reference.",
-                    "ItemSpellTableEntryParser");
+                return ClassifyItemSpellTableEntryText(cleaned);
             }
 
             return new TextCaseInfo(
@@ -1969,12 +2136,7 @@ internal static partial class DataQualityReportGenerator
 
         if (FreeCastSpellGrantRegex().IsMatch(cleaned))
         {
-            return new TextCaseInfo(
-                "free-cast-spell-grant-candidate",
-                "candidate",
-                0.86,
-                "Text appears to grant a spell that can be cast once without spending a spell slot.",
-                "FreeCastSpellGrantParser");
+            return ClassifyFreeCastSpellGrantText(category);
         }
 
         if (SpellSlotExpenditureEffectRegex().IsMatch(cleaned))
@@ -2093,12 +2255,7 @@ internal static partial class DataQualityReportGenerator
                 || string.Equals(category, "item-group", StringComparison.OrdinalIgnoreCase))
             && ItemSpellActivationRegex().IsMatch(cleaned))
         {
-            return new TextCaseInfo(
-                "item-spell-activation-candidate",
-                "candidate",
-                0.8,
-                "Text appears to describe spellcasting through an item activation or charge effect.",
-                "ItemSpellActivationParser");
+            return ClassifyItemSpellActivationText(cleaned);
         }
 
         if (LevelGatedSpellGrantRegex().IsMatch(cleaned))
@@ -2610,6 +2767,12 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"^\s*(?:\{@spell\s+[^}]+}\s*(?:\([^)]*\))?\s*(?:,|and|or)?\s*)+$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SpellReferenceListRegex();
 
+    [GeneratedRegex(@"\{@spell\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SpellTagRegex();
+
+    [GeneratedRegex(@"^\s*\{@spell\s+[^}]+}\s*(?:\([^)]*\)|\[[^\]]*]|-[^-]+|to the\b|only\b|if\b|when\b|as\b|save \{@dc|\{@dc|\{@hit)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ItemQualifiedSpellTableEntryRegex();
+
     [GeneratedRegex(@"\b(?:following spells|following spell|can be used to cast the following spells|can cast the following spells|spells:)\b.*\{@spell\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ItemSpellListSentenceRegex();
 
@@ -2706,6 +2869,9 @@ internal static partial class DataQualityReportGenerator
     [GeneratedRegex(@"\b(?:cast|casts|used to cast|use .* to cast|property .* used|once .* cast|once .* used)\b.*\b(?:spell|cantrip|{@spell)\b.*\b(?:can't|cannot|can not|must finish|until the next dawn|until dawn|finish a short or long rest|finish a long rest|30 days|regains? all expended uses?)\b|\b(?:can't|cannot|can not|must finish|until the next dawn|until dawn|finish a short or long rest|finish a long rest|30 days)\b.*\b(?:cast|casts|used to cast|spell|cantrip|{@spell)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ItemRechargeSpellActivationRegex();
 
+    [GeneratedRegex(@"\bwhen you cast\b.*\bspell\b.*\b(?:modify|metamagic|treat the spell|spell slot|reroll|change|increase|extend|careful|distant|empowered|heightened|quickened|subtle)\b.*\b(?:once|can't|cannot|finish a long rest|until the next dawn)\b|\b(?:once|can't|cannot|finish a long rest|until the next dawn)\b.*\bwhen you cast\b.*\bspell\b.*\b(?:modify|metamagic|treat the spell|spell slot|reroll|change|increase|extend)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ItemLimitedSpellModifierRegex();
+
     [GeneratedRegex(@"\b(?:cast|casts|used to cast|use .* to cast|can use .* to cast|property .* used|once .* cast|once .* used|cast from|cast .* from (?:it|the item|the \w+)|can cast)\b.*\{@spell\b.*\b(?:can't|cannot|can not|must finish|until the next dawn|until dawn|finish a short or long rest|finish a long rest|regains? all expended uses?|regains? .* at dawn)\b|\b(?:can't|cannot|can not|must finish|until the next dawn|until dawn|finish a short or long rest|finish a long rest)\b.*\b(?:cast|casts|used to cast|use .* to cast|can cast)\b.*\{@spell\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ItemRechargeDirectSpellActivationRegex();
 
@@ -2729,6 +2895,9 @@ internal static partial class DataQualityReportGenerator
 
     [GeneratedRegex(@"\b(?:charges?|charge)\b.*\b(?:one of the following spells|following spells|spell on .* table|spells? table|associated spell|following table|table indicates)\b|\b(?:one of the following spells|following spells|spell on .* table|spells? table|associated spell|following table|table indicates)\b.*\b(?:charges?|charge)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ItemChargeSpellListActivationRegex();
+
+    [GeneratedRegex(@"\b(?:provides no defense against|immunity to damage from|such as \{@spell|as \{@spell|targeted by|affected by|breath(?:e|ing).*environment|harmful gases|vapors|spell effects? can't|spell or magical effect|spellcasting magic|obsessed with)\b.*\b(?:spell|{@spell)\b|\b(?:spell|{@spell)\b.*\b(?:provides no defense against|immunity to damage from|targeted by|affected by|harmful gases|vapors|spell effects? can't|spell or magical effect|obsessed with)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ItemSpellActivationReferenceRegex();
 
     [GeneratedRegex(@"\b(?:as (?:an? |a bonus )?action|bonus action|\{@action Magic\|XPHB} action|Magic action|while (?:wearing|holding|playing|bearing|attuned to)[^,.]*)\b.*\b(?:expend|spend)\s+(?:\d+|one|a|an|some|the number of|one or more)(?:\s+or more)?(?:\s+of (?:its|the \w+'s|the item's|the staff's|the orb's))?\s+charges?\b.*\b(?:cast|casts|{@spell)\b|\b(?:expend|spend)\s+(?:\d+|one|a|an|some|the number of|one or more)(?:\s+or more)?(?:\s+of (?:its|the \w+'s|the item's|the staff's|the orb's))?\s+charges?\b.*\b(?:as (?:an? |a bonus )?action|bonus action|\{@action Magic\|XPHB} action|Magic action|cast|casts|{@spell)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ItemChargeDirectSpellActivationRegex();
